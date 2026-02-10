@@ -1,0 +1,32 @@
+# Build artifacts
+Builds/MacOSX/build/
+Builds/MacOSX/DerivedData/
+Builds/MacOSX/*.xcuserstate
+Builds/MacOSX/xcuserdata/
+Builds/MacOSX/Elements.xcodeproj/xcuserdata/
+Builds/MacOSX/Elements.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Object files
+*.o
+*.obj
+*.exe
+*.app
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# IDE
+*.user
+.vscode/
+.idea/
+
+# Large assets (EXR not needed, HDR is used)
+*.exr
+
+# JUCE auto-generated (can be regenerated from .jucer)
+# JuceLibraryCode/
+
+# Claude
+.claude/
