@@ -2189,7 +2189,21 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     resonanceAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "filterResonance", filterResonanceSlider);
     filterTypeAttachment = std::make_unique<ComboBoxAttachment>(audioProcessor.apvts, "filterType", filterTypeCombo);
 
-    setupLabel(envelopeLabel, "ENVELOPE", 13.0f, true);
+    // Filter Envelope
+    setupLabel(filterEnvLabel, "FILTER ENV", 13.0f, true);
+    setupLabel(fAttackLabel, "A", 10.0f);
+    setupLabel(fDecayLabel, "D", 10.0f);
+    setupLabel(fSustainLabel, "S", 10.0f);
+    setupLabel(fReleaseLabel, "R", 10.0f);
+    setupRotarySlider(filterAttackSlider, 0.001, 2, 0.01);
+    setupRotarySlider(filterDecaySlider, 0.001, 2, 0.3);
+    setupRotarySlider(filterSustainSlider, 0, 1, 0.0);
+    setupRotarySlider(filterReleaseSlider, 0.001, 2, 0.3);
+    setupLabel(filterEnvAmountLabel, "Amt", 10.0f);
+    setupRotarySlider(filterEnvAmountSlider, 0.0, 1.0, 0.0);
+
+    // Amplitude Envelope
+    setupLabel(envelopeLabel, "AMP ENV", 13.0f, true);
     setupLabel(attackLabel, "A", 10.0f);
     setupLabel(decayLabel, "D", 10.0f);
     setupLabel(sustainLabel, "S", 10.0f);
@@ -2351,30 +2365,54 @@ void ElementsAudioProcessorEditor::resized()
     rightCol.removeFromTop(5);
     filterTypeCombo.setBounds(rightCol.removeFromTop(24).reduced(10, 0));
 
-    rightCol.removeFromTop(10);
-    envelopeLabel.setBounds(rightCol.removeFromTop(20));
-    rightCol.removeFromTop(5);
-    auto envRow = rightCol.removeFromTop(50);
+    // Filter Envelope
+    rightCol.removeFromTop(8);
+    filterEnvLabel.setBounds(rightCol.removeFromTop(18));
+    rightCol.removeFromTop(3);
+    auto fEnvRow = rightCol.removeFromTop(40);
+    int fEnvKnobW = fEnvRow.getWidth() / 4;
+    auto fEnvA = fEnvRow.removeFromLeft(fEnvKnobW);
+    auto fEnvD = fEnvRow.removeFromLeft(fEnvKnobW);
+    auto fEnvS = fEnvRow.removeFromLeft(fEnvKnobW);
+    auto fEnvR = fEnvRow;
+    fAttackLabel.setBounds(fEnvA.removeFromTop(12));
+    filterAttackSlider.setBounds(fEnvA);
+    fDecayLabel.setBounds(fEnvD.removeFromTop(12));
+    filterDecaySlider.setBounds(fEnvD);
+    fSustainLabel.setBounds(fEnvS.removeFromTop(12));
+    filterSustainSlider.setBounds(fEnvS);
+    fReleaseLabel.setBounds(fEnvR.removeFromTop(12));
+    filterReleaseSlider.setBounds(fEnvR);
+    rightCol.removeFromTop(2);
+    auto amtRow = rightCol.removeFromTop(36);
+    filterEnvAmountLabel.setBounds(amtRow.removeFromLeft(30).withTrimmedTop(8));
+    filterEnvAmountSlider.setBounds(amtRow.reduced(20, 0));
+
+    // Amplitude Envelope
+    rightCol.removeFromTop(8);
+    envelopeLabel.setBounds(rightCol.removeFromTop(18));
+    rightCol.removeFromTop(3);
+    auto envRow = rightCol.removeFromTop(40);
     int envKnobW = envRow.getWidth() / 4;
     auto envA = envRow.removeFromLeft(envKnobW);
     auto envD = envRow.removeFromLeft(envKnobW);
     auto envS = envRow.removeFromLeft(envKnobW);
     auto envR = envRow;
-    attackLabel.setBounds(envA.removeFromTop(14));
+    attackLabel.setBounds(envA.removeFromTop(12));
     attackSlider.setBounds(envA);
-    decayLabel.setBounds(envD.removeFromTop(14));
+    decayLabel.setBounds(envD.removeFromTop(12));
     decaySlider.setBounds(envD);
-    sustainLabel.setBounds(envS.removeFromTop(14));
+    sustainLabel.setBounds(envS.removeFromTop(12));
     sustainSlider.setBounds(envS);
-    releaseLabel.setBounds(envR.removeFromTop(14));
+    releaseLabel.setBounds(envR.removeFromTop(12));
     releaseSlider.setBounds(envR);
 
-    rightCol.removeFromTop(5);
-    adsrDisplay.setBounds(rightCol.removeFromTop(60));
-    rightCol.removeFromTop(5);
-    volumeLabel.setBounds(rightCol.removeFromTop(20));
-    rightCol.removeFromTop(5);
-    volumeSlider.setBounds(rightCol.removeFromTop(50).reduced(30, 0));
+    rightCol.removeFromTop(3);
+    adsrDisplay.setBounds(rightCol.removeFromTop(50));
+    rightCol.removeFromTop(3);
+    volumeLabel.setBounds(rightCol.removeFromTop(18));
+    rightCol.removeFromTop(3);
+    volumeSlider.setBounds(rightCol.removeFromTop(40).reduced(30, 0));
 
     // === CENTER COLUMN: Viewport + Piano ===
     auto centerCol = bounds.reduced(padding);
@@ -2398,6 +2436,16 @@ void ElementsAudioProcessorEditor::sliderValueChanged(juce::Slider* slider)
         audioProcessor.setSustain(static_cast<float>(slider->getValue()));
     else if (slider == &releaseSlider)
         audioProcessor.setRelease(static_cast<float>(slider->getValue()));
+    else if (slider == &filterAttackSlider)
+        audioProcessor.setFilterAttack(static_cast<float>(slider->getValue()));
+    else if (slider == &filterDecaySlider)
+        audioProcessor.setFilterDecay(static_cast<float>(slider->getValue()));
+    else if (slider == &filterSustainSlider)
+        audioProcessor.setFilterSustain(static_cast<float>(slider->getValue()));
+    else if (slider == &filterReleaseSlider)
+        audioProcessor.setFilterRelease(static_cast<float>(slider->getValue()));
+    else if (slider == &filterEnvAmountSlider)
+        audioProcessor.setFilterEnvAmount(static_cast<float>(slider->getValue()));
     else if (slider == &volumeSlider)
         audioProcessor.setVolume(static_cast<float>(slider->getValue()));
 }

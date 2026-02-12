@@ -372,7 +372,14 @@ private:
     std::unique_ptr<SliderAttachment> resonanceAttachment;
     std::unique_ptr<ComboBoxAttachment> filterTypeAttachment;
 
-    // Envelope
+    // Filter Envelope
+    juce::Label filterEnvLabel;
+    juce::Slider filterAttackSlider, filterDecaySlider, filterSustainSlider, filterReleaseSlider;
+    juce::Label fAttackLabel, fDecayLabel, fSustainLabel, fReleaseLabel;
+    juce::Slider filterEnvAmountSlider;
+    juce::Label filterEnvAmountLabel;
+
+    // Amplitude Envelope
     juce::Label envelopeLabel;
     juce::Slider attackSlider, decaySlider, sustainSlider, releaseSlider;
     juce::Label attackLabel, decayLabel, sustainLabel, releaseLabel;

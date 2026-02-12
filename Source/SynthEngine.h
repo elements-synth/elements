@@ -355,6 +355,20 @@ public:
     float getSustain() const { return envelope.sustain; }
     float getRelease() const { return envelope.release; }
 
+    // --- Filter Envelope ---
+
+    void setFilterAttack(float seconds);
+    void setFilterDecay(float seconds);
+    void setFilterSustain(float level);
+    void setFilterRelease(float seconds);
+    void setFilterEnvAmount(float amount);
+
+    float getFilterAttack() const { return filterEnvelope.attack; }
+    float getFilterDecay() const { return filterEnvelope.decay; }
+    float getFilterSustain() const { return filterEnvelope.sustain; }
+    float getFilterRelease() const { return filterEnvelope.release; }
+    float getFilterEnvAmount() const { return filterEnvAmount; }
+
     // --- Volume ---
 
     void setVolume(float vol) { volume = clamp(vol, 0.0f, 1.0f); }
@@ -375,6 +389,7 @@ private:
     void regenerateWavetables();
 
     float generateEnvelopeSample(Voice& voice);
+    float generateFilterEnvelopeSample(int numSamples);
     float readWavetable(float phase, const std::array<float, WAVETABLE_SIZE>& wavetable);
 
     int findFreeVoice();
@@ -419,8 +434,17 @@ private:
     std::array<int, MAX_POLYPHONY> voiceOrder;  // For voice stealing (oldest first)
     int voiceOrderCount = 0;
 
-    // Envelope
+    // Amplitude Envelope
     ADSREnvelope envelope;
+
+    // Filter Envelope (global, not per-voice)
+    ADSREnvelope filterEnvelope{0.01f, 0.3f, 0.0f, 0.3f};
+    float filterEnvValue = 0.0f;
+    int filterEnvAge = 0;
+    bool filterEnvReleasing = false;
+    int filterEnvReleaseAge = 0;
+    float filterEnvReleaseStartLevel = 0.0f;
+    float filterEnvAmount = 0.0f;
 
     // Filter
     BiquadFilter filter;

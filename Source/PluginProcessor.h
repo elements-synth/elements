@@ -98,7 +98,7 @@ public:
     void setFilterResonance(float q) { synth.setFilterResonance(q); }
     void setFilterEnabled(bool enabled) { synth.setFilterEnabled(enabled); }
 
-    // Envelope
+    // Amplitude Envelope
     void setAttack(float seconds) { synth.setAttack(seconds); }
     void setDecay(float seconds) { synth.setDecay(seconds); }
     void setSustain(float level) { synth.setSustain(level); }
@@ -107,6 +107,18 @@ public:
     float getDecay() const { return synth.getDecay(); }
     float getSustain() const { return synth.getSustain(); }
     float getRelease() const { return synth.getRelease(); }
+
+    // Filter Envelope
+    void setFilterAttack(float seconds) { synth.setFilterAttack(seconds); }
+    void setFilterDecay(float seconds) { synth.setFilterDecay(seconds); }
+    void setFilterSustain(float level) { synth.setFilterSustain(level); }
+    void setFilterRelease(float seconds) { synth.setFilterRelease(seconds); }
+    void setFilterEnvAmount(float amount) { synth.setFilterEnvAmount(amount); }
+    float getFilterAttack() const { return synth.getFilterAttack(); }
+    float getFilterDecay() const { return synth.getFilterDecay(); }
+    float getFilterSustain() const { return synth.getFilterSustain(); }
+    float getFilterRelease() const { return synth.getFilterRelease(); }
+    float getFilterEnvAmount() const { return synth.getFilterEnvAmount(); }
 
     // Volume
     void setVolume(float vol) { synth.setVolume(vol); }

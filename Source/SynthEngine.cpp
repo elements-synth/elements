@@ -106,9 +106,8 @@ float BiquadFilter::process(float input)
 
 void BiquadFilter::reset()
 {
+    // Only reset state, keep coefficients intact
     x1 = x2 = y1 = y2 = 0.0f;
-    b0 = 1.0f;
-    b1 = b2 = a1 = a2 = 0.0f;
 }
 
 // ==============================================================================
@@ -165,10 +164,12 @@ void WavetableGenerator::generateFromSpectrum(
                        + spectrum[static_cast<size_t>(i1)] * frac;
 
         // Emphasis curve: exaggerate spectral differences for audible contrast
-        specAmp = std::pow(specAmp, 1.8f);
+        // Higher exponent = more contrast between transparent and opaque regions
+        specAmp = std::pow(specAmp, 3.0f);
 
         // Natural harmonic rolloff (higher harmonics are quieter)
-        float rolloff = 1.0f / (1.0f + (h - 1) * 0.08f);
+        // Gentle rolloff allows bright materials (Sapphire, Amethyst) to keep their highs
+        float rolloff = 1.0f / (1.0f + (h - 1) * 0.03f);
         float amplitude = specAmp * rolloff;
 
         if (amplitude > 0.001f)
@@ -316,19 +317,10 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     // Smooth spectral amplitude (controls volume based on angle) - gentler
     spectralAmplitude += (spectralAmplitudeTarget - spectralAmplitude) * 0.05f;
 
-    // Always update filter coefficients to stay in sync with current values
-    switch (filterType)
-    {
-        case FilterType::Lowpass:
-            filter.setLowpass(filterCutoff, filterResonance, static_cast<float>(sampleRate));
-            break;
-        case FilterType::Highpass:
-            filter.setHighpass(filterCutoff, filterResonance, static_cast<float>(sampleRate));
-            break;
-        case FilterType::Bandpass:
-            filter.setBandpass(filterCutoff, filterResonance, static_cast<float>(sampleRate));
-            break;
-    }
+    // Filter envelope: compute start and end values for per-sample interpolation
+    float filterEnvStart = filterEnvValue;
+    filterEnvValue = generateFilterEnvelopeSample(numSamples);
+    float filterEnvEnd = filterEnvValue;
 
     // Count active voices BEFORE processing (for filter reset on silence→sound transition)
     int currentActiveVoiceCount = 0;
@@ -342,19 +334,6 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     if (currentActiveVoiceCount > 0 && prevActiveVoiceCount == 0)
     {
         filter.reset();
-        // Re-apply coefficients after reset
-        switch (filterType)
-        {
-            case FilterType::Lowpass:
-                filter.setLowpass(filterCutoff, filterResonance, static_cast<float>(sampleRate));
-                break;
-            case FilterType::Highpass:
-                filter.setHighpass(filterCutoff, filterResonance, static_cast<float>(sampleRate));
-                break;
-            case FilterType::Bandpass:
-                filter.setBandpass(filterCutoff, filterResonance, static_cast<float>(sampleRate));
-                break;
-        }
     }
     prevActiveVoiceCount = currentActiveVoiceCount;
 
@@ -485,9 +464,58 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     // Smooth filter enable/disable crossfade
     float filterMixStep = (filterEnabledTarget - filterEnabledMix) * 0.001f;
 
+    // Pre-compute whether filter envelope is active
+    bool filterEnvActive = std::abs(filterEnvAmount) > 0.001f;
+
+    // Set initial filter coefficients (no envelope or start of interpolation)
+    {
+        float modCutoff = filterCutoff;
+        if (filterEnvActive)
+        {
+            float envMod = filterEnvAmount * filterEnvStart;
+            modCutoff = filterCutoff * std::pow(2.0f, envMod * 7.0f);
+            modCutoff = clamp(modCutoff, 20.0f, 20000.0f);
+        }
+        switch (filterType)
+        {
+            case FilterType::Lowpass:
+                filter.setLowpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
+                break;
+            case FilterType::Highpass:
+                filter.setHighpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
+                break;
+            case FilterType::Bandpass:
+                filter.setBandpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
+                break;
+        }
+    }
+
     for (int i = 0; i < numSamples; ++i)
     {
         float sample = buffer[i];
+
+        // Update filter coefficients every 32 samples when envelope is active
+        // This interpolates the envelope smoothly across the block
+        if (filterEnvActive && i > 0 && (i % 32 == 0))
+        {
+            float t = static_cast<float>(i) / numSamples;
+            float envInterp = filterEnvStart + (filterEnvEnd - filterEnvStart) * t;
+            float envMod = filterEnvAmount * envInterp;
+            float modCutoff = filterCutoff * std::pow(2.0f, envMod * 7.0f);
+            modCutoff = clamp(modCutoff, 20.0f, 20000.0f);
+            switch (filterType)
+            {
+                case FilterType::Lowpass:
+                    filter.setLowpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
+                    break;
+                case FilterType::Highpass:
+                    filter.setHighpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
+                    break;
+                case FilterType::Bandpass:
+                    filter.setBandpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
+                    break;
+            }
+        }
 
         // Apply filter with smooth enable/disable crossfade
         filterEnabledMix += filterMixStep;
@@ -592,6 +620,11 @@ void ElementsSynth::noteOn(int noteNumber, float velocity)
         // DON'T use fadeInRemaining - we use retrigger crossfade instead
         voice.fadeInRemaining = 0;
         // DON'T reset phase - continue where we left off for smooth waveform
+
+        // Retrigger filter envelope
+        filterEnvAge = 0;
+        filterEnvReleasing = false;
+        filterEnvReleaseAge = 0;
         return;
     }
 
@@ -643,6 +676,11 @@ void ElementsSynth::noteOn(int noteNumber, float velocity)
     {
         voiceOrder[voiceOrderCount++] = voiceIndex;
     }
+
+    // Retrigger filter envelope (monophonic — always follows last note)
+    filterEnvAge = 0;
+    filterEnvReleasing = false;
+    filterEnvReleaseAge = 0;
 }
 
 void ElementsSynth::noteOff(int noteNumber)
@@ -679,6 +717,17 @@ void ElementsSynth::noteOff(int noteNumber)
         voice.releaseStartLevel = currentLevel;
         voice.releasing = true;
         voice.releaseAge = 0;
+    }
+
+    // Check if any voices are still active (not releasing) — if none, trigger filter env release
+    bool anyActive = false;
+    for (auto& v : voices)
+        if (v.active && !v.releasing) { anyActive = true; break; }
+    if (!anyActive && !filterEnvReleasing)
+    {
+        filterEnvReleasing = true;
+        filterEnvReleaseAge = 0;
+        filterEnvReleaseStartLevel = filterEnvValue;
     }
 }
 
@@ -825,6 +874,35 @@ void ElementsSynth::setRelease(float seconds)
 }
 
 // ==============================================================================
+// FILTER ENVELOPE CONTROL
+// ==============================================================================
+
+void ElementsSynth::setFilterAttack(float seconds)
+{
+    filterEnvelope.attack = clamp(seconds, 0.001f, 5.0f);
+}
+
+void ElementsSynth::setFilterDecay(float seconds)
+{
+    filterEnvelope.decay = clamp(seconds, 0.001f, 5.0f);
+}
+
+void ElementsSynth::setFilterSustain(float level)
+{
+    filterEnvelope.sustain = clamp(level, 0.0f, 1.0f);
+}
+
+void ElementsSynth::setFilterRelease(float seconds)
+{
+    filterEnvelope.release = clamp(seconds, 0.001f, 5.0f);
+}
+
+void ElementsSynth::setFilterEnvAmount(float amount)
+{
+    filterEnvAmount = clamp(amount, 0.0f, 1.0f);
+}
+
+// ==============================================================================
 // INTERNAL METHODS
 // ==============================================================================
 
@@ -851,7 +929,7 @@ void ElementsSynth::updateSpectrum()
         return;
     }
 
-    // SUM contributions from all active lights (not average!)
+    // SUM contributions from all active lights
     // Each light adds its own spectral contribution based on:
     // - Its spectral distribution (Sunset=warm, Daylight=neutral, LED=cool)
     // - The angle between the object and that specific light
@@ -860,6 +938,7 @@ void ElementsSynth::updateSpectrum()
     std::array<float, NUM_WAVELENGTHS> combinedSpectrum{};
     std::fill(combinedSpectrum.begin(), combinedSpectrum.end(), 0.0f);
 
+    float totalIntensity = 0.0f;
     for (int i = 0; i < 3; ++i)
     {
         if (!lights[i].enabled)
@@ -868,21 +947,47 @@ void ElementsSynth::updateSpectrum()
         const LightSource& light = lightSources[lights[i].sourceIndex];
         const LightPosition& lightPos = getLightPosition(lights[i].positionIndex);
 
-        // Multi-face spectrum: sums Fresnel contributions from ALL visible faces
-        // Each face contributes its own Fresnel spectrum at its own angle to the light
-        // Result: rotation ALWAYS produces spectral variation (different faces, different angles)
         std::array<float, NUM_WAVELENGTHS> lightSpectrum{};
         calculateSpectrumMultiFace(material, light, lightPos.position,
                                    objectRotationMatrix, currentGeometry, lightSpectrum);
 
-        // Scale by light position intensity (key=1.0, fill=0.5, rim=0.7)
-        // and SUM contributions from all active lights
         for (int w = 0; w < NUM_WAVELENGTHS; ++w)
             combinedSpectrum[w] += lightSpectrum[w] * lightPos.intensity;
+
+        totalIntensity += lightPos.intensity;
+    }
+
+    // PROBLEM 1 FIX: Normalize by total light intensity so volume stays
+    // consistent regardless of how many lights are active.
+    // More lights = richer timbre, NOT louder volume.
+    if (totalIntensity > 0.0f)
+    {
+        float lightNorm = 1.0f / totalIntensity;
+        for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+            combinedSpectrum[w] *= lightNorm;
+    }
+
+    // PROBLEM 2 FIX: Per-material gain compensation.
+    // Materials with low transmission values (Sapphire, Emerald, Amethyst)
+    // produce weak spectra. Boost them so all materials have similar volume.
+    static const float materialGain[NUM_MATERIALS] = {
+        1.0f,   // Diamond  — baseline (high uniform transmission)
+        1.0f,   // Water    — OK
+        1.0f,   // Amber    — OK
+        1.0f,   // Ruby     — OK
+        1.0f,   // Gold     — OK
+        1.8f,   // Emerald  — boost (bell curve, energy concentrated)
+        2.5f,   // Amethyst — boost (blocks red end)
+        3.5f    // Sapphire — critical boost (blocks most of spectrum)
+    };
+    float matGain = materialGain[currentMaterialIndex];
+    if (matGain != 1.0f)
+    {
+        for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+            combinedSpectrum[w] *= matGain;
     }
 
     // Normalize the combined spectrum to prevent clipping
-    // Find the maximum value and scale if needed
     float maxVal = 0.0f;
     for (int w = 0; w < NUM_WAVELENGTHS; ++w)
     {
@@ -890,7 +995,6 @@ void ElementsSynth::updateSpectrum()
             maxVal = combinedSpectrum[w];
     }
 
-    // Scale down if max exceeds 1.0, otherwise keep as-is
     float spectrumTotal = 0.0f;
     float scaleFactor = (maxVal > 1.0f) ? (1.0f / maxVal) : 1.0f;
     for (int w = 0; w < NUM_WAVELENGTHS; ++w)
@@ -998,6 +1102,47 @@ float ElementsSynth::generateEnvelopeSample(Voice& voice)
         {
             // Sustain
             return envelope.sustain;
+        }
+    }
+}
+
+float ElementsSynth::generateFilterEnvelopeSample(int numSamples)
+{
+    int attackSamples = static_cast<int>(filterEnvelope.attack * sampleRate);
+    int decaySamples = static_cast<int>(filterEnvelope.decay * sampleRate);
+    int releaseSamples = static_cast<int>(filterEnvelope.release * sampleRate);
+
+    if (attackSamples < 1) attackSamples = 1;
+    if (decaySamples < 1) decaySamples = 1;
+    if (releaseSamples < 1) releaseSamples = 1;
+
+    if (filterEnvReleasing)
+    {
+        if (filterEnvReleaseAge >= releaseSamples)
+            return 0.0f;
+
+        float env = filterEnvReleaseStartLevel * (1.0f - static_cast<float>(filterEnvReleaseAge) / releaseSamples);
+        filterEnvReleaseAge += numSamples;
+        return env;
+    }
+    else
+    {
+        if (filterEnvAge < attackSamples)
+        {
+            float env = static_cast<float>(filterEnvAge) / attackSamples;
+            filterEnvAge += numSamples;
+            return env;
+        }
+        else if (filterEnvAge < attackSamples + decaySamples)
+        {
+            float decayProgress = static_cast<float>(filterEnvAge - attackSamples) / decaySamples;
+            float env = 1.0f - (1.0f - filterEnvelope.sustain) * decayProgress;
+            filterEnvAge += numSamples;
+            return env;
+        }
+        else
+        {
+            return filterEnvelope.sustain;
         }
     }
 }
