@@ -22,60 +22,84 @@
  */
 static std::array<Material, NUM_MATERIALS> s_materials = {{
     // Diamond - Near-perfect uniform transmission → ALL harmonics → crystalline
+    // Pure diamond is colorless with >95% transmission across visible spectrum
     Material(
         "Diamond",
         {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.96f, 0.97f, 0.98f, 0.98f, 0.97f, 0.97f, 0.96f, 0.95f }},
+        {{ 0.95f, 0.96f, 0.97f, 0.97f, 0.96f, 0.96f, 0.95f, 0.94f }},
         "#E8F4FF", 2.42f
     ),
-    // Water - High transmission with slight red falloff
+    // Water - Strong IR/red absorption (vibrational overtones of O-H bonds)
+    // Very transparent in blue-green, drops sharply above 600nm
     Material(
         "Water",
         {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.95f, 0.97f, 0.98f, 0.96f, 0.92f, 0.85f, 0.75f, 0.60f }},
+        {{ 0.98f, 0.98f, 0.97f, 0.95f, 0.82f, 0.55f, 0.25f, 0.08f }},
         "#50C8E8", 1.33f
     ),
-    // Amber - Low blue, high red → warm bass tones
+    // Amber - Fossilized resin, strong UV/blue absorption from conjugated organics
+    // Gradual warm slope with near-zero blue transmission
     Material(
         "Amber",
         {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.20f, 0.30f, 0.45f, 0.60f, 0.75f, 0.85f, 0.90f, 0.92f }},
+        {{ 0.03f, 0.08f, 0.22f, 0.55f, 0.80f, 0.92f, 0.95f, 0.97f }},
         "#FFBF00", 1.55f
     ),
-    // Ruby - Very low blue/green, very high red → deep bass
+    // Ruby - Cr3+ in Al2O3, sharp absorption below 600nm (d-d transitions)
+    // Near-zero transmission in blue/green, abrupt step to high red transmission
     Material(
         "Ruby",
         {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.10f, 0.10f, 0.12f, 0.15f, 0.45f, 0.80f, 0.92f, 0.95f }},
+        {{ 0.02f, 0.02f, 0.03f, 0.04f, 0.18f, 0.78f, 0.95f, 0.98f }},
         "#E0115F", 1.77f
     ),
-    // Gold - Absorbs blue, transmits red → LOW harmonics → warm, mellow
+    // Gold - Sharp interband transition at ~500nm (5d→6sp electron excitation)
+    // Abrupt step from near-zero blue to high transmission above 520nm
     Material(
         "Gold",
         {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.15f, 0.20f, 0.35f, 0.55f, 0.78f, 0.90f, 0.95f, 0.97f }},
+        {{ 0.01f, 0.02f, 0.05f, 0.72f, 0.94f, 0.97f, 0.98f, 0.98f }},
         "#FFD700", 0.47f
     ),
-    // Emerald - Bell curve on green → harmonics 4-8 → nasal, vocal
+    // Emerald - Cr3+ in Be3Al2Si6O18, narrow green transmission window
+    // Sharp absorption in both blue and red, only green passes through
     Material(
         "Emerald",
         {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.15f, 0.40f, 0.75f, 0.92f, 0.75f, 0.40f, 0.18f, 0.12f }},
+        {{ 0.04f, 0.18f, 0.72f, 0.95f, 0.65f, 0.15f, 0.04f, 0.02f }},
         "#50C878", 1.57f
     ),
-    // Amethyst - High violet/blue, blocks red → harmonics 9-20 → brilliant
+    // Amethyst - Fe4+ charge transfer in SiO2, absorbs green/yellow (500-600nm)
+    // BIMODAL: transmits violet AND some red, creating characteristic purple
     Material(
         "Amethyst",
         {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.92f, 0.85f, 0.70f, 0.45f, 0.25f, 0.15f, 0.10f, 0.08f }},
+        {{ 0.90f, 0.82f, 0.45f, 0.15f, 0.12f, 0.28f, 0.45f, 0.35f }},
         "#9966CC", 1.54f
     ),
-    // Sapphire - Transmits blue, blocks red → HIGH harmonics → cold
+    // Sapphire - Fe2+/Ti4+ intervalence charge transfer in Al2O3
+    // Strong blue transmission, steep cutoff above 550nm
     Material(
         "Sapphire",
         {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.92f, 0.88f, 0.75f, 0.50f, 0.25f, 0.12f, 0.08f, 0.05f }},
+        {{ 0.95f, 0.92f, 0.78f, 0.42f, 0.10f, 0.03f, 0.01f, 0.01f }},
         "#0F52BA", 1.77f
+    ),
+    // Copper - Interband transition at ~590nm (higher than Gold's ~500nm)
+    // Only deep red/IR passes through; extremely warm/bass-heavy
+    Material(
+        "Copper",
+        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
+        {{ 0.01f, 0.01f, 0.02f, 0.03f, 0.08f, 0.45f, 0.85f, 0.95f }},
+        "#B87333", 0.46f
+    ),
+    // Obsidian - Volcanic glass (amorphous SiO2 + Fe3O4/Fe2O3 inclusions)
+    // Nearly opaque; only deep red passes in thin sections
+    Material(
+        "Obsidian",
+        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
+        {{ 0.01f, 0.01f, 0.01f, 0.02f, 0.03f, 0.12f, 0.40f, 0.70f }},
+        "#1C1C1C", 1.50f
     )
 }};
 
@@ -185,36 +209,44 @@ const std::array<Material, NUM_MATERIALS>& getMaterials()
     static std::array<Material, NUM_MATERIALS> materials = {{
         Material("Diamond",
                  {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.96f, 0.97f, 0.98f, 0.98f, 0.97f, 0.97f, 0.96f, 0.95f }},
+                 {{ 0.95f, 0.96f, 0.97f, 0.97f, 0.96f, 0.96f, 0.95f, 0.94f }},
                  "#E8F4FF", 2.42f),
         Material("Water",
                  {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.95f, 0.97f, 0.98f, 0.96f, 0.92f, 0.85f, 0.75f, 0.60f }},
+                 {{ 0.98f, 0.98f, 0.97f, 0.95f, 0.82f, 0.55f, 0.25f, 0.08f }},
                  "#50C8E8", 1.33f),
         Material("Amber",
                  {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.20f, 0.30f, 0.45f, 0.60f, 0.75f, 0.85f, 0.90f, 0.92f }},
+                 {{ 0.03f, 0.08f, 0.22f, 0.55f, 0.80f, 0.92f, 0.95f, 0.97f }},
                  "#FFBF00", 1.55f),
         Material("Ruby",
                  {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.10f, 0.10f, 0.12f, 0.15f, 0.45f, 0.80f, 0.92f, 0.95f }},
+                 {{ 0.02f, 0.02f, 0.03f, 0.04f, 0.18f, 0.78f, 0.95f, 0.98f }},
                  "#E0115F", 1.77f),
         Material("Gold",
                  {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.15f, 0.20f, 0.35f, 0.55f, 0.78f, 0.90f, 0.95f, 0.97f }},
+                 {{ 0.01f, 0.02f, 0.05f, 0.72f, 0.94f, 0.97f, 0.98f, 0.98f }},
                  "#FFD700", 0.47f),
         Material("Emerald",
                  {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.15f, 0.40f, 0.75f, 0.92f, 0.75f, 0.40f, 0.18f, 0.12f }},
+                 {{ 0.04f, 0.18f, 0.72f, 0.95f, 0.65f, 0.15f, 0.04f, 0.02f }},
                  "#50C878", 1.57f),
         Material("Amethyst",
                  {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.92f, 0.85f, 0.70f, 0.45f, 0.25f, 0.15f, 0.10f, 0.08f }},
+                 {{ 0.90f, 0.82f, 0.45f, 0.15f, 0.12f, 0.28f, 0.45f, 0.35f }},
                  "#9966CC", 1.54f),
         Material("Sapphire",
                  {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.92f, 0.88f, 0.75f, 0.50f, 0.25f, 0.12f, 0.08f, 0.05f }},
-                 "#0F52BA", 1.77f)
+                 {{ 0.95f, 0.92f, 0.78f, 0.42f, 0.10f, 0.03f, 0.01f, 0.01f }},
+                 "#0F52BA", 1.77f),
+        Material("Copper",
+                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
+                 {{ 0.01f, 0.01f, 0.02f, 0.03f, 0.08f, 0.45f, 0.85f, 0.95f }},
+                 "#B87333", 0.46f),
+        Material("Obsidian",
+                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
+                 {{ 0.01f, 0.01f, 0.01f, 0.02f, 0.03f, 0.12f, 0.40f, 0.70f }},
+                 "#1C1C1C", 1.50f)
     }};
     return materials;
 }
@@ -622,10 +654,10 @@ void calculateFresnelSpectral(float angleDeg,
         float wlPos = (wavelengths[i] - 380.0f) / (780.0f - 380.0f);
 
         // Per-wavelength exponential decay rate:
-        //   Blue (wlPos=0): decayRate = 4.0 → drops fast with angle
+        //   Blue (wlPos=0): decayRate = 6.0 → drops very fast with angle
         //   Red  (wlPos=1): decayRate = 1.0 → resists angle changes
-        // This creates strong spectral SHAPE changes at moderate angles
-        float decayRate = 1.0f + 3.0f * (1.0f - wlPos);
+        // Higher multiplier = more dramatic timbre shifts with rotation
+        float decayRate = 1.0f + 5.0f * (1.0f - wlPos);
         float spectralMod = std::pow(1.0f - angleFactor, decayRate);
 
         // Final transmission: Fresnel base * spectral shaping (NO amplitude factor)
@@ -994,7 +1026,14 @@ void calculateSpectrumMultiFace(const Material& material,
         float angleDeg = std::acos(clamp(cosAngle, -1.0f, 1.0f)) * 180.0f / 3.14159265359f;
 
         // Weight by how directly this face sees the light
-        float weight = cosAngle;
+        // Steeper weighting = dominant face contributes more = more timbral variation
+        // Cube: pow(4) for dramatic 6-position transitions
+        // Torus/Dodecahedron: pow(2) for smoother but still noticeable contrast
+        float weight;
+        if (geometry == Geometry::Cube)
+            weight = cosAngle * cosAngle * cosAngle * cosAngle;  // pow(cosAngle, 4)
+        else
+            weight = cosAngle * cosAngle;  // pow(cosAngle, 2)
 
         // Calculate Fresnel spectrum at THIS face's specific angle
         // Each face gets a different Fresnel response based on its angle to light

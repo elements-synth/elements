@@ -46,7 +46,7 @@ private:
     ElementsAudioProcessor& processor;
     juce::OpenGLContext openGLContext;
 
-    Geometry currentGeometry = Geometry::Cube;
+    Geometry currentGeometry = Geometry::Sphere;
     juce::Colour materialColour{0xFFE8F4FF};
 
     // Mouse rotation state
@@ -119,7 +119,7 @@ private:
 
     // PBR material properties indexed by material enum (same order as materialNames)
     //                          metal  rough  ior    transp  sssStr sssRad  absorption R,G,B
-    static constexpr PBRMaterialProps pbrMaterials[8] = {
+    static constexpr PBRMaterialProps pbrMaterials[NUM_MATERIALS] = {
         { 0.00f, 0.05f, 2.42f, 0.95f, 0.15f, 0.3f, {0.97f, 0.98f, 1.00f} },  // Diamond
         { 0.00f, 0.10f, 1.33f, 0.90f, 0.05f, 0.5f, {0.70f, 0.85f, 0.95f} },  // Water
         { 0.00f, 0.30f, 1.55f, 0.70f, 0.40f, 0.4f, {1.00f, 0.75f, 0.20f} },  // Amber
@@ -128,6 +128,8 @@ private:
         { 0.05f, 0.20f, 1.57f, 0.55f, 0.35f, 0.3f, {0.20f, 0.80f, 0.40f} },  // Emerald
         { 0.05f, 0.25f, 1.54f, 0.65f, 0.35f, 0.3f, {0.60f, 0.30f, 0.80f} },  // Amethyst
         { 0.05f, 0.10f, 1.77f, 0.60f, 0.40f, 0.3f, {0.10f, 0.30f, 0.85f} },  // Sapphire
+        { 1.00f, 0.20f, 0.46f, 0.00f, 0.00f, 0.0f, {0.97f, 0.57f, 0.32f} },  // Copper  — metallic, orange-tinted like gold
+        { 0.00f, 0.03f, 1.50f, 0.00f, 0.00f, 0.0f, {0.02f, 0.02f, 0.02f} },  // Obsidian — black glass, glossy specular
     };
 
     // Shader program
@@ -395,14 +397,16 @@ private:
     void updateGeometryButtons();
 
     // Material data
-    static constexpr int NUM_MATERIALS = 8;
+    static constexpr int NUM_MATERIALS = 10;
     const juce::String materialNames[NUM_MATERIALS] = {
-        "Diamond", "Water", "Amber", "Ruby", "Gold", "Emerald", "Amethyst", "Sapphire"
+        "Diamond", "Water", "Amber", "Ruby", "Gold", "Emerald", "Amethyst", "Sapphire",
+        "Copper", "Obsidian"
     };
     const juce::Colour materialColours[NUM_MATERIALS] = {
         juce::Colour(0xFFE8F4FF), juce::Colour(0xFF50C8E8), juce::Colour(0xFFFFBF00),
         juce::Colour(0xFFE0115F), juce::Colour(0xFFFFD700), juce::Colour(0xFF50C878),
-        juce::Colour(0xFF9966CC), juce::Colour(0xFF0F52BA)
+        juce::Colour(0xFF9966CC), juce::Colour(0xFF0F52BA),
+        juce::Colour(0xFFB87333), juce::Colour(0xFF1C1C1C)
     };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ElementsAudioProcessorEditor)

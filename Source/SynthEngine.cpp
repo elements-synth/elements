@@ -168,8 +168,8 @@ void WavetableGenerator::generateFromSpectrum(
         specAmp = std::pow(specAmp, 3.0f);
 
         // Natural harmonic rolloff (higher harmonics are quieter)
-        // Gentle rolloff allows bright materials (Sapphire, Amethyst) to keep their highs
-        float rolloff = 1.0f / (1.0f + (h - 1) * 0.03f);
+        // Moderate rolloff: preserves natural sound while allowing spectral character
+        float rolloff = 1.0f / (1.0f + (h - 1) * 0.05f);
         float amplitude = specAmp * rolloff;
 
         if (amplitude > 0.001f)
@@ -490,6 +490,9 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
         }
     }
 
+    // Voice count compensation: 1 voice = 1.0, 2 = 0.71, 4 = 0.50, 8 = 0.35
+    float voiceScale = 1.0f / std::sqrt(static_cast<float>(std::max(activeVoiceCount, 1)));
+
     for (int i = 0; i < numSamples; ++i)
     {
         float sample = buffer[i];
@@ -532,11 +535,11 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                 sample = filtered;
         }
 
-        // Apply master volume
-        sample *= volume;
+        // Apply master volume with voice count compensation
+        sample *= volume * voiceScale;
 
-        // Safety clamp to prevent speaker damage
-        sample = clamp(sample, -1.0f, 1.0f);
+        // Soft clipper (tanh) instead of hard clamp — prevents crackles on chords
+        sample = std::tanh(sample);
 
         buffer[i] = sample;
 
@@ -967,18 +970,20 @@ void ElementsSynth::updateSpectrum()
             combinedSpectrum[w] *= lightNorm;
     }
 
-    // PROBLEM 2 FIX: Per-material gain compensation.
-    // Materials with low transmission values (Sapphire, Emerald, Amethyst)
-    // produce weak spectra. Boost them so all materials have similar volume.
+    // Per-material gain compensation.
+    // Normalizes perceived volume across materials with different total transmission.
+    // Gains calculated from avg transmission ratio to Diamond (baseline ~0.96).
     static const float materialGain[NUM_MATERIALS] = {
-        1.0f,   // Diamond  — baseline (high uniform transmission)
-        1.0f,   // Water    — OK
-        1.0f,   // Amber    — OK
-        1.0f,   // Ruby     — OK
-        1.0f,   // Gold     — OK
-        1.8f,   // Emerald  — boost (bell curve, energy concentrated)
-        2.5f,   // Amethyst — boost (blocks red end)
-        3.5f    // Sapphire — critical boost (blocks most of spectrum)
+        1.0f,   // Diamond  — baseline (flat ~0.96 transmission)
+        1.6f,   // Water    — red absorption, needs slight brightness boost
+        1.7f,   // Amber    — strong blue absorption
+        2.5f,   // Ruby     — near-zero below 600nm, low total energy
+        2.0f,   // Gold     — sharper interband step, less total energy
+        2.8f,   // Emerald  — narrow green peak, most energy concentrated
+        2.2f,   // Amethyst — bimodal, green/yellow absorbed
+        4.0f,   // Sapphire — steep cutoff, only blue/high harmonics pass
+        2.8f,   // Copper   — deep red only, very low total energy
+        4.5f    // Obsidian — near-opaque, minimal transmission
     };
     float matGain = materialGain[currentMaterialIndex];
     if (matGain != 1.0f)

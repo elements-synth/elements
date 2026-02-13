@@ -217,8 +217,11 @@ static constexpr const char* pbrFragmentShader = R"(
         // Ambient
         vec3 ambient = vec3(0.03) * u_albedo;
 
+        // Environment reflection strength: reduced for opaque metals, stronger for transparent/glossy
+        float envStrength = mix(0.15, 0.4, u_transparency) * mix(1.0, 0.5, u_metallic);
+
         // Opaque color: ambient + direct lighting + environment specular + SSS
-        vec3 opaqueColor = ambient + Lo + envSpec * 0.5 + sssAccum;
+        vec3 opaqueColor = ambient + Lo + envSpec * envStrength + sssAccum;
 
         // Transparent color: refraction + env + SSS
         vec3 transColor = refractionColor + envSpec * 0.3 + sssAccum;

@@ -405,7 +405,7 @@ private:
 
     // Material and lighting
     int currentMaterialIndex = 0;           // Diamond by default
-    Geometry currentGeometry = Geometry::Cube;
+    Geometry currentGeometry = Geometry::Sphere;
     std::array<LightConfig, 3> lights;
     RotationMatrix objectRotationMatrix;  // Gimbal-lock-free rotation storage
 

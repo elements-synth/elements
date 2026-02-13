@@ -369,9 +369,10 @@ void Viewport3D::timerCallback()
         const juce::Colour colours[] = {
             juce::Colour(0xFFE8F4FF), juce::Colour(0xFF50C8E8), juce::Colour(0xFFFFBF00),
             juce::Colour(0xFFE0115F), juce::Colour(0xFFFFD700), juce::Colour(0xFF50C878),
-            juce::Colour(0xFF9966CC), juce::Colour(0xFF0F52BA)
+            juce::Colour(0xFF9966CC), juce::Colour(0xFF0F52BA),
+            juce::Colour(0xFFB87333), juce::Colour(0xFF1C1C1C)
         };
-        if (matIndex >= 0 && matIndex < 8)
+        if (matIndex >= 0 && matIndex < NUM_MATERIALS)
             materialColour = colours[matIndex];
 
         repaint();
@@ -1028,7 +1029,7 @@ void Viewport3D::renderGeometryPBR()
 
     // Get PBR material properties
     int matIdx = processor.getMaterial();
-    if (matIdx < 0 || matIdx >= 8) matIdx = 0;
+    if (matIdx < 0 || matIdx >= NUM_MATERIALS) matIdx = 0;
     const auto& mat = pbrMaterials[matIdx];
     float albedo[3] = {
         materialColour.getFloatRed(),
@@ -2304,10 +2305,10 @@ void ElementsAudioProcessorEditor::resized()
     leftCol.removeFromTop(5);
     auto geomRow = leftCol.removeFromTop(28);
     int geomBtnW = geomRow.getWidth() / 4;
-    cubeButton.setBounds(geomRow.removeFromLeft(geomBtnW).reduced(1, 0));
     sphereButton.setBounds(geomRow.removeFromLeft(geomBtnW).reduced(1, 0));
     torusButton.setBounds(geomRow.removeFromLeft(geomBtnW).reduced(1, 0));
-    dodecaButton.setBounds(geomRow.reduced(1, 0));
+    dodecaButton.setBounds(geomRow.removeFromLeft(geomBtnW).reduced(1, 0));
+    cubeButton.setBounds(geomRow.reduced(1, 0));
 
     leftCol.removeFromTop(10);
     rotationLabel.setBounds(leftCol.removeFromTop(20));

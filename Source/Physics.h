@@ -25,7 +25,7 @@ constexpr float WAVELENGTH_MIN = 380.0f;
 constexpr float WAVELENGTH_MAX = 780.0f;
 
 // Number of materials and light sources
-constexpr int NUM_MATERIALS = 8;
+constexpr int NUM_MATERIALS = 10;
 constexpr int NUM_LIGHT_SOURCES = 3;
 
 // ==============================================================================
