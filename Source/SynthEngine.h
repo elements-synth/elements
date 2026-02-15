@@ -369,6 +369,11 @@ public:
     float getFilterRelease() const { return filterEnvelope.release; }
     float getFilterEnvAmount() const { return filterEnvAmount; }
 
+    // --- Thickness (Beer-Lambert) ---
+
+    void setThickness(float t);
+    float getThickness() const { return thickness; }
+
     // --- Volume ---
 
     void setVolume(float vol) { volume = clamp(vol, 0.0f, 1.0f); }
@@ -402,6 +407,9 @@ private:
 
     double sampleRate = 44100.0;
     int blockSize = 512;
+
+    // Thickness (Beer-Lambert)
+    float thickness = 1.0f;  // 0.1 = thin/bright, 1.0 = reference, 3.0 = thick/dark
 
     // Material and lighting
     int currentMaterialIndex = 0;           // Diamond by default

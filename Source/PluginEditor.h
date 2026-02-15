@@ -78,6 +78,9 @@ private:
     float cumulativeRotY = 0.0f;
     float cumulativeRotZ = 0.0f;
 
+    // Thickness for shader uniform
+    float currentThickness = 1.0f;
+
     // Dirty flag for optimization - only repaint when needed
     bool needsRepaint = true;
     int lastMaterial = -1;
@@ -340,6 +343,10 @@ private:
     juce::TextButton torusButton{"Torus"};
     juce::TextButton dodecaButton{"Dodeca"};
 
+    // Thickness
+    juce::Label thicknessLabel;
+    juce::Slider thicknessSlider;
+
     // Rotation numeric fields
     juce::Label rotationLabel;
     juce::Label rotXLabel, rotYLabel, rotZLabel;
@@ -370,6 +377,7 @@ private:
     // APVTS attachments — keep sliders/combo in sync with automatable parameters
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
+    std::unique_ptr<SliderAttachment> thicknessAttachment;
     std::unique_ptr<SliderAttachment> cutoffAttachment;
     std::unique_ptr<SliderAttachment> resonanceAttachment;
     std::unique_ptr<ComboBoxAttachment> filterTypeAttachment;

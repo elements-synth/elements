@@ -51,6 +51,7 @@ static constexpr const char* pbrFragmentShader = R"(
     uniform float u_sssStrength;
     uniform float u_sssRadius;
     uniform vec3 u_absorptionColor;
+    uniform float u_thickness;
 
     // Environment map (equirectangular HDR, sampled as 2D texture)
     uniform sampler2D u_envMap;
@@ -204,9 +205,8 @@ static constexpr const char* pbrFragmentShader = R"(
 
             vec3 refractSample = sampleEnvMap(refractDir);
 
-            // Beer's law absorption: exp(-thickness * (1 - absorptionColor) * density)
-            float thickness = 1.0;  // Approximate uniform thickness
-            vec3 absorption = exp(-thickness * (vec3(1.0) - u_absorptionColor) * 2.0);
+            // Beer's law absorption using dynamic thickness parameter
+            vec3 absorption = exp(-u_thickness * (vec3(1.0) - u_absorptionColor) * 2.0);
             refractionColor = refractSample * absorption;
         }
 

@@ -76,6 +76,10 @@ public:
     void setGeometry(Geometry geom) { synth.setGeometry(geom); }
     Geometry getGeometry() const { return synth.getGeometry(); }
 
+    // Thickness — APVTS is the source of truth (automatable from DAW)
+    float getThickness() const { return apvts.getRawParameterValue("thickness")->load(); }
+    juce::RangedAudioParameter* getThicknessParam() { return apvts.getParameter("thickness"); }
+
     // Rotation — APVTS is the source of truth (automatable from DAW)
     float getRotationX() const { return apvts.getRawParameterValue("rotationX")->load(); }
     float getRotationY() const { return apvts.getRawParameterValue("rotationY")->load(); }
@@ -144,6 +148,7 @@ private:
     float lastRotX = 0.0f;
     float lastRotY = 0.0f;
     float lastRotZ = 0.0f;
+    float lastThickness = 1.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ElementsAudioProcessor)
 };

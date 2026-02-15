@@ -750,6 +750,12 @@ void ElementsSynth::allNotesOff()
 // MATERIAL & LIGHT CONTROL
 // ==============================================================================
 
+void ElementsSynth::setThickness(float t)
+{
+    thickness = clamp(t, 0.1f, 3.0f);
+    updateSpectrum();
+}
+
 void ElementsSynth::setMaterial(int materialIndex)
 {
     if (materialIndex >= 0 && materialIndex < NUM_MATERIALS)
@@ -968,6 +974,15 @@ void ElementsSynth::updateSpectrum()
         float lightNorm = 1.0f / totalIntensity;
         for (int w = 0; w < NUM_WAVELENGTHS; ++w)
             combinedSpectrum[w] *= lightNorm;
+    }
+
+    // Beer-Lambert thickness: T_effective = T^thickness
+    // thickness < 1.0 = thinner walls = more transmission = brighter sound
+    // thickness > 1.0 = thicker walls = more absorption = darker/bassier sound
+    if (std::abs(thickness - 1.0f) > 0.001f)
+    {
+        for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+            combinedSpectrum[w] = std::pow(std::max(combinedSpectrum[w], 0.001f), thickness);
     }
 
     // Per-material gain compensation.

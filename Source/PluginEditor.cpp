@@ -351,6 +351,14 @@ void Viewport3D::timerCallback()
         }
     }
 
+    // Sync thickness from processor (for shader uniform only)
+    float newThickness = processor.getThickness();
+    if (std::abs(newThickness - currentThickness) > 0.01f)
+    {
+        currentThickness = newThickness;
+        needsRepaint = true;
+    }
+
     bool changed = (matIndex != lastMaterial) ||
                    (geom != lastGeometry) ||
                    (rotVersion != lastRotVersion) ||
@@ -569,26 +577,25 @@ void Viewport3D::mouseMove(const juce::MouseEvent& e)
 
 std::vector<Viewport3D::PBRVertex> Viewport3D::generateCubeVertices(float size)
 {
-    float s = size / 2.0f;
-    // 6 faces x 2 triangles x 3 vertices = 36 vertices
-    struct Face { float nx, ny, nz; float v[4][3]; };
-    Face faces[6] = {
-        { 0, 0, 1, {{-s,-s,s},{s,-s,s},{s,s,s},{-s,s,s}} },       // Front
-        { 0, 0,-1, {{ s,-s,-s},{-s,-s,-s},{-s,s,-s},{s,s,-s}} },   // Back
-        { 0, 1, 0, {{-s,s,s},{s,s,s},{s,s,-s},{-s,s,-s}} },        // Top
-        { 0,-1, 0, {{-s,-s,-s},{s,-s,-s},{s,-s,s},{-s,-s,s}} },    // Bottom
-        { 1, 0, 0, {{ s,-s,s},{s,-s,-s},{s,s,-s},{s,s,s}} },       // Right
-        {-1, 0, 0, {{-s,-s,-s},{-s,-s,s},{-s,s,s},{-s,s,-s}} },    // Left
-    };
-
     std::vector<PBRVertex> verts;
     verts.reserve(36);
+
+    float s = size / 2.0f;
+
+    struct Face { float nx, ny, nz; float v[4][3]; };
+    Face faces[6] = {
+        { 0, 0, 1,   {{-s,-s,s},{s,-s,s},{s,s,s},{-s,s,s}} },
+        { 0, 0,-1,   {{ s,-s,-s},{-s,-s,-s},{-s,s,-s},{s,s,-s}} },
+        { 0, 1, 0,   {{-s,s,s},{s,s,s},{s,s,-s},{-s,s,-s}} },
+        { 0,-1, 0,   {{-s,-s,-s},{s,-s,-s},{s,-s,s},{-s,-s,s}} },
+        { 1, 0, 0,   {{ s,-s,s},{s,-s,-s},{s,s,-s},{s,s,s}} },
+        {-1, 0, 0,   {{-s,-s,-s},{-s,-s,s},{-s,s,s},{-s,s,-s}} },
+    };
+
     for (auto& f : faces)
     {
-        // Quad → 2 triangles: 0-1-2, 0-2-3
         int indices[] = {0,1,2, 0,2,3};
-        for (int idx : indices)
-        {
+        for (int idx : indices) {
             PBRVertex v;
             v.position[0] = f.v[idx][0]; v.position[1] = f.v[idx][1]; v.position[2] = f.v[idx][2];
             v.normal[0] = f.nx; v.normal[1] = f.ny; v.normal[2] = f.nz;
@@ -618,13 +625,11 @@ std::vector<Viewport3D::PBRVertex> Viewport3D::generateSphereVertices(float radi
             float x0 = std::cos(lng0), z0 = std::sin(lng0);
             float x1 = std::cos(lng1), z1 = std::sin(lng1);
 
-            // 4 corners of the quad
             PBRVertex v00 = {{ radius*x0*r0, radius*y0, radius*z0*r0 }, { x0*r0, y0, z0*r0 }};
             PBRVertex v10 = {{ radius*x1*r0, radius*y0, radius*z1*r0 }, { x1*r0, y0, z1*r0 }};
             PBRVertex v11 = {{ radius*x1*r1, radius*y1, radius*z1*r1 }, { x1*r1, y1, z1*r1 }};
             PBRVertex v01 = {{ radius*x0*r1, radius*y1, radius*z0*r1 }, { x0*r1, y1, z0*r1 }};
 
-            // 2 triangles
             verts.push_back(v00); verts.push_back(v10); verts.push_back(v11);
             verts.push_back(v00); verts.push_back(v11); verts.push_back(v01);
         }
@@ -691,13 +696,14 @@ std::vector<Viewport3D::PBRVertex> Viewport3D::generateDodecahedronVertices(floa
         {-phi,  invPhi, 0}, {-phi, -invPhi, 0}                          // 18-19: XY plane
     };
 
-    // Scale all vertices to desired radius
-    for (auto& v : rawVerts)
+    // Normalize raw vertices to unit sphere
+    float rawNorm[20][3];
+    for (int i = 0; i < 20; ++i)
     {
-        float len = std::sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
-        v[0] = v[0] / len * radius;
-        v[1] = v[1] / len * radius;
-        v[2] = v[2] / len * radius;
+        float len = std::sqrt(rawVerts[i][0]*rawVerts[i][0] + rawVerts[i][1]*rawVerts[i][1] + rawVerts[i][2]*rawVerts[i][2]);
+        rawNorm[i][0] = rawVerts[i][0] / len;
+        rawNorm[i][1] = rawVerts[i][1] / len;
+        rawNorm[i][2] = rawVerts[i][2] / len;
     }
 
     // 12 face normals (icosahedron vertices = dodecahedron face centers)
@@ -712,44 +718,55 @@ std::vector<Viewport3D::PBRVertex> Viewport3D::generateDodecahedronVertices(floa
         n[0] /= len; n[1] /= len; n[2] /= len;
     }
 
+    // Scale raw vertices to radius
+    float scaledVerts[20][3];
+    for (int i = 0; i < 20; ++i)
+    {
+        scaledVerts[i][0] = rawNorm[i][0] * radius;
+        scaledVerts[i][1] = rawNorm[i][1] * radius;
+        scaledVerts[i][2] = rawNorm[i][2] * radius;
+    }
+
     std::vector<PBRVertex> verts;
-    verts.reserve(12 * 3 * 3);  // 12 faces * 3 triangles each
+    verts.reserve(12 * 3 * 3);
 
     for (int f = 0; f < 12; ++f)
     {
-        float nx = faceNormals[f][0], ny = faceNormals[f][1], nz = faceNormals[f][2];
+        float nx = faceNormals[f][0];
+        float ny = faceNormals[f][1];
+        float nz = faceNormals[f][2];
 
-        // Find 5 vertices closest to this face normal (highest dot product)
+        // Find 5 vertices closest to this face normal
         struct VertDot { int idx; float dot; };
         VertDot dots[20];
         for (int i = 0; i < 20; ++i)
         {
             dots[i].idx = i;
-            dots[i].dot = rawVerts[i][0]*nx + rawVerts[i][1]*ny + rawVerts[i][2]*nz;
+            dots[i].dot = rawNorm[i][0]*faceNormals[f][0] + rawNorm[i][1]*faceNormals[f][1] + rawNorm[i][2]*faceNormals[f][2];
         }
         for (int i = 0; i < 19; ++i)
             for (int j = i + 1; j < 20; ++j)
                 if (dots[j].dot > dots[i].dot)
                     std::swap(dots[i], dots[j]);
 
-        // Top 5 = face vertices
         float fv[5][3];
         for (int i = 0; i < 5; ++i)
         {
-            fv[i][0] = rawVerts[dots[i].idx][0];
-            fv[i][1] = rawVerts[dots[i].idx][1];
-            fv[i][2] = rawVerts[dots[i].idx][2];
+            fv[i][0] = scaledVerts[dots[i].idx][0];
+            fv[i][1] = scaledVerts[dots[i].idx][1];
+            fv[i][2] = scaledVerts[dots[i].idx][2];
         }
 
         // Sort vertices by angle around face normal for correct winding
+        float fnx = faceNormals[f][0], fny = faceNormals[f][1], fnz = faceNormals[f][2];
         float tx, ty, tz;
-        if (std::abs(nx) < 0.9f)
-            { tx = 0; ty = -nz; tz = ny; }
+        if (std::abs(fnx) < 0.9f)
+            { tx = 0; ty = -fnz; tz = fny; }
         else
-            { tx = nz; ty = 0; tz = -nx; }
+            { tx = fnz; ty = 0; tz = -fnx; }
         float tlen = std::sqrt(tx*tx + ty*ty + tz*tz);
         tx /= tlen; ty /= tlen; tz /= tlen;
-        float bx = ny*tz - nz*ty, by = nz*tx - nx*tz, bz = nx*ty - ny*tx;
+        float bx = fny*tz - fnz*ty, by = fnz*tx - fnx*tz, bz = fnx*ty - fny*tx;
 
         float angles[5];
         for (int i = 0; i < 5; ++i)
@@ -762,7 +779,6 @@ std::vector<Viewport3D::PBRVertex> Viewport3D::generateDodecahedronVertices(floa
                 if (angles[order[j]] < angles[order[i]])
                     std::swap(order[i], order[j]);
 
-        // Fan triangulate pentagon: 3 triangles from vertex 0
         for (int i = 1; i < 4; ++i)
         {
             PBRVertex v0 = {{ fv[order[0]][0], fv[order[0]][1], fv[order[0]][2] }, { nx, ny, nz }};
@@ -1090,6 +1106,7 @@ void Viewport3D::renderGeometryPBR()
     setFloat("u_sssStrength", mat.sssStrength);
     setFloat("u_sssRadius", mat.sssRadius);
     setVec3("u_absorptionColor", mat.absorptionColor[0], mat.absorptionColor[1], mat.absorptionColor[2]);
+    setFloat("u_thickness", currentThickness);
 
     // Environment cubemap sampler
     setInt("u_envMap", 0);  // Texture unit 0
@@ -2119,6 +2136,11 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     addAndMakeVisible(torusButton);
     addAndMakeVisible(dodecaButton);
 
+    // Thickness slider
+    setupLabel(thicknessLabel, "THICKNESS", 13.0f, true);
+    setupRotarySlider(thicknessSlider, 0.1, 3.0, 1.0);
+    thicknessAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "thickness", thicknessSlider);
+
     // Rotation numeric display
     setupLabel(rotationLabel, "ROTATION", 13.0f, true);
 
@@ -2221,7 +2243,7 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     updateGeometryButtons();
 
     startTimerHz(30);
-    setSize(1000, 700);
+    setSize(1000, 750);
 }
 
 ElementsAudioProcessorEditor::~ElementsAudioProcessorEditor()
@@ -2310,7 +2332,11 @@ void ElementsAudioProcessorEditor::resized()
     dodecaButton.setBounds(geomRow.removeFromLeft(geomBtnW).reduced(1, 0));
     cubeButton.setBounds(geomRow.reduced(1, 0));
 
-    leftCol.removeFromTop(10);
+    leftCol.removeFromTop(5);
+    thicknessLabel.setBounds(leftCol.removeFromTop(18));
+    thicknessSlider.setBounds(leftCol.removeFromTop(50).reduced(20, 0));
+
+    leftCol.removeFromTop(5);
     rotationLabel.setBounds(leftCol.removeFromTop(20));
     leftCol.removeFromTop(5);
 

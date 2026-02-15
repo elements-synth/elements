@@ -76,6 +76,17 @@ ElementsAudioProcessor::createParameterLayout()
         [](float v, int) { return juce::String(v, 1) + juce::String::fromUTF8("\xC2\xB0"); },
         nullptr));
 
+    // Thickness: 0.1 (thin/bright) – 3.0 (thick/dark), default 1.0
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"thickness", 1},
+        "Thickness",
+        juce::NormalisableRange<float>(0.1f, 3.0f, 0.01f, 1.0f),
+        1.0f,
+        juce::String(),
+        juce::AudioProcessorParameter::genericParameter,
+        [](float v, int) { return juce::String(v, 2); },
+        nullptr));
+
     return layout;
 }
 
@@ -260,6 +271,16 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             lastRotY = newRotY;
             lastRotZ = newRotZ;
             synth.setObjectRotation(newRotX, newRotY, newRotZ);
+        }
+    }
+
+    // Thickness: only update synth when APVTS value actually changes
+    {
+        float newThickness = apvts.getRawParameterValue("thickness")->load();
+        if (newThickness != lastThickness)
+        {
+            lastThickness = newThickness;
+            synth.setThickness(newThickness);
         }
     }
 
