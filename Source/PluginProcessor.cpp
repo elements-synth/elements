@@ -76,12 +76,12 @@ ElementsAudioProcessor::createParameterLayout()
         [](float v, int) { return juce::String(v, 1) + juce::String::fromUTF8("\xC2\xB0"); },
         nullptr));
 
-    // Thickness: 0.1 (thin/bright) – 3.0 (thick/dark), default 1.0
+    // Thickness: 0.1 (thin/bright) – 2.0 (thick/dark), default 0.5
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"thickness", 1},
         "Thickness",
-        juce::NormalisableRange<float>(0.1f, 3.0f, 0.01f, 1.0f),
-        1.0f,
+        juce::NormalisableRange<float>(0.1f, 2.0f, 0.01f, 1.0f),
+        0.5f,
         juce::String(),
         juce::AudioProcessorParameter::genericParameter,
         [](float v, int) { return juce::String(v, 2); },

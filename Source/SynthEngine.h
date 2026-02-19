@@ -386,6 +386,7 @@ public:
     // --- Oscilloscope Access (for visualization) ---
 
     const std::array<float, 512>& getOscilloscopeBuffer() const { return oscilloscopeBuffer; }
+    int getOscilloscopeWritePos() const { return oscilloscopeWritePos; }
 
 private:
     // --- Internal Methods ---

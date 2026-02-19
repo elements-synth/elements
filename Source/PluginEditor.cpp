@@ -1674,10 +1674,11 @@ void OscilloscopeDisplay::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xFF2A2A3A));
     g.drawHorizontalLine(static_cast<int>(centerY), bounds.getX() + 4, bounds.getRight() - 4);
 
-    // Get waveform buffer
+    // Get waveform buffer (circular — writePos is the oldest sample)
     const auto& buffer = processor.getOscilloscopeBuffer();
     int bufferSize = static_cast<int>(buffer.size());
     if (bufferSize == 0) return;
+    int writePos = processor.getOscilloscopeWritePos();
 
     // Draw waveform with auto-scaling
     juce::Path waveformPath;
@@ -1686,21 +1687,21 @@ void OscilloscopeDisplay::paint(juce::Graphics& g)
     float startX = bounds.getX() + 4.0f;
 
     // Find peak for auto-scaling
-    float peak = 0.001f;  // Minimum to avoid division by zero
+    float peak = 0.001f;
     for (int i = 0; i < bufferSize; ++i)
     {
         float absVal = std::abs(buffer[static_cast<size_t>(i)]);
         if (absVal > peak) peak = absVal;
     }
 
-    // Scale factor with some headroom (amplify weak signals)
     float scale = (height * 0.45f) / peak;
-    scale = std::min(scale, height * 5.0f);  // Cap maximum amplification
+    scale = std::min(scale, height * 5.0f);
 
     for (int i = 0; i < bufferSize; ++i)
     {
+        int idx = (writePos + i) % bufferSize;  // read from oldest to newest
         float x = startX + (width * i / bufferSize);
-        float sample = buffer[static_cast<size_t>(i)];
+        float sample = buffer[static_cast<size_t>(idx)];
         float y = centerY - (sample * scale);
 
         if (i == 0)
@@ -1709,7 +1710,7 @@ void OscilloscopeDisplay::paint(juce::Graphics& g)
             waveformPath.lineTo(x, y);
     }
 
-    g.setColour(juce::Colour(0xFF4A90E2));
+    g.setColour(waveformColour);
     g.strokePath(waveformPath, juce::PathStrokeType(1.5f));
 
     // Border
@@ -1735,11 +1736,11 @@ void ADSRDisplay::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xFF0D0D15));
     g.fillRoundedRectangle(bounds, 6.0f);
 
-    // Get ADSR values
-    float attack  = processor.getAttack();
-    float decay   = processor.getDecay();
-    float sustain = processor.getSustain();
-    float release = processor.getRelease();
+    // Get ADSR values (amp or filter depending on mode)
+    float attack  = filterMode ? processor.getFilterAttack()  : processor.getAttack();
+    float decay   = filterMode ? processor.getFilterDecay()   : processor.getDecay();
+    float sustain = filterMode ? processor.getFilterSustain() : processor.getSustain();
+    float release = filterMode ? processor.getFilterRelease() : processor.getRelease();
 
     // Visual sustain hold duration (fixed for display)
     float sustainHold = 0.3f;
@@ -1787,7 +1788,7 @@ void ADSRDisplay::paint(juce::Graphics& g)
     curvePath.lineTo(x3, ySus);               // Sustain hold
     curvePath.lineTo(x4, yBottom);            // Release: sustain → 0
 
-    g.setColour(juce::Colour(0xFF4A90E2));
+    g.setColour(envelopeColour);
     g.strokePath(curvePath, juce::PathStrokeType(1.5f));
 
     // Filled area under curve (subtle)
@@ -1795,7 +1796,7 @@ void ADSRDisplay::paint(juce::Graphics& g)
     fillPath.lineTo(x4, yBottom);
     fillPath.lineTo(x0, yBottom);
     fillPath.closeSubPath();
-    g.setColour(juce::Colour(0xFF4A90E2).withAlpha(0.08f));
+    g.setColour(envelopeColour.withAlpha(0.08f));
     g.fillPath(fillPath);
 
     // Border
@@ -1974,6 +1975,17 @@ juce::Rectangle<int> PianoRoll::getKeyBounds(int note, bool isBlack)
 // LIGHT PANEL
 // ==============================================================================
 
+static juce::Colour getLightSourceColour(int id)
+{
+    switch (id)
+    {
+        case 1: return juce::Colour(0xFFE07830);  // Sunset — orange
+        case 2: return juce::Colour(0xFFD4A843);  // Daylight — gold
+        case 3: return juce::Colour(0xFF7EC8E3);  // LED Cool — light blue
+        default: return ElementsColors::text;
+    }
+}
+
 LightPanel::LightPanel(ElementsAudioProcessor& p, int idx, const juce::String& name)
     : processor(p), lightIndex(idx), lightName(name)
 {
@@ -1986,6 +1998,7 @@ LightPanel::LightPanel(ElementsAudioProcessor& p, int idx, const juce::String& n
     sourceCombo.addItem("Daylight", 2);
     sourceCombo.addItem("LED Cool", 3);
     sourceCombo.setSelectedId(idx + 1);
+    sourceCombo.setColour(juce::ComboBox::textColourId, getLightSourceColour(idx + 1));
     sourceCombo.addListener(this);
     addAndMakeVisible(sourceCombo);
 }
@@ -1994,7 +2007,7 @@ LightPanel::~LightPanel() {}
 
 void LightPanel::paint(juce::Graphics& g)
 {
-    g.setColour(juce::Colour(0xFF2A2A3A));
+    g.setColour(juce::Colour(0x601c2534));
     g.fillRoundedRectangle(getLocalBounds().toFloat(), 4.0f);
 }
 
@@ -2014,6 +2027,8 @@ void LightPanel::buttonClicked(juce::Button*)
 void LightPanel::comboBoxChanged(juce::ComboBox*)
 {
     processor.setLightSource(lightIndex, sourceCombo.getSelectedId() - 1);
+    sourceCombo.setColour(juce::ComboBox::textColourId,
+                          getLightSourceColour(sourceCombo.getSelectedId()));
 }
 
 void LightPanel::setEnabled(bool enabled)
@@ -2027,43 +2042,150 @@ void LightPanel::setEnabled(bool enabled)
 
 ElementsLookAndFeel::ElementsLookAndFeel()
 {
-    setColour(juce::Slider::thumbColourId, juce::Colour(0xFF4A90E2));
-    setColour(juce::Slider::rotarySliderFillColourId, juce::Colour(0xFF4A90E2));
-    setColour(juce::Slider::rotarySliderOutlineColourId, juce::Colour(0xFF2A2A3A));
-    setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF2A2A3A));
-    setColour(juce::ComboBox::textColourId, juce::Colours::white);
-    setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF2A2A3A));
-    setColour(juce::Label::textColourId, juce::Colours::white);
-    setColour(juce::ToggleButton::textColourId, juce::Colours::white);
-    setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF4A90E2));
+    jbmRegular = juce::Typeface::createSystemTypefaceFor(
+        BinaryData::JetBrainsMonoRegular_ttf, BinaryData::JetBrainsMonoRegular_ttfSize);
+    jbmBold = juce::Typeface::createSystemTypefaceFor(
+        BinaryData::JetBrainsMonoBold_ttf, BinaryData::JetBrainsMonoBold_ttfSize);
+
+    setColour(juce::Slider::thumbColourId, currentAccent);
+    setColour(juce::Slider::rotarySliderFillColourId, currentAccent);
+    setColour(juce::Slider::rotarySliderOutlineColourId, ElementsColors::bg2);
+    setColour(juce::ComboBox::backgroundColourId, ElementsColors::bg3.withAlpha(0.6f));
+    setColour(juce::ComboBox::textColourId, ElementsColors::text);
+    setColour(juce::ComboBox::outlineColourId, ElementsColors::border.withAlpha(0.5f));
+    setColour(juce::TextButton::buttonColourId, ElementsColors::bg3.withAlpha(0.6f));
+    setColour(juce::Label::textColourId, ElementsColors::text);
+    setColour(juce::ToggleButton::textColourId, ElementsColors::text);
+    setColour(juce::ToggleButton::tickColourId, currentAccent);
+    setColour(juce::PopupMenu::backgroundColourId, ElementsColors::bg2.withAlpha(0.9f));
+    setColour(juce::PopupMenu::textColourId, ElementsColors::mid);
+    setColour(juce::PopupMenu::highlightedBackgroundColourId, ElementsColors::bg3.withAlpha(0.9f));
+    setColour(juce::PopupMenu::highlightedTextColourId, ElementsColors::text);
+}
+
+juce::Typeface::Ptr ElementsLookAndFeel::getTypefaceForFont(const juce::Font& font)
+{
+    if (font.isBold())
+        return jbmBold;
+    return jbmRegular;
 }
 
 void ElementsLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                                            float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                                            juce::Slider&)
 {
-    auto radius = static_cast<float>(juce::jmin(width / 2, height / 2)) - 4.0f;
-    auto centreX = static_cast<float>(x + width / 2);
-    auto centreY = static_cast<float>(y + height / 2);
-    auto angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+    const float PI = juce::MathConstants<float>::pi;
+    auto knobSize = static_cast<float>(juce::jmin(width, height));
+    auto centreX = static_cast<float>(x) + static_cast<float>(width) * 0.5f;
+    auto centreY = static_cast<float>(y) + static_cast<float>(height) * 0.5f;
 
-    g.setColour(juce::Colour(0xFF1A1A2A));
-    g.fillEllipse(centreX - radius, centreY - radius, radius * 2, radius * 2);
+    // Use JUCE-provided angles (0 = 12 o'clock, CW positive)
+    // Default: ~7 o'clock to ~5 o'clock (280° sweep)
+    float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
 
-    juce::Path arc;
-    arc.addCentredArc(centreX, centreY, radius - 4, radius - 4, 0, rotaryStartAngle, rotaryEndAngle, true);
-    g.setColour(juce::Colour(0xFF2A2A3A));
-    g.strokePath(arc, juce::PathStrokeType(3.0f));
+    // Position helper: JUCE rotary convention (0=top, CW+)
+    auto posX = [&](float a, float r) { return centreX + r * std::sin(a); };
+    auto posY = [&](float a, float r) { return centreY - r * std::cos(a); };
 
-    juce::Path valueArc;
-    valueArc.addCentredArc(centreX, centreY, radius - 4, radius - 4, 0, rotaryStartAngle, angle, true);
-    g.setColour(juce::Colour(0xFF4A90E2));
-    g.strokePath(valueArc, juce::PathStrokeType(3.0f));
+    // --- 1. Outer ring separator ---
+    float outerRingR = knobSize * 0.46f;
+    g.setColour(ElementsColors::border.withAlpha(0.8f));
+    g.drawEllipse(centreX - outerRingR, centreY - outerRingR,
+                  outerRingR * 2, outerRingR * 2, 0.8f);
 
-    juce::Path thumb;
-    thumb.addRectangle(-2.0f, -radius + 6, 4.0f, radius * 0.5f);
-    g.setColour(juce::Colours::white);
-    g.fillPath(thumb, juce::AffineTransform::rotation(angle).translated(centreX, centreY));
+    // --- 2. Arc track (full sweep) ---
+    float arcR = knobSize * 0.41f;
+    {
+        juce::Path track;
+        track.addCentredArc(centreX, centreY, arcR, arcR, 0,
+                            rotaryStartAngle, rotaryEndAngle, true);
+        g.setColour(ElementsColors::border);
+        g.strokePath(track, juce::PathStrokeType(3.0f));
+    }
+
+    // --- 3. Progress arc with opacity gradient ---
+    if (sliderPos > 0.001f)
+    {
+        const int numSegs = 40;
+        for (int i = 0; i < numSegs; ++i)
+        {
+            float t0 = static_cast<float>(i) / numSegs;
+            float t1 = static_cast<float>(i + 1) / numSegs;
+            if (t0 >= sliderPos) break;
+            if (t1 > sliderPos) t1 = sliderPos;
+
+            float a0 = rotaryStartAngle + t0 * (rotaryEndAngle - rotaryStartAngle);
+            float a1 = rotaryStartAngle + t1 * (rotaryEndAngle - rotaryStartAngle);
+
+            // Opacity: 0.08 at arc start → 1.0 at arc end
+            float opacity = 0.08f + 0.92f * t1;
+
+            juce::Path seg;
+            seg.addCentredArc(centreX, centreY, arcR, arcR, 0, a0, a1, true);
+            g.setColour(currentAccent.withAlpha(opacity));
+            g.strokePath(seg, juce::PathStrokeType(3.0f));
+        }
+    }
+
+    // Endpoint white dot with glow (always visible)
+    {
+        float endX = posX(angle, arcR);
+        float endY = posY(angle, arcR);
+
+        g.setColour(currentAccent.withAlpha(0.25f));
+        g.fillEllipse(endX - 5, endY - 5, 10, 10);
+        g.setColour(juce::Colours::white);
+        g.fillEllipse(endX - 2.5f, endY - 2.5f, 5, 5);
+    }
+
+    // --- 4. Indicator line (radius 0.22 → 0.60) ---
+    {
+        float r0 = knobSize * 0.11f;
+        float r1 = knobSize * 0.30f;
+
+        g.setColour(currentAccent.withAlpha(0.5f));
+        g.drawLine(posX(angle, r0), posY(angle, r0),
+                   posX(angle, r1), posY(angle, r1), 1.1f);
+    }
+
+    // --- 5. Diaphragm (8 blades) ---
+    {
+        float oR = knobSize * 0.26f;  // outer radius of diaphragm (0.52 * half)
+        float iR = juce::jmap(sliderPos, oR * 0.08f, oR * 0.88f); // aperture radius
+        float bladeLen = oR - iR;
+
+        for (int i = 0; i < 8; ++i)
+        {
+            float bladeAngle = (static_cast<float>(i) / 8.0f) * 2.0f * PI
+                              - sliderPos * PI * 0.18f;
+
+            float pivotX = iR;
+            float rootW = knobSize * 0.04f;
+            float tipW  = knobSize * 0.015f;
+
+            juce::Path blade;
+            blade.startNewSubPath(pivotX, -rootW);
+            blade.lineTo(pivotX + bladeLen, -tipW);
+            blade.lineTo(pivotX + bladeLen,  tipW);
+            blade.lineTo(pivotX,  rootW);
+            blade.closeSubPath();
+
+            auto xf = juce::AffineTransform::rotation(bladeAngle)
+                          .translated(centreX, centreY);
+
+            g.setColour(currentAccent.withAlpha(0.12f));
+            g.fillPath(blade, xf);
+            g.setColour(currentAccent.withAlpha(0.28f));
+            g.strokePath(blade, juce::PathStrokeType(0.6f), xf);
+        }
+
+        // --- 6. Aperture center glow ---
+        float glowR = iR + 2.0f;
+        juce::ColourGradient glow(currentAccent.withAlpha(0.65f), centreX, centreY,
+                                  currentAccent.withAlpha(0.0f), centreX + glowR, centreY, true);
+        g.setGradientFill(glow);
+        g.fillEllipse(centreX - glowR, centreY - glowR, glowR * 2, glowR * 2);
+    }
 }
 
 void ElementsLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
@@ -2075,27 +2197,94 @@ void ElementsLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int 
     if (isHorizontal)
     {
         float trackY = static_cast<float>(y + height / 2);
-        g.setColour(juce::Colour(0xFF2A2A3A));
-        g.fillRoundedRectangle(static_cast<float>(x), trackY - 2, static_cast<float>(width), 4.0f, 2.0f);
+        g.setColour(ElementsColors::bg2);
+        g.fillRoundedRectangle(static_cast<float>(x), trackY - 1.5f, static_cast<float>(width), 3.0f, 1.5f);
 
-        g.setColour(juce::Colour(0xFF4A90E2));
-        g.fillRoundedRectangle(static_cast<float>(x), trackY - 2, sliderPos - x, 4.0f, 2.0f);
+        g.setColour(currentAccent);
+        g.fillRoundedRectangle(static_cast<float>(x), trackY - 1.5f, sliderPos - x, 3.0f, 1.5f);
 
-        g.setColour(juce::Colours::white);
-        g.fillEllipse(sliderPos - 6, trackY - 6, 12.0f, 12.0f);
+        // Thumb with glow
+        g.setColour(currentAccent.withAlpha(0.2f));
+        g.fillEllipse(sliderPos - 7, trackY - 7, 14.0f, 14.0f);
+        g.setColour(ElementsColors::bg1);
+        g.fillEllipse(sliderPos - 5, trackY - 5, 10.0f, 10.0f);
+        g.setColour(currentAccent);
+        g.drawEllipse(sliderPos - 5, trackY - 5, 10.0f, 10.0f, 1.2f);
     }
     else
     {
         float trackX = static_cast<float>(x + width / 2);
-        g.setColour(juce::Colour(0xFF2A2A3A));
-        g.fillRoundedRectangle(trackX - 2, static_cast<float>(y), 4.0f, static_cast<float>(height), 2.0f);
+        g.setColour(ElementsColors::bg2);
+        g.fillRoundedRectangle(trackX - 1.5f, static_cast<float>(y), 3.0f, static_cast<float>(height), 1.5f);
 
-        g.setColour(juce::Colour(0xFF4A90E2));
-        g.fillRoundedRectangle(trackX - 2, sliderPos, 4.0f, static_cast<float>(y + height) - sliderPos, 2.0f);
+        g.setColour(currentAccent);
+        g.fillRoundedRectangle(trackX - 1.5f, sliderPos, 3.0f, static_cast<float>(y + height) - sliderPos, 1.5f);
 
-        g.setColour(juce::Colours::white);
-        g.fillEllipse(trackX - 6, sliderPos - 6, 12.0f, 12.0f);
+        g.setColour(currentAccent.withAlpha(0.2f));
+        g.fillEllipse(trackX - 7, sliderPos - 7, 14.0f, 14.0f);
+        g.setColour(ElementsColors::bg1);
+        g.fillEllipse(trackX - 5, sliderPos - 5, 10.0f, 10.0f);
+        g.setColour(currentAccent);
+        g.drawEllipse(trackX - 5, sliderPos - 5, 10.0f, 10.0f, 1.2f);
     }
+}
+
+juce::Colour ElementsLookAndFeel::getColourForItemText(const juce::String& text) const
+{
+    // Materials
+    if (text == "Diamond")   return MaterialAccents::diamond;
+    if (text == "Water")     return MaterialAccents::water;
+    if (text == "Amber")     return MaterialAccents::amber;
+    if (text == "Ruby")      return MaterialAccents::ruby;
+    if (text == "Gold")      return MaterialAccents::gold;
+    if (text == "Emerald")   return MaterialAccents::emerald;
+    if (text == "Amethyst")  return MaterialAccents::amethyst;
+    if (text == "Sapphire")  return MaterialAccents::sapphire;
+    if (text == "Copper")    return MaterialAccents::copper;
+    if (text == "Obsidian")  return MaterialAccents::obsidian;
+    // Light sources
+    if (text == "Sunset")    return juce::Colour(0xFFE07830);
+    if (text == "Daylight")  return juce::Colour(0xFFD4A843);
+    if (text == "LED Cool")  return juce::Colour(0xFF7EC8E3);
+
+    return ElementsColors::text;
+}
+
+void ElementsLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rectangle<int>& area,
+                                            bool isSeparator, bool isActive, bool isHighlighted,
+                                            bool isTicked, bool /*hasSubMenu*/,
+                                            const juce::String& text, const juce::String& /*shortcutKeyText*/,
+                                            const juce::Drawable* /*icon*/, const juce::Colour* /*textColour*/)
+{
+    if (isSeparator)
+    {
+        auto r = area.reduced(5, 0).withHeight(1).withCentre(area.getCentre());
+        g.setColour(ElementsColors::border);
+        g.fillRect(r);
+        return;
+    }
+
+    if (isHighlighted && isActive)
+    {
+        g.setColour(ElementsColors::bg3.withAlpha(0.9f));
+        g.fillRect(area);
+    }
+
+    auto itemColour = getColourForItemText(text);
+    if (!isActive)
+        itemColour = itemColour.withAlpha(0.3f);
+
+    auto textArea = area;
+    if (isTicked)
+    {
+        g.setColour(itemColour);
+        auto tickArea = textArea.removeFromLeft(textArea.getHeight()).reduced(6);
+        g.fillEllipse(tickArea.toFloat());
+    }
+
+    g.setColour(itemColour);
+    g.setFont(juce::Font(13.0f));
+    g.drawText(text, textArea.reduced(8, 0), juce::Justification::centredLeft);
 }
 
 // ==============================================================================
@@ -2109,89 +2298,125 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
       pianoRoll(p),
       spectrumDisplay(p),
       oscilloscopeDisplay(p),
-      adsrDisplay(p)
+      adsrDisplay(p),
+      filterAdsrDisplay(p, true)
 {
     setLookAndFeel(&lookAndFeel);
+    juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
+    lookAndFeel.setAccent(MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
 
-    // === LEFT COLUMN: Materials + Geometry + Rotation + Lights ===
-    setupLabel(materialsLabel, "MATERIALS", 13.0f, true);
+    // === TOOLBAR: Geometry + Material dropdowns (floating inside viewport) ===
+    geoLabel.setText("GEO", juce::dontSendNotification);
+    geoLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    geoLabel.setJustificationType(juce::Justification::centred);
+    geoLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(geoLabel);
+
+    geoCombo.addItem("Cube", 1);
+    geoCombo.addItem("Sphere", 2);
+    geoCombo.addItem("Torus", 3);
+    geoCombo.addItem("Dodeca", 4);
+    geoCombo.setSelectedId(static_cast<int>(audioProcessor.getGeometry()) + 1, juce::dontSendNotification);
+    geoCombo.addListener(this);
+    viewport3D.addAndMakeVisible(geoCombo);
+
+    matLabel.setText("MAT", juce::dontSendNotification);
+    matLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    matLabel.setJustificationType(juce::Justification::centred);
+    matLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(matLabel);
+
     for (int i = 0; i < NUM_MATERIALS; ++i)
-    {
-        auto* btn = new juce::TextButton(materialNames[i]);
-        btn->addListener(this);
-        btn->setColour(juce::TextButton::buttonColourId, materialColours[i].darker(0.5f));
-        btn->setColour(juce::TextButton::textColourOffId,
-                       materialColours[i].getBrightness() > 0.5f ? juce::Colours::black : juce::Colours::white);
-        addAndMakeVisible(btn);
-        materialButtons.add(btn);
-    }
+        matCombo.addItem(materialNames[i], i + 1);
+    matCombo.setSelectedId(audioProcessor.getMaterial() + 1, juce::dontSendNotification);
+    matCombo.addListener(this);
+    matCombo.setColour(juce::ComboBox::textColourId,
+                       MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
+    viewport3D.addAndMakeVisible(matCombo);
 
-    setupLabel(geometryLabel, "GEOMETRY", 13.0f, true);
-    cubeButton.addListener(this);
-    sphereButton.addListener(this);
-    torusButton.addListener(this);
-    dodecaButton.addListener(this);
-    addAndMakeVisible(cubeButton);
-    addAndMakeVisible(sphereButton);
-    addAndMakeVisible(torusButton);
-    addAndMakeVisible(dodecaButton);
+    // Set initial visualizer colors to match material
+    oscilloscopeDisplay.setWaveformColour(
+        MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
+    adsrDisplay.setEnvelopeColour(
+        MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
+    filterAdsrDisplay.setEnvelopeColour(
+        MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
 
-    // Thickness slider
-    setupLabel(thicknessLabel, "THICKNESS", 13.0f, true);
-    setupRotarySlider(thicknessSlider, 0.1, 3.0, 1.0);
-    thicknessAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "thickness", thicknessSlider);
-
-    // Rotation numeric display
-    setupLabel(rotationLabel, "ROTATION", 13.0f, true);
-
+    // === Rotation fields (floating inside viewport, left column) ===
     auto setupRotLabel = [&](juce::Label& lbl, const juce::String& text, juce::Colour col) {
         lbl.setText(text, juce::dontSendNotification);
-        lbl.setFont(juce::Font(11.0f, juce::Font::bold));
+        lbl.setFont(juce::Font(10.0f, juce::Font::bold));
         lbl.setColour(juce::Label::textColourId, col);
-        lbl.setJustificationType(juce::Justification::centred);
-        addAndMakeVisible(lbl);
+        lbl.setJustificationType(juce::Justification::centredRight);
+        viewport3D.addAndMakeVisible(lbl);
     };
     auto setupRotValue = [&](juce::Label& lbl) {
         lbl.setText("0.0", juce::dontSendNotification);
         lbl.setFont(juce::Font(11.0f));
-        lbl.setColour(juce::Label::textColourId, juce::Colours::white);
-        lbl.setColour(juce::Label::backgroundColourId, juce::Colour(0xFF1A1A2A));
-        lbl.setColour(juce::Label::outlineColourId, juce::Colour(0xFF3A3A4A));
+        lbl.setColour(juce::Label::textColourId, ElementsColors::text);
+        lbl.setColour(juce::Label::backgroundColourId, ElementsColors::bg3.withAlpha(0.5f));
+        lbl.setColour(juce::Label::outlineColourId, ElementsColors::border.withAlpha(0.4f));
         lbl.setJustificationType(juce::Justification::centred);
         lbl.setEditable(true);
-        addAndMakeVisible(lbl);
+        lbl.addListener(this);
+        viewport3D.addAndMakeVisible(lbl);
     };
 
-    setupRotLabel(rotXLabel, "X", juce::Colour(0xFFE03030));
-    setupRotLabel(rotYLabel, "Y", juce::Colour(0xFF30E030));
-    setupRotLabel(rotZLabel, "Z", juce::Colour(0xFF3060E0));
+    setupRotLabel(rotXLabel, "rotX", juce::Colour(0xFFE03030));
+    setupRotLabel(rotYLabel, "rotY", juce::Colour(0xFF30E030));
+    setupRotLabel(rotZLabel, "rotZ", juce::Colour(0xFF3060E0));
     setupRotValue(rotXValue);
     setupRotValue(rotYValue);
     setupRotValue(rotZValue);
-    rotXValue.addListener(this);
-    rotYValue.addListener(this);
-    rotZValue.addListener(this);
 
+    resetRotationButton.setColour(juce::TextButton::buttonColourId, ElementsColors::bg3.withAlpha(0.5f));
+    resetRotationButton.setColour(juce::TextButton::textColourOffId, ElementsColors::text);
     resetRotationButton.addListener(this);
-    resetRotationButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF2A2A3A));
-    addAndMakeVisible(resetRotationButton);
+    viewport3D.addAndMakeVisible(resetRotationButton);
 
-    setupLabel(lightsLabel, "LIGHTS", 13.0f, true);
+    // === Lights + Thickness (floating inside viewport bottom) ===
+
+    // Thickness — horizontal slider in viewport top bar
+    thicknessLabel.setText("Thickness", juce::dontSendNotification);
+    thicknessLabel.setFont(juce::Font(13.0f, juce::Font::bold));
+    thicknessLabel.setJustificationType(juce::Justification::centredLeft);
+    thicknessLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(thicknessLabel);
+
+    thicknessSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    thicknessSlider.setRange(0.1, 2.0, 0.01);
+    thicknessSlider.setValue(0.5);
+    thicknessSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    thicknessSlider.addListener(this);
+    viewport3D.addAndMakeVisible(thicknessSlider);
+    thicknessAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "thickness", thicknessSlider);
+
+    lightsLabel.setText("LIGHTS", juce::dontSendNotification);
+    lightsLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    lightsLabel.setJustificationType(juce::Justification::centred);
+    lightsLabel.setColour(juce::Label::textColourId, ElementsColors::dim);
+    viewport3D.addAndMakeVisible(lightsLabel);
+
     keyLightPanel = std::make_unique<LightPanel>(p, 0, "Key");
     fillLightPanel = std::make_unique<LightPanel>(p, 1, "Fill");
     rimLightPanel = std::make_unique<LightPanel>(p, 2, "Rim");
-    addAndMakeVisible(keyLightPanel.get());
-    addAndMakeVisible(fillLightPanel.get());
-    addAndMakeVisible(rimLightPanel.get());
+    viewport3D.addAndMakeVisible(keyLightPanel.get());
+    viewport3D.addAndMakeVisible(fillLightPanel.get());
+    viewport3D.addAndMakeVisible(rimLightPanel.get());
 
     // === CENTER COLUMN: Viewport + Piano ===
     addAndMakeVisible(viewport3D);
     addAndMakeVisible(pianoRoll);
 
     // === RIGHT COLUMN: Spectrum + Oscilloscope + Controls ===
+    setupLabel(spectrumLabel, "SPECTRUM", 13.0f, true);
+    spectrumLabel.setColour(juce::Label::textColourId, ElementsColors::dim);
+    setupLabel(oscilloscopeLabel, "OSCILLOSCOPE", 13.0f, true);
+    oscilloscopeLabel.setColour(juce::Label::textColourId, ElementsColors::dim);
     addAndMakeVisible(spectrumDisplay);
     addAndMakeVisible(oscilloscopeDisplay);
     addAndMakeVisible(adsrDisplay);
+    addAndMakeVisible(filterAdsrDisplay);
 
     setupLabel(filterLabel, "FILTER", 13.0f, true);
     filterBypassButton.setToggleState(true, juce::dontSendNotification);  // Filter ON by default
@@ -2239,11 +2464,8 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     setupLabel(volumeLabel, "VOLUME", 13.0f, true);
     setupRotarySlider(volumeSlider, 0, 1, 0.8);
 
-    updateMaterialButtons();
-    updateGeometryButtons();
-
     startTimerHz(30);
-    setSize(1000, 750);
+    setSize(1100, 770);
 }
 
 ElementsAudioProcessorEditor::~ElementsAudioProcessorEditor()
@@ -2254,10 +2476,25 @@ ElementsAudioProcessorEditor::~ElementsAudioProcessorEditor()
 
 void ElementsAudioProcessorEditor::timerCallback()
 {
-    updateMaterialButtons();
-    updateGeometryButtons();
+    // Sync combos from processor (for DAW automation changes)
+    int geo = static_cast<int>(audioProcessor.getGeometry()) + 1;
+    if (geoCombo.getSelectedId() != geo)
+        geoCombo.setSelectedId(geo, juce::dontSendNotification);
 
-    // Update rotation value displays
+    int mat = audioProcessor.getMaterial() + 1;
+    if (matCombo.getSelectedId() != mat)
+    {
+        matCombo.setSelectedId(mat, juce::dontSendNotification);
+        auto accent = MaterialAccents::getAccentForMaterial(mat - 1);
+        lookAndFeel.setAccent(accent);
+        matCombo.setColour(juce::ComboBox::textColourId, accent);
+        oscilloscopeDisplay.setWaveformColour(accent);
+        adsrDisplay.setEnvelopeColour(accent);
+        filterAdsrDisplay.setEnvelopeColour(accent);
+        repaint();
+    }
+
+    // Sync rotation value displays
     auto fmt = [](float v) { return juce::String(v, 1); };
     rotXValue.setText(fmt(audioProcessor.getRotationX()), juce::dontSendNotification);
     rotYValue.setText(fmt(audioProcessor.getRotationY()), juce::dontSendNotification);
@@ -2285,103 +2522,63 @@ void ElementsAudioProcessorEditor::setupLabel(juce::Label& label, const juce::St
 
 void ElementsAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF12121A));
+    g.fillAll(ElementsColors::bg0);
 
     // Title
-    g.setColour(juce::Colours::white);
+    g.setColour(ElementsColors::text);
     g.setFont(juce::Font(28.0f, juce::Font::bold));
     g.drawText("ELEMENTS", 20, 10, 200, 30, juce::Justification::centredLeft);
 
-    g.setColour(juce::Colour(0xFF4A90E2));
+    g.setColour(lookAndFeel.getAccent());
     g.setFont(juce::Font(12.0f));
     g.drawText("Spectral Synthesizer", 20, 38, 200, 16, juce::Justification::centredLeft);
 
-    // Column separators
-    g.setColour(juce::Colour(0xFF2A2A3A));
-    g.drawVerticalLine(200, 60, static_cast<float>(getHeight() - 10));
-    g.drawVerticalLine(getWidth() - 200, 60, static_cast<float>(getHeight() - 10));
+    // Section frames (Microfreak-style rounded borders)
+    for (auto& frame : sectionFrames)
+    {
+        g.setColour(ElementsColors::mid.withAlpha(0.35f));
+        g.drawRoundedRectangle(frame.toFloat().reduced(0.5f), 4.0f, 1.17f);
+    }
 }
 
 void ElementsAudioProcessorEditor::resized()
 {
     auto bounds = getLocalBounds();
-    bounds.removeFromTop(60);  // Header
+    int pad = 8;
 
-    int leftWidth = 200;
-    int rightWidth = 200;
-    int padding = 10;
+    // === BOTTOM: Piano Roll (full width) ===
+    auto pianoArea = bounds.removeFromBottom(52);
+    pianoRoll.setBounds(pianoArea);
 
-    // === LEFT COLUMN: Materials + Geometry + Rotation + Lights ===
-    auto leftCol = bounds.removeFromLeft(leftWidth).reduced(padding);
+    // === Header (title only, combos are inside viewport) ===
+    bounds.removeFromTop(56);
 
-    materialsLabel.setBounds(leftCol.removeFromTop(20));
-    leftCol.removeFromTop(5);
+    // === RIGHT COLUMN: 310px ===
+    auto rightCol = bounds.removeFromRight(310).reduced(pad);
+    sectionFrames.clear();
+    int envTotalW = rightCol.getWidth() * 3 / 4;
+    int envMargin = (rightCol.getWidth() - envTotalW) / 2;
 
-    for (int i = 0; i < NUM_MATERIALS; ++i)
-    {
-        materialButtons[i]->setBounds(leftCol.removeFromTop(28).reduced(2, 2));
-    }
+    // --- SPECTRUM ---
+    spectrumLabel.setBounds(rightCol.removeFromTop(14));
+    spectrumDisplay.setBounds(rightCol.removeFromTop(48));
+    rightCol.removeFromTop(6);
 
-    leftCol.removeFromTop(10);
-    geometryLabel.setBounds(leftCol.removeFromTop(20));
-    leftCol.removeFromTop(5);
-    auto geomRow = leftCol.removeFromTop(28);
-    int geomBtnW = geomRow.getWidth() / 4;
-    sphereButton.setBounds(geomRow.removeFromLeft(geomBtnW).reduced(1, 0));
-    torusButton.setBounds(geomRow.removeFromLeft(geomBtnW).reduced(1, 0));
-    dodecaButton.setBounds(geomRow.removeFromLeft(geomBtnW).reduced(1, 0));
-    cubeButton.setBounds(geomRow.reduced(1, 0));
+    // --- OSCILLOSCOPE ---
+    oscilloscopeLabel.setBounds(rightCol.removeFromTop(14));
+    oscilloscopeDisplay.setBounds(rightCol.removeFromTop(48));
+    rightCol.removeFromTop(8);
 
-    leftCol.removeFromTop(5);
-    thicknessLabel.setBounds(leftCol.removeFromTop(18));
-    thicknessSlider.setBounds(leftCol.removeFromTop(50).reduced(20, 0));
-
-    leftCol.removeFromTop(5);
-    rotationLabel.setBounds(leftCol.removeFromTop(20));
-    leftCol.removeFromTop(5);
-
-    // X Y Z rotation fields in a row: [Label][Value] [Label][Value] [Label][Value]
-    auto rotRow = leftCol.removeFromTop(22);
-    int rotFieldW = rotRow.getWidth() / 3;
-    auto rxArea = rotRow.removeFromLeft(rotFieldW);
-    auto ryArea = rotRow.removeFromLeft(rotFieldW);
-    auto rzArea = rotRow;
-    rotXLabel.setBounds(rxArea.removeFromLeft(16));
-    rotXValue.setBounds(rxArea.reduced(1, 0));
-    rotYLabel.setBounds(ryArea.removeFromLeft(16));
-    rotYValue.setBounds(ryArea.reduced(1, 0));
-    rotZLabel.setBounds(rzArea.removeFromLeft(16));
-    rotZValue.setBounds(rzArea.reduced(1, 0));
-
-    leftCol.removeFromTop(4);
-    resetRotationButton.setBounds(leftCol.removeFromTop(22).reduced(30, 0));
-
-    leftCol.removeFromTop(10);
-    lightsLabel.setBounds(leftCol.removeFromTop(20));
-    leftCol.removeFromTop(5);
-    keyLightPanel->setBounds(leftCol.removeFromTop(28));
-    leftCol.removeFromTop(3);
-    fillLightPanel->setBounds(leftCol.removeFromTop(28));
-    leftCol.removeFromTop(3);
-    rimLightPanel->setBounds(leftCol.removeFromTop(28));
-
-    // === RIGHT COLUMN: Spectrum + Oscilloscope + Controls ===
-    auto rightCol = bounds.removeFromRight(rightWidth).reduced(padding);
-
-    // Spectrum display at top
-    spectrumDisplay.setBounds(rightCol.removeFromTop(80));
-    rightCol.removeFromTop(10);
-
-    // Oscilloscope
-    oscilloscopeDisplay.setBounds(rightCol.removeFromTop(80));
-    rightCol.removeFromTop(10);
-
-    // Filter
+    // --- FILTER section (framed) ---
+    int filterFrameTop = rightCol.getY();
+    rightCol.removeFromTop(6); // inner padding top
     auto filterHeaderRow = rightCol.removeFromTop(20);
     filterLabel.setBounds(filterHeaderRow.removeFromLeft(60));
     filterBypassButton.setBounds(filterHeaderRow.removeFromRight(40));
-    rightCol.removeFromTop(5);
-    auto filterRow = rightCol.removeFromTop(50);
+    rightCol.removeFromTop(4);
+    filterTypeCombo.setBounds(rightCol.removeFromTop(24).reduced(10, 0));
+    rightCol.removeFromTop(4);
+    auto filterRow = rightCol.removeFromTop(55);
     int filterKnobW = filterRow.getWidth() / 2;
     auto filterCut = filterRow.removeFromLeft(filterKnobW);
     auto filterRes = filterRow;
@@ -2389,67 +2586,145 @@ void ElementsAudioProcessorEditor::resized()
     filterCutoffSlider.setBounds(filterCut);
     filterResonanceLabel.setBounds(filterRes.removeFromTop(14));
     filterResonanceSlider.setBounds(filterRes);
-    rightCol.removeFromTop(5);
-    filterTypeCombo.setBounds(rightCol.removeFromTop(24).reduced(10, 0));
 
-    // Filter Envelope
-    rightCol.removeFromTop(8);
-    filterEnvLabel.setBounds(rightCol.removeFromTop(18));
-    rightCol.removeFromTop(3);
-    auto fEnvRow = rightCol.removeFromTop(40);
-    int fEnvKnobW = fEnvRow.getWidth() / 4;
-    auto fEnvA = fEnvRow.removeFromLeft(fEnvKnobW);
-    auto fEnvD = fEnvRow.removeFromLeft(fEnvKnobW);
-    auto fEnvS = fEnvRow.removeFromLeft(fEnvKnobW);
-    auto fEnvR = fEnvRow;
-    fAttackLabel.setBounds(fEnvA.removeFromTop(12));
-    filterAttackSlider.setBounds(fEnvA);
-    fDecayLabel.setBounds(fEnvD.removeFromTop(12));
-    filterDecaySlider.setBounds(fEnvD);
-    fSustainLabel.setBounds(fEnvS.removeFromTop(12));
-    filterSustainSlider.setBounds(fEnvS);
-    fReleaseLabel.setBounds(fEnvR.removeFromTop(12));
-    filterReleaseSlider.setBounds(fEnvR);
+    // Filter Envelope (inside the FILTER frame)
+    rightCol.removeFromTop(4);
+    filterEnvLabel.setBounds(rightCol.removeFromTop(16));
+    rightCol.removeFromTop(4);
+    {
+        auto fEnvRow = rightCol.removeFromTop(50);
+        auto fEnvCenter = fEnvRow.withTrimmedLeft(envMargin).withTrimmedRight(envMargin);
+        int fEnvKnobW = fEnvCenter.getWidth() / 4;
+        auto fEnvA = fEnvCenter.removeFromLeft(fEnvKnobW);
+        auto fEnvD = fEnvCenter.removeFromLeft(fEnvKnobW);
+        auto fEnvS = fEnvCenter.removeFromLeft(fEnvKnobW);
+        auto fEnvR = fEnvCenter;
+        fAttackLabel.setBounds(fEnvA.removeFromTop(12));
+        filterAttackSlider.setBounds(fEnvA);
+        fDecayLabel.setBounds(fEnvD.removeFromTop(12));
+        filterDecaySlider.setBounds(fEnvD);
+        fSustainLabel.setBounds(fEnvS.removeFromTop(12));
+        filterSustainSlider.setBounds(fEnvS);
+        fReleaseLabel.setBounds(fEnvR.removeFromTop(12));
+        filterReleaseSlider.setBounds(fEnvR);
+    }
     rightCol.removeFromTop(2);
-    auto amtRow = rightCol.removeFromTop(36);
-    filterEnvAmountLabel.setBounds(amtRow.removeFromLeft(30).withTrimmedTop(8));
-    filterEnvAmountSlider.setBounds(amtRow.reduced(20, 0));
-
-    // Amplitude Envelope
+    filterEnvAmountLabel.setBounds(rightCol.removeFromTop(14));
+    rightCol.removeFromTop(2);
+    filterEnvAmountSlider.setBounds(rightCol.removeFromTop(49).reduced(30, 0));
+    rightCol.removeFromTop(2);
+    // Filter ADSR display — same 75% centered width as knobs
+    {
+        auto fAdsrRow = rightCol.removeFromTop(34);
+        filterAdsrDisplay.setBounds(fAdsrRow.withTrimmedLeft(envMargin).withTrimmedRight(envMargin));
+    }
+    rightCol.removeFromTop(6); // inner padding bottom
+    int filterFrameBottom = rightCol.getY();
+    sectionFrames.push_back({rightCol.getX(), filterFrameTop, rightCol.getWidth(), filterFrameBottom - filterFrameTop});
     rightCol.removeFromTop(8);
-    envelopeLabel.setBounds(rightCol.removeFromTop(18));
-    rightCol.removeFromTop(3);
-    auto envRow = rightCol.removeFromTop(40);
-    int envKnobW = envRow.getWidth() / 4;
-    auto envA = envRow.removeFromLeft(envKnobW);
-    auto envD = envRow.removeFromLeft(envKnobW);
-    auto envS = envRow.removeFromLeft(envKnobW);
-    auto envR = envRow;
-    attackLabel.setBounds(envA.removeFromTop(12));
-    attackSlider.setBounds(envA);
-    decayLabel.setBounds(envD.removeFromTop(12));
-    decaySlider.setBounds(envD);
-    sustainLabel.setBounds(envS.removeFromTop(12));
-    sustainSlider.setBounds(envS);
-    releaseLabel.setBounds(envR.removeFromTop(12));
-    releaseSlider.setBounds(envR);
 
-    rightCol.removeFromTop(3);
-    adsrDisplay.setBounds(rightCol.removeFromTop(50));
-    rightCol.removeFromTop(3);
-    volumeLabel.setBounds(rightCol.removeFromTop(18));
-    rightCol.removeFromTop(3);
-    volumeSlider.setBounds(rightCol.removeFromTop(40).reduced(30, 0));
+    // --- AMP ENV section (framed) ---
+    int ampFrameTop = rightCol.getY();
+    rightCol.removeFromTop(6); // inner padding top
+    envelopeLabel.setBounds(rightCol.removeFromTop(16));
+    rightCol.removeFromTop(4);
+    {
+        auto envRow = rightCol.removeFromTop(50);
+        auto envCenter = envRow.withTrimmedLeft(envMargin).withTrimmedRight(envMargin);
+        int envKnobW = envCenter.getWidth() / 4;
+        auto envA = envCenter.removeFromLeft(envKnobW);
+        auto envD = envCenter.removeFromLeft(envKnobW);
+        auto envS = envCenter.removeFromLeft(envKnobW);
+        auto envR = envCenter;
+        attackLabel.setBounds(envA.removeFromTop(12));
+        attackSlider.setBounds(envA);
+        decayLabel.setBounds(envD.removeFromTop(12));
+        decaySlider.setBounds(envD);
+        sustainLabel.setBounds(envS.removeFromTop(12));
+        sustainSlider.setBounds(envS);
+        releaseLabel.setBounds(envR.removeFromTop(12));
+        releaseSlider.setBounds(envR);
+    }
+    rightCol.removeFromTop(4);
+    // Amp ADSR display — same 75% centered width as knobs
+    {
+        auto aAdsrRow = rightCol.removeFromTop(34);
+        adsrDisplay.setBounds(aAdsrRow.withTrimmedLeft(envMargin).withTrimmedRight(envMargin));
+    }
+    rightCol.removeFromTop(6); // inner padding bottom
+    int ampFrameBottom = rightCol.getY();
+    sectionFrames.push_back({rightCol.getX(), ampFrameTop, rightCol.getWidth(), ampFrameBottom - ampFrameTop});
+    rightCol.removeFromTop(8);
 
-    // === CENTER COLUMN: Viewport + Piano ===
-    auto centerCol = bounds.reduced(padding);
+    // --- OUTPUT (framed) ---
+    int volFrameTop = rightCol.getY();
+    rightCol.removeFromTop(6);
+    volumeLabel.setBounds(rightCol.removeFromTop(16));
+    rightCol.removeFromTop(3);
+    volumeSlider.setBounds(rightCol.removeFromTop(80).reduced(30, 0));
+    rightCol.removeFromTop(6);
+    int volFrameBottom = rightCol.getY();
+    sectionFrames.push_back({rightCol.getX(), volFrameTop, rightCol.getWidth(), volFrameBottom - volFrameTop});
 
-    int pianoHeight = 80;
-    int viewportHeight = centerCol.getHeight() - pianoHeight - 10;
+    // === LEFT COLUMN: Viewport fills everything ===
+    auto leftCol = bounds.reduced(pad);
+    viewport3D.setBounds(leftCol);
 
-    viewport3D.setBounds(centerCol.removeFromTop(viewportHeight));
-    centerCol.removeFromTop(10);
-    pianoRoll.setBounds(centerCol);
+    // Position floating UI inside viewport (local coordinates)
+    int vpW = viewport3D.getWidth();
+    int vpH = viewport3D.getHeight();
+
+    // --- Top bar: Geo (left) + Mat (center) + Thickness (right) ---
+    int comboY = 8;
+    int comboH = 24;
+
+    // Geometry — left
+    geoLabel.setBounds(8, comboY, 30, comboH);
+    geoCombo.setBounds(40, comboY, 110, comboH);
+
+    // Material — center
+    int matX = vpW / 2 - 75;
+    matLabel.setBounds(matX, comboY, 30, comboH);
+    matCombo.setBounds(matX + 32, comboY, 120, comboH);
+
+    // Thickness — right
+    int thkSliderW = 100;
+    int thkLabelW = 58;
+    thicknessLabel.setBounds(vpW - 8 - thkSliderW - thkLabelW, comboY, thkLabelW, comboH);
+    thicknessSlider.setBounds(vpW - 8 - thkSliderW, comboY + 2, thkSliderW, comboH - 4);
+
+    // --- Left side: Rotation X Y Z (vertical stack) + Reset ---
+    int rotFieldW = 44;
+    int rotLabelW = 28;
+    int rotH = 20;
+    int rotLx = 8;
+    int ry = 44;
+
+    rotXLabel.setBounds(rotLx, ry, rotLabelW, rotH);
+    rotXValue.setBounds(rotLx + rotLabelW + 2, ry, rotFieldW, rotH);
+    ry += rotH + 3;
+    rotYLabel.setBounds(rotLx, ry, rotLabelW, rotH);
+    rotYValue.setBounds(rotLx + rotLabelW + 2, ry, rotFieldW, rotH);
+    ry += rotH + 3;
+    rotZLabel.setBounds(rotLx, ry, rotLabelW, rotH);
+    rotZValue.setBounds(rotLx + rotLabelW + 2, ry, rotFieldW, rotH);
+    ry += rotH + 4;
+    resetRotationButton.setBounds(rotLx, ry, rotLabelW + 2 + rotFieldW, rotH);
+
+    // --- Bottom: Lights bar (no thickness anymore) ---
+    int barH = 44;
+    int barY = vpH - barH - 6;
+    int lx = 8;
+
+    lightsLabel.setBounds(lx, barY, 46, barH);
+    lx += 48;
+
+    int lightW = (vpW - lx - 8) / 3;
+    keyLightPanel->setBounds(lx, barY + 4, lightW - 4, barH - 8);
+    lx += lightW;
+    fillLightPanel->setBounds(lx, barY + 4, lightW - 4, barH - 8);
+    lx += lightW;
+    rimLightPanel->setBounds(lx, barY + 4, lightW - 4, barH - 8);
 }
 
 void ElementsAudioProcessorEditor::sliderValueChanged(juce::Slider* slider)
@@ -2479,47 +2754,41 @@ void ElementsAudioProcessorEditor::sliderValueChanged(juce::Slider* slider)
 
 void ElementsAudioProcessorEditor::buttonClicked(juce::Button* button)
 {
-    for (int i = 0; i < NUM_MATERIALS; ++i)
+    if (button == &filterBypassButton)
     {
-        if (button == materialButtons[i])
-        {
-            audioProcessor.setMaterial(i);
-            updateMaterialButtons();
-            return;
-        }
+        audioProcessor.setFilterEnabled(filterBypassButton.getToggleState());
     }
-
-    if (button == &cubeButton)
-        audioProcessor.setGeometry(Geometry::Cube);
-    else if (button == &sphereButton)
-        audioProcessor.setGeometry(Geometry::Sphere);
-    else if (button == &torusButton)
-        audioProcessor.setGeometry(Geometry::Torus);
-    else if (button == &dodecaButton)
-        audioProcessor.setGeometry(Geometry::Dodecahedron);
     else if (button == &resetRotationButton)
     {
         viewport3D.resetRotation();
     }
-    else if (button == &filterBypassButton)
-    {
-        audioProcessor.setFilterEnabled(filterBypassButton.getToggleState());
-    }
-
-    updateGeometryButtons();
 }
 
 void ElementsAudioProcessorEditor::comboBoxChanged(juce::ComboBox* combo)
 {
+    if (combo == &geoCombo)
+    {
+        int id = geoCombo.getSelectedId();  // 1=Sphere, 2=Cube, 3=Torus, 4=Dodeca
+        audioProcessor.setGeometry(static_cast<Geometry>(id - 1));
+    }
+    else if (combo == &matCombo)
+    {
+        int matIndex = matCombo.getSelectedId() - 1;
+        audioProcessor.setMaterial(matIndex);
+        auto accent = MaterialAccents::getAccentForMaterial(matIndex);
+        lookAndFeel.setAccent(accent);
+        matCombo.setColour(juce::ComboBox::textColourId, accent);
+        oscilloscopeDisplay.setWaveformColour(accent);
+        adsrDisplay.setEnvelopeColour(accent);
+        filterAdsrDisplay.setEnvelopeColour(accent);
+        repaint();
+    }
     // Filter type is handled by APVTS attachment (DAW-automatable)
-    juce::ignoreUnused(combo);
 }
 
 void ElementsAudioProcessorEditor::labelTextChanged(juce::Label* label)
 {
     float val = label->getText().getFloatValue();
-
-    // Wrap to 0-360 range
     val = std::fmod(val, 360.0f);
     if (val < 0.0f) val += 360.0f;
 
@@ -2535,31 +2804,11 @@ void ElementsAudioProcessorEditor::labelTextChanged(juce::Label* label)
         writeParam(audioProcessor.getRotationYParam(), val);
     else if (label == &rotZValue)
         writeParam(audioProcessor.getRotationZParam(), val);
+    else
+        return;
 
-    // Rebuild the viewport rotation matrix from the new Euler angles
     viewport3D.setRotationFromEuler(audioProcessor.getRotationX(),
                                      audioProcessor.getRotationY(),
                                      audioProcessor.getRotationZ());
 }
 
-void ElementsAudioProcessorEditor::updateMaterialButtons()
-{
-    int current = audioProcessor.getMaterial();
-    for (int i = 0; i < NUM_MATERIALS; ++i)
-    {
-        auto col = (i == current) ? materialColours[i] : materialColours[i].darker(0.6f);
-        materialButtons[i]->setColour(juce::TextButton::buttonColourId, col);
-    }
-}
-
-void ElementsAudioProcessorEditor::updateGeometryButtons()
-{
-    auto geom = audioProcessor.getGeometry();
-    auto active = juce::Colour(0xFF4A90E2);
-    auto inactive = juce::Colour(0xFF2A2A3A);
-
-    cubeButton.setColour(juce::TextButton::buttonColourId, geom == Geometry::Cube ? active : inactive);
-    sphereButton.setColour(juce::TextButton::buttonColourId, geom == Geometry::Sphere ? active : inactive);
-    torusButton.setColour(juce::TextButton::buttonColourId, geom == Geometry::Torus ? active : inactive);
-    dodecaButton.setColour(juce::TextButton::buttonColourId, geom == Geometry::Dodecahedron ? active : inactive);
-}

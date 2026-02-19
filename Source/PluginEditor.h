@@ -10,6 +10,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "Shaders.h"
+#include "ElementsUI.h"
 
 // ==============================================================================
 // VIEWPORT 3D - Renders geometry with OpenGL
@@ -200,11 +201,13 @@ public:
     void timerCallback() override;
 
     void pushSample(float sample);
+    void setWaveformColour(juce::Colour c) { waveformColour = c; }
 
 private:
     ElementsAudioProcessor& processor;
     std::array<float, 512> waveformBuffer{};
     int writePosition = 0;
+    juce::Colour waveformColour { 0xFF4A90E2 };
 };
 
 // ==============================================================================
@@ -215,13 +218,17 @@ class ADSRDisplay : public juce::Component,
                     public juce::Timer
 {
 public:
-    ADSRDisplay(ElementsAudioProcessor& p) : processor(p) { startTimerHz(30); }
+    ADSRDisplay(ElementsAudioProcessor& p, bool isFilterEnv = false)
+        : processor(p), filterMode(isFilterEnv) { startTimerHz(30); }
 
     void paint(juce::Graphics& g) override;
     void timerCallback() override { repaint(); }
+    void setEnvelopeColour(juce::Colour c) { envelopeColour = c; }
 
 private:
     ElementsAudioProcessor& processor;
+    bool filterMode = false;
+    juce::Colour envelopeColour { 0xFF4A90E2 };
 };
 
 // ==============================================================================
@@ -296,6 +303,9 @@ class ElementsLookAndFeel : public juce::LookAndFeel_V4
 public:
     ElementsLookAndFeel();
 
+    void setAccent(juce::Colour c) { currentAccent = c; }
+    juce::Colour getAccent() const { return currentAccent; }
+
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                           float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                           juce::Slider& slider) override;
@@ -303,6 +313,23 @@ public:
     void drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
                           float sliderPos, float minSliderPos, float maxSliderPos,
                           juce::Slider::SliderStyle style, juce::Slider& slider) override;
+
+    void drawPopupMenuItem(juce::Graphics& g, const juce::Rectangle<int>& area,
+                           bool isSeparator, bool isActive, bool isHighlighted,
+                           bool isTicked, bool hasSubMenu,
+                           const juce::String& text, const juce::String& shortcutKeyText,
+                           const juce::Drawable* icon, const juce::Colour* textColour) override;
+
+    // Color lookup for popup menu items
+    juce::Colour getColourForItemText(const juce::String& text) const;
+
+    // Force JetBrains Mono for all fonts
+    juce::Typeface::Ptr getTypefaceForFont(const juce::Font& font) override;
+
+private:
+    juce::Colour currentAccent { MaterialAccents::diamond };
+    juce::Typeface::Ptr jbmRegular;
+    juce::Typeface::Ptr jbmBold;
 };
 
 // ==============================================================================
@@ -333,39 +360,37 @@ private:
     ElementsAudioProcessor& audioProcessor;
     ElementsLookAndFeel lookAndFeel;
 
-    // === LEFT COLUMN: Materials + Geometry + Rotation + Lights ===
-    juce::Label materialsLabel;
-    juce::OwnedArray<juce::TextButton> materialButtons;
+    // === TOOLBAR: Geometry + Material dropdowns ===
+    juce::ComboBox geoCombo, matCombo;
+    juce::Label geoLabel, matLabel;
 
-    juce::Label geometryLabel;
-    juce::TextButton cubeButton{"Cube"};
-    juce::TextButton sphereButton{"Sphere"};
-    juce::TextButton torusButton{"Torus"};
-    juce::TextButton dodecaButton{"Dodeca"};
+    // === LEFT COLUMN: Viewport + Lights ===
+    Viewport3D viewport3D;
 
-    // Thickness
-    juce::Label thicknessLabel;
-    juce::Slider thicknessSlider;
-
-    // Rotation numeric fields
-    juce::Label rotationLabel;
-    juce::Label rotXLabel, rotYLabel, rotZLabel;
-    juce::Label rotXValue, rotYValue, rotZValue;
-    juce::TextButton resetRotationButton{"Reset"};
-
+    // Lights (kept as LightPanel for now, will become LightsBar in Phase 3)
     juce::Label lightsLabel;
     std::unique_ptr<LightPanel> keyLightPanel;
     std::unique_ptr<LightPanel> fillLightPanel;
     std::unique_ptr<LightPanel> rimLightPanel;
 
-    // === CENTER COLUMN: Viewport + Piano ===
-    Viewport3D viewport3D;
+    // Thickness
+    juce::Label thicknessLabel;
+    juce::Slider thicknessSlider;
+
+    // Rotation (floating inside viewport)
+    juce::Label rotXLabel, rotYLabel, rotZLabel;
+    juce::Label rotXValue, rotYValue, rotZValue;
+    juce::TextButton resetRotationButton{"Reset"};
+
+    // === BOTTOM: Piano ===
     PianoRoll pianoRoll;
 
-    // === RIGHT COLUMN: Spectrum + Oscilloscope + Controls ===
+    // === RIGHT COLUMN: Visualizers + Controls ===
+    juce::Label spectrumLabel, oscilloscopeLabel;
     SpectrumDisplay spectrumDisplay;
     OscilloscopeDisplay oscilloscopeDisplay;
     ADSRDisplay adsrDisplay;
+    ADSRDisplay filterAdsrDisplay;
 
     // Filter
     juce::Label filterLabel;
@@ -374,7 +399,7 @@ private:
     juce::Label filterCutoffLabel, filterResonanceLabel;
     juce::ComboBox filterTypeCombo;
 
-    // APVTS attachments — keep sliders/combo in sync with automatable parameters
+    // APVTS attachments
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
     std::unique_ptr<SliderAttachment> thicknessAttachment;
@@ -401,8 +426,6 @@ private:
     // === Helpers ===
     void setupRotarySlider(juce::Slider& slider, double min, double max, double def);
     void setupLabel(juce::Label& label, const juce::String& text, float fontSize, bool bold = false);
-    void updateMaterialButtons();
-    void updateGeometryButtons();
 
     // Material data
     static constexpr int NUM_MATERIALS = 10;
@@ -416,6 +439,9 @@ private:
         juce::Colour(0xFF9966CC), juce::Colour(0xFF0F52BA),
         juce::Colour(0xFFB87333), juce::Colour(0xFF1C1C1C)
     };
+
+    // Section frame rectangles (right column, for paint())
+    std::vector<juce::Rectangle<int>> sectionFrames;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ElementsAudioProcessorEditor)
 };

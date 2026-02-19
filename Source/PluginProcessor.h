@@ -133,6 +133,7 @@ public:
 
     // Oscilloscope (for visualization)
     const std::array<float, 512>& getOscilloscopeBuffer() const { return synth.getOscilloscopeBuffer(); }
+    int getOscilloscopeWritePos() const { return synth.getOscilloscopeWritePos(); }
 
     // ==============================================================================
     // AUTOMATABLE PARAMETERS (exposed to DAW / Bitwig modulators)

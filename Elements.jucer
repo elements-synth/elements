@@ -24,6 +24,8 @@
             file="Source/PluginEditor.h"/>
       <FILE id="shaders_h" name="Shaders.h" compile="0" resource="0"
             file="Source/Shaders.h"/>
+      <FILE id="elementsui_h" name="ElementsUI.h" compile="0" resource="0"
+            file="Source/ElementsUI.h"/>
       <FILE id="physics_cpp" name="Physics.cpp" compile="1" resource="0"
             file="Source/Physics.cpp"/>
       <FILE id="physics_h" name="Physics.h" compile="0" resource="0" file="Source/Physics.h"/>
@@ -31,6 +33,10 @@
             file="Source/SynthEngine.cpp"/>
       <FILE id="synthengine_h" name="SynthEngine.h" compile="0" resource="0"
             file="Source/SynthEngine.h"/>
+      <FILE id="font_jbm_regular" name="JetBrainsMono-Regular.ttf" compile="0"
+            resource="1" file="Source/JetBrainsMono-Regular.ttf"/>
+      <FILE id="font_jbm_bold" name="JetBrainsMono-Bold.ttf" compile="0"
+            resource="1" file="Source/JetBrainsMono-Bold.ttf"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
