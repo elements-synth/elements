@@ -202,9 +202,9 @@ void Viewport3D::renderOpenGL()
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    glTranslatef(0.0f, 0.0f, -7.0f);
-    glRotatef(25.0f, 1.0f, 0.0f, 0.0f);
-    glRotatef(-30.0f, 0.0f, 1.0f, 0.0f);
+    glTranslatef(0.0f, 0.0f, -cameraDist);
+    glRotatef(cameraTilt, 1.0f, 0.0f, 0.0f);
+    glRotatef(cameraRotY, 0.0f, 1.0f, 0.0f);
 
     // Setup legacy lighting (for light indicators)
     setupLighting();
@@ -249,9 +249,9 @@ void Viewport3D::renderOpenGL()
 
         // Undo model matrix for the rest
         glLoadIdentity();
-        glTranslatef(0.0f, 0.0f, -7.0f);
-        glRotatef(25.0f, 1.0f, 0.0f, 0.0f);
-        glRotatef(-30.0f, 0.0f, 1.0f, 0.0f);
+        glTranslatef(0.0f, 0.0f, -cameraDist);
+        glRotatef(cameraTilt, 1.0f, 0.0f, 0.0f);
+        glRotatef(cameraRotY, 0.0f, 1.0f, 0.0f);
     }
 
     // === FIXED-FUNCTION: Light indicators (world space) ===
@@ -302,6 +302,14 @@ void Viewport3D::paint(juce::Graphics& g)
         g.setColour(juce::Colours::white);
         g.drawText("OpenGL not available", getLocalBounds(), juce::Justification::centred);
     }
+
+    // Viewport hints (Houdini-style)
+    auto bounds = getLocalBounds();
+    g.setColour(ElementsColors::text.withAlpha(0.35f));
+    g.setFont(juce::Font(10.5f));
+    int hintY = bounds.getBottom() - 62;
+    g.drawText("RMB  Orbit    Scroll  Zoom", 12, hintY, 250, 14,
+               juce::Justification::centredLeft);
 }
 
 void Viewport3D::resized()
@@ -407,9 +415,9 @@ Viewport3D::DragAxis Viewport3D::hitTestGizmo(juce::Point<float> mousePos)
     float topP = nearP * std::tan(fov * PI / 360.0f);
     float rightP = topP * aspect;
 
-    // Camera angles
-    float camTiltX = 25.0f * DEG2RAD;
-    float camRotY = -30.0f * DEG2RAD;
+    // Camera angles (use current orbit state)
+    float camTiltX = cameraTilt * DEG2RAD;
+    float camRotY = cameraRotY * DEG2RAD;
     float cCX = std::cos(camTiltX), sCX = std::sin(camTiltX);
     float cCY = std::cos(camRotY), sCY = std::sin(camRotY);
 
@@ -430,8 +438,8 @@ Viewport3D::DragAxis Viewport3D::hitTestGizmo(juce::Point<float> mousePos)
         tz = y * sCX + z * cCX;
         y = ty; z = tz;
 
-        // Translate (camera at z=-5)
-        z -= 7.0f;
+        // Translate (camera distance)
+        z -= cameraDist;
 
         // Perspective projection
         if (z >= -nearP) return {-10000.0f, -10000.0f};
@@ -488,6 +496,15 @@ Viewport3D::DragAxis Viewport3D::hitTestGizmo(juce::Point<float> mousePos)
 
 void Viewport3D::mouseDown(const juce::MouseEvent& e)
 {
+    // Right-click: orbit camera
+    if (e.mods.isRightButtonDown())
+    {
+        isOrbiting = true;
+        lastOrbitPos = e.position;
+        return;
+    }
+
+    // Left-click: gizmo rotation
     lockedAxis = hitTestGizmo(e.position);
 
     if (lockedAxis != DragAxis::None)
@@ -504,6 +521,19 @@ void Viewport3D::mouseDown(const juce::MouseEvent& e)
 
 void Viewport3D::mouseDrag(const juce::MouseEvent& e)
 {
+    // Orbit camera
+    if (isOrbiting)
+    {
+        float dx = e.position.x - lastOrbitPos.x;
+        float dy = e.position.y - lastOrbitPos.y;
+        cameraRotY += dx * 0.4f;
+        cameraTilt += dy * 0.4f;
+        cameraTilt = juce::jlimit(-89.0f, 89.0f, cameraTilt);
+        lastOrbitPos = e.position;
+        needsRepaint = true;
+        return;
+    }
+
     if (!isDragging || lockedAxis == DragAxis::None) return;
 
     float deltaX = e.position.x - lastMousePos.x;
@@ -550,6 +580,12 @@ void Viewport3D::mouseDrag(const juce::MouseEvent& e)
 
 void Viewport3D::mouseUp(const juce::MouseEvent&)
 {
+    if (isOrbiting)
+    {
+        isOrbiting = false;
+        return;
+    }
+
     if (isDragging)
     {
         // End gesture for all rotation axes
@@ -559,6 +595,13 @@ void Viewport3D::mouseUp(const juce::MouseEvent&)
     }
     isDragging = false;
     lockedAxis = DragAxis::None;
+}
+
+void Viewport3D::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+{
+    cameraDist -= wheel.deltaY * 2.0f;
+    cameraDist = juce::jlimit(2.5f, 20.0f, cameraDist);
+    needsRepaint = true;
 }
 
 void Viewport3D::mouseMove(const juce::MouseEvent& e)
@@ -1018,10 +1061,10 @@ void Viewport3D::renderGeometryPBR()
     float aspect = getWidth() / static_cast<float>(std::max(1, getHeight()));
     float projMatrix[16], viewMatrix[16];
     buildProjectionMatrix(projMatrix, 45.0f, aspect, 0.1f, 100.0f);
-    buildViewMatrix(viewMatrix, 25.0f, -30.0f, 7.0f);
+    buildViewMatrix(viewMatrix, cameraTilt, cameraRotY, cameraDist);
 
     float cameraPos[3];
-    getCameraPosition(cameraPos, 25.0f, -30.0f, 7.0f);
+    getCameraPosition(cameraPos, cameraTilt, cameraRotY, cameraDist);
 
     // Normal matrix = transpose(inverse(modelMatrix))
     // For orthogonal rotation matrix, inverse = transpose, so normalMatrix = rotationMatrix (3x3)

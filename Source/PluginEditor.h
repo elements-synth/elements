@@ -37,6 +37,7 @@ public:
     void mouseDrag(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
     void mouseMove(const juce::MouseEvent& e) override;
+    void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
 
     void setGeometry(Geometry geom) { currentGeometry = geom; }
     void setMaterialColour(juce::Colour c) { materialColour = c; }
@@ -78,6 +79,13 @@ private:
     float cumulativeRotX = 0.0f;
     float cumulativeRotY = 0.0f;
     float cumulativeRotZ = 0.0f;
+
+    // Camera orbit + zoom
+    float cameraTilt = 25.0f;    // degrees, vertical orbit
+    float cameraRotY = -30.0f;   // degrees, horizontal orbit
+    float cameraDist = 7.0f;     // distance from origin
+    bool isOrbiting = false;
+    juce::Point<float> lastOrbitPos;
 
     // Thickness for shader uniform
     float currentThickness = 1.0f;
