@@ -51,6 +51,48 @@ enum class FrequencyBand
 };
 
 // ==============================================================================
+// BIQUAD FILTER
+// ==============================================================================
+
+/**
+ * TPT State Variable Filter (SVF).
+ *
+ * Topology-Preserving Transform SVF based on Vadim Zavalishin's design.
+ * Uses integrator states instead of delayed I/O samples, which means:
+ * - No transients when input signal changes character (note transitions)
+ * - No transients when coefficients change (cutoff modulation)
+ * - Inherently stable — integrators are continuous by nature
+ *
+ * Replaces the original Direct Form I biquad which produced clicks
+ * during polyphonic note transitions at low cutoff frequencies.
+ */
+class BiquadFilter
+{
+public:
+    BiquadFilter() { reset(); }
+
+    void setLowpass(float cutoffHz, float Q, float sampleRate);
+    void setHighpass(float cutoffHz, float Q, float sampleRate);
+    void setBandpass(float cutoffHz, float Q, float sampleRate);
+
+    float process(float input);
+    void reset();
+
+private:
+    // SVF coefficients
+    float g = 0.0f;    // tan(pi * fc / fs) — tuning
+    float k = 2.0f;    // 1/Q — damping
+    float a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
+
+    // SVF integrator states (continuous, no transients)
+    float ic1eq = 0.0f;
+    float ic2eq = 0.0f;
+
+    // Output mode
+    enum class Mode { Low, High, Band } mode = Mode::Low;
+};
+
+// ==============================================================================
 // VOICE STRUCTURE
 // ==============================================================================
 
@@ -153,41 +195,6 @@ struct WavetableSet
         if (freq < 1600.0f) return midHigh;
         return high;
     }
-};
-
-// ==============================================================================
-// BIQUAD FILTER
-// ==============================================================================
-
-/**
- * Biquad filter with resonance.
- *
- * Un filtro biquad es un filtro digital de segundo orden.
- * "Bi-quad" = dos polos y dos ceros (quad = cuadrático).
- *
- * Usamos coeficientes en formato "Direct Form I":
- * y[n] = (b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]) / a0
- */
-class BiquadFilter
-{
-public:
-    BiquadFilter() { reset(); }
-
-    void setLowpass(float cutoffHz, float Q, float sampleRate);
-    void setHighpass(float cutoffHz, float Q, float sampleRate);
-    void setBandpass(float cutoffHz, float Q, float sampleRate);
-
-    float process(float input);
-    void reset();
-
-private:
-    // Filter coefficients (normalized, a0 = 1)
-    float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f;
-    float a1 = 0.0f, a2 = 0.0f;
-
-    // Filter state (previous samples)
-    float x1 = 0.0f, x2 = 0.0f;  // Previous inputs
-    float y1 = 0.0f, y2 = 0.0f;  // Previous outputs
 };
 
 // ==============================================================================
@@ -455,7 +462,7 @@ private:
     float filterEnvReleaseStartLevel = 0.0f;
     float filterEnvAmount = 0.0f;
 
-    // Filter
+    // Filter (global, applied to mixed output)
     BiquadFilter filter;
     FilterType filterType = FilterType::Lowpass;
     float filterCutoff = 1000.0f;

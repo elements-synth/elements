@@ -240,6 +240,33 @@ private:
 };
 
 // ==============================================================================
+// ELEMENTS LOGO - PNG from BinaryData
+// ==============================================================================
+
+class ElementsLogo : public juce::Component
+{
+public:
+    ElementsLogo()
+    {
+        logoImage = juce::ImageFileFormat::loadFrom(
+            BinaryData::elementslogo_png,
+            static_cast<size_t>(BinaryData::elementslogo_pngSize));
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        if (logoImage.isValid())
+        {
+            g.drawImage(logoImage, getLocalBounds().toFloat(),
+                        juce::RectanglePlacement::yMid);
+        }
+    }
+
+private:
+    juce::Image logoImage;
+};
+
+// ==============================================================================
 // PIANO ROLL - Visual keyboard
 // ==============================================================================
 
@@ -334,10 +361,19 @@ public:
     // Force JetBrains Mono for all fonts
     juce::Typeface::Ptr getTypefaceForFont(const juce::Font& font) override;
 
+    void loadKnobFramesFromBinaryData();
+    bool hasKnobFrames() const { return ! knobFramesOriginal.empty(); }
+
 private:
+    void rebuildTintedFrames();
+
     juce::Colour currentAccent { MaterialAccents::diamond };
     juce::Typeface::Ptr jbmRegular;
     juce::Typeface::Ptr jbmBold;
+
+    // Filmstrip knob frames (loaded from disk for testing)
+    std::vector<juce::Image> knobFramesOriginal;  // untinted source
+    std::vector<juce::Image> knobFrames;           // tinted for current accent
 };
 
 // ==============================================================================
@@ -368,7 +404,8 @@ private:
     ElementsAudioProcessor& audioProcessor;
     ElementsLookAndFeel lookAndFeel;
 
-    // === TOOLBAR: Geometry + Material dropdowns ===
+    // === TOOLBAR: Logo + Geometry + Material dropdowns ===
+    ElementsLogo elementsLogo;
     juce::ComboBox geoCombo, matCombo;
     juce::Label geoLabel, matLabel;
 
@@ -407,14 +444,6 @@ private:
     juce::Label filterCutoffLabel, filterResonanceLabel;
     juce::ComboBox filterTypeCombo;
 
-    // APVTS attachments
-    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
-    using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
-    std::unique_ptr<SliderAttachment> thicknessAttachment;
-    std::unique_ptr<SliderAttachment> cutoffAttachment;
-    std::unique_ptr<SliderAttachment> resonanceAttachment;
-    std::unique_ptr<ComboBoxAttachment> filterTypeAttachment;
-
     // Filter Envelope
     juce::Label filterEnvLabel;
     juce::Slider filterAttackSlider, filterDecaySlider, filterSustainSlider, filterReleaseSlider;
@@ -430,6 +459,24 @@ private:
     // Volume
     juce::Label volumeLabel;
     juce::Slider volumeSlider;
+
+    // APVTS attachments (MUST be declared AFTER all sliders/combos so they are
+    // destroyed FIRST, before the widgets they reference)
+    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
+    using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
+    std::unique_ptr<SliderAttachment> cutoffAttachment;
+    std::unique_ptr<SliderAttachment> resonanceAttachment;
+    std::unique_ptr<ComboBoxAttachment> filterTypeAttachment;
+    std::unique_ptr<SliderAttachment> filterAttackAttachment;
+    std::unique_ptr<SliderAttachment> filterDecayAttachment;
+    std::unique_ptr<SliderAttachment> filterSustainAttachment;
+    std::unique_ptr<SliderAttachment> filterReleaseAttachment;
+    std::unique_ptr<SliderAttachment> filterEnvAmountAttachment;
+    std::unique_ptr<SliderAttachment> ampAttackAttachment;
+    std::unique_ptr<SliderAttachment> ampDecayAttachment;
+    std::unique_ptr<SliderAttachment> ampSustainAttachment;
+    std::unique_ptr<SliderAttachment> ampReleaseAttachment;
+    std::unique_ptr<SliderAttachment> thicknessAttachment;
 
     // === Helpers ===
     void setupRotarySlider(juce::Slider& slider, double min, double max, double def);

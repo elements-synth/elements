@@ -11,35 +11,20 @@
 #include <cstring>
 
 // ==============================================================================
-// BIQUAD FILTER IMPLEMENTATION
+// TPT SVF FILTER IMPLEMENTATION
 // ==============================================================================
 
 void BiquadFilter::setLowpass(float cutoffHz, float Q, float sampleRate)
 {
-    // Clamp cutoff to safe range
     cutoffHz = clamp(cutoffHz, 20.0f, sampleRate * 0.45f);
     Q = clamp(Q, 0.5f, 10.0f);
 
-    // Angular frequency (normalized)
-    float w0 = 2.0f * 3.14159265359f * cutoffHz / sampleRate;
-    float cosW0 = std::cos(w0);
-    float sinW0 = std::sin(w0);
-    float alpha = sinW0 / (2.0f * Q);
-
-    // Lowpass coefficients (Audio EQ Cookbook)
-    float b0_temp = (1.0f - cosW0) / 2.0f;
-    float b1_temp = 1.0f - cosW0;
-    float b2_temp = (1.0f - cosW0) / 2.0f;
-    float a0_temp = 1.0f + alpha;
-    float a1_temp = -2.0f * cosW0;
-    float a2_temp = 1.0f - alpha;
-
-    // Normalize by a0
-    b0 = b0_temp / a0_temp;
-    b1 = b1_temp / a0_temp;
-    b2 = b2_temp / a0_temp;
-    a1 = a1_temp / a0_temp;
-    a2 = a2_temp / a0_temp;
+    g = std::tan(3.14159265359f * cutoffHz / sampleRate);
+    k = 1.0f / Q;
+    a1 = 1.0f / (1.0f + g * (g + k));
+    a2 = g * a1;
+    a3 = g * a2;
+    mode = Mode::Low;
 }
 
 void BiquadFilter::setHighpass(float cutoffHz, float Q, float sampleRate)
@@ -47,23 +32,12 @@ void BiquadFilter::setHighpass(float cutoffHz, float Q, float sampleRate)
     cutoffHz = clamp(cutoffHz, 20.0f, sampleRate * 0.45f);
     Q = clamp(Q, 0.5f, 10.0f);
 
-    float w0 = 2.0f * 3.14159265359f * cutoffHz / sampleRate;
-    float cosW0 = std::cos(w0);
-    float sinW0 = std::sin(w0);
-    float alpha = sinW0 / (2.0f * Q);
-
-    float b0_temp = (1.0f + cosW0) / 2.0f;
-    float b1_temp = -(1.0f + cosW0);
-    float b2_temp = (1.0f + cosW0) / 2.0f;
-    float a0_temp = 1.0f + alpha;
-    float a1_temp = -2.0f * cosW0;
-    float a2_temp = 1.0f - alpha;
-
-    b0 = b0_temp / a0_temp;
-    b1 = b1_temp / a0_temp;
-    b2 = b2_temp / a0_temp;
-    a1 = a1_temp / a0_temp;
-    a2 = a2_temp / a0_temp;
+    g = std::tan(3.14159265359f * cutoffHz / sampleRate);
+    k = 1.0f / Q;
+    a1 = 1.0f / (1.0f + g * (g + k));
+    a2 = g * a1;
+    a3 = g * a2;
+    mode = Mode::High;
 }
 
 void BiquadFilter::setBandpass(float cutoffHz, float Q, float sampleRate)
@@ -71,43 +45,38 @@ void BiquadFilter::setBandpass(float cutoffHz, float Q, float sampleRate)
     cutoffHz = clamp(cutoffHz, 20.0f, sampleRate * 0.45f);
     Q = clamp(Q, 0.5f, 10.0f);
 
-    float w0 = 2.0f * 3.14159265359f * cutoffHz / sampleRate;
-    float cosW0 = std::cos(w0);
-    float sinW0 = std::sin(w0);
-    float alpha = sinW0 / (2.0f * Q);
-
-    float b0_temp = alpha;
-    float b1_temp = 0.0f;
-    float b2_temp = -alpha;
-    float a0_temp = 1.0f + alpha;
-    float a1_temp = -2.0f * cosW0;
-    float a2_temp = 1.0f - alpha;
-
-    b0 = b0_temp / a0_temp;
-    b1 = b1_temp / a0_temp;
-    b2 = b2_temp / a0_temp;
-    a1 = a1_temp / a0_temp;
-    a2 = a2_temp / a0_temp;
+    g = std::tan(3.14159265359f * cutoffHz / sampleRate);
+    k = 1.0f / Q;
+    a1 = 1.0f / (1.0f + g * (g + k));
+    a2 = g * a1;
+    a3 = g * a2;
+    mode = Mode::Band;
 }
 
 float BiquadFilter::process(float input)
 {
-    // Direct Form I implementation
-    float output = b0 * input + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    // TPT SVF: integrator states are continuous → no transients on signal changes
+    float v3 = input - ic2eq;
+    float v1 = a1 * ic1eq + a2 * v3;
+    float v2 = ic2eq + a2 * ic1eq + a3 * v3;
 
-    // Update state
-    x2 = x1;
-    x1 = input;
-    y2 = y1;
-    y1 = output;
+    // Update integrator states
+    ic1eq = 2.0f * v1 - ic1eq;
+    ic2eq = 2.0f * v2 - ic2eq;
 
-    return output;
+    switch (mode)
+    {
+        case Mode::Low:  return v2;
+        case Mode::High: return input - k * v1 - v2;
+        case Mode::Band: return v1;
+    }
+    return v2;
 }
 
 void BiquadFilter::reset()
 {
-    // Only reset state, keep coefficients intact
-    x1 = x2 = y1 = y2 = 0.0f;
+    ic1eq = 0.0f;
+    ic2eq = 0.0f;
 }
 
 // ==============================================================================
@@ -272,9 +241,14 @@ void ElementsSynth::prepareToPlay(double newSampleRate, int samplesPerBlock)
         voice.reset();
     }
 
-    // Reset filter
-    filter.reset();
-    filter.setLowpass(filterCutoff, filterResonance, static_cast<float>(sampleRate));
+    // Set initial global filter coefficients
+    float sr = static_cast<float>(sampleRate);
+    switch (filterType)
+    {
+        case FilterType::Lowpass:  filter.setLowpass(filterCutoff, filterResonance, sr);  break;
+        case FilterType::Highpass: filter.setHighpass(filterCutoff, filterResonance, sr); break;
+        case FilterType::Bandpass: filter.setBandpass(filterCutoff, filterResonance, sr); break;
+    }
 
     // Regenerate wavetables for new sample rate
     regenerateWavetables();
@@ -322,18 +296,12 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     filterEnvValue = generateFilterEnvelopeSample(numSamples);
     float filterEnvEnd = filterEnvValue;
 
-    // Count active voices BEFORE processing (for filter reset on silence→sound transition)
+    // Count active voices BEFORE processing
     int currentActiveVoiceCount = 0;
     for (const auto& voice : voices)
     {
         if (voice.active && !voice.stealing)
             ++currentActiveVoiceCount;
-    }
-
-    // Reset filter state on silence→sound transition to prevent transients
-    if (currentActiveVoiceCount > 0 && prevActiveVoiceCount == 0)
-    {
-        filter.reset();
     }
     prevActiveVoiceCount = currentActiveVoiceCount;
 
@@ -343,6 +311,32 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     {
         xfadeStart = crossfade.progress;
         xfadeEnd = std::min(1.0f, xfadeStart + crossfade.increment * numSamples);
+    }
+
+    // Pre-compute filter state
+    bool filterEnvActive = std::abs(filterEnvAmount) > 0.001f;
+    float filterMixStep = (filterEnabledTarget - filterEnabledMix) * 0.001f;
+
+    // Compute start and end modulated cutoff for interpolation across block
+    float modCutoffStart = filterCutoff;
+    float modCutoffEnd = filterCutoff;
+    if (filterEnvActive)
+    {
+        modCutoffStart = filterCutoff * std::pow(2.0f, filterEnvAmount * filterEnvStart * 7.0f);
+        modCutoffStart = clamp(modCutoffStart, 20.0f, 20000.0f);
+        modCutoffEnd = filterCutoff * std::pow(2.0f, filterEnvAmount * filterEnvEnd * 7.0f);
+        modCutoffEnd = clamp(modCutoffEnd, 20.0f, 20000.0f);
+    }
+
+    // Set initial global filter coefficients
+    {
+        float sr = static_cast<float>(sampleRate);
+        switch (filterType)
+        {
+            case FilterType::Lowpass:  filter.setLowpass(modCutoffStart, filterResonance, sr);  break;
+            case FilterType::Highpass: filter.setHighpass(modCutoffStart, filterResonance, sr); break;
+            case FilterType::Bandpass: filter.setBandpass(modCutoffStart, filterResonance, sr); break;
+        }
     }
 
     // Count active voices for mixing
@@ -369,16 +363,13 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             // Handle voice stealing fade-out
             if (voice.stealing)
             {
-                // Read wavetable for fade-out
                 float sample = readWavetable(voice.phase, wavetable);
 
-                // Apply steal fade-out
                 float fadeGain = static_cast<float>(voice.stealFadeRemaining) / Voice::FADE_SAMPLES;
                 sample *= fadeGain * voice.amplitude * voice.velocity * spectralAmplitude;
 
                 buffer[i] += sample;
 
-                // Advance phase
                 voice.phase += phaseIncrement;
                 if (voice.phase >= 1.0f)
                     voice.phase -= 1.0f;
@@ -397,7 +388,6 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             float env = generateEnvelopeSample(voice);
             if (env < 0.0f)
             {
-                // Voice has finished
                 voice.active = false;
                 break;
             }
@@ -416,12 +406,10 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             // Calculate envelope level with velocity
             float envWithVelocity = env * voice.velocity;
 
-            // CLICK FIX: Retrigger crossfade - smooth transition from old level to new envelope
-            // This prevents clicks when pressing the same key while release is active
+            // Retrigger crossfade
             if (voice.retriggering && voice.retriggerFadeRemaining > 0)
             {
                 float fadeProgress = 1.0f - static_cast<float>(voice.retriggerFadeRemaining) / Voice::FADE_SAMPLES;
-                // Crossfade from old level (retriggerStartLevel) to new level (envWithVelocity)
                 envWithVelocity = voice.retriggerStartLevel * (1.0f - fadeProgress) + envWithVelocity * fadeProgress;
                 voice.retriggerFadeRemaining--;
                 if (voice.retriggerFadeRemaining <= 0)
@@ -431,7 +419,7 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             // Apply amplitude and spectral amplitude
             sample *= envWithVelocity * voice.amplitude * spectralAmplitude;
 
-            // Anti-click fade-in for NEW voices (not retriggered ones)
+            // Anti-click fade-in for NEW voices
             if (voice.fadeInRemaining > 0)
             {
                 float fadeGain = 1.0f - static_cast<float>(voice.fadeInRemaining) / Voice::FADE_SAMPLES;
@@ -447,7 +435,6 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             if (voice.phase >= 1.0f)
                 voice.phase -= 1.0f;
 
-            // Update voice age
             voice.age++;
         }
     }
@@ -460,85 +447,48 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             crossfade.active = false;
     }
 
-    // Master processing: Filter + Volume
-    // Smooth filter enable/disable crossfade
-    float filterMixStep = (filterEnabledTarget - filterEnabledMix) * 0.001f;
-
-    // Pre-compute whether filter envelope is active
-    bool filterEnvActive = std::abs(filterEnvAmount) > 0.001f;
-
-    // Set initial filter coefficients (no envelope or start of interpolation)
-    {
-        float modCutoff = filterCutoff;
-        if (filterEnvActive)
-        {
-            float envMod = filterEnvAmount * filterEnvStart;
-            modCutoff = filterCutoff * std::pow(2.0f, envMod * 7.0f);
-            modCutoff = clamp(modCutoff, 20.0f, 20000.0f);
-        }
-        switch (filterType)
-        {
-            case FilterType::Lowpass:
-                filter.setLowpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
-                break;
-            case FilterType::Highpass:
-                filter.setHighpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
-                break;
-            case FilterType::Bandpass:
-                filter.setBandpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
-                break;
-        }
-    }
+    // Update filter enabled mix (for next block)
+    filterEnabledMix += filterMixStep * numSamples;
+    filterEnabledMix = clamp(filterEnabledMix, 0.0f, 1.0f);
 
     // Voice count compensation: 1 voice = 1.0, 2 = 0.71, 4 = 0.50, 8 = 0.35
     float voiceScale = 1.0f / std::sqrt(static_cast<float>(std::max(activeVoiceCount, 1)));
 
+    // Master processing: Global filter + Volume + Soft clipper
     for (int i = 0; i < numSamples; ++i)
     {
         float sample = buffer[i];
 
-        // Update filter coefficients every 32 samples when envelope is active
-        // This interpolates the envelope smoothly across the block
-        if (filterEnvActive && i > 0 && (i % 32 == 0))
+        // Update global filter coefficients every 32 samples for smooth envelope interpolation
+        if (i > 0 && (i % 32 == 0) && (filterEnvActive || modCutoffStart != modCutoffEnd))
         {
             float t = static_cast<float>(i) / numSamples;
-            float envInterp = filterEnvStart + (filterEnvEnd - filterEnvStart) * t;
-            float envMod = filterEnvAmount * envInterp;
-            float modCutoff = filterCutoff * std::pow(2.0f, envMod * 7.0f);
-            modCutoff = clamp(modCutoff, 20.0f, 20000.0f);
+            float interpCutoff = modCutoffStart + (modCutoffEnd - modCutoffStart) * t;
+            float sr = static_cast<float>(sampleRate);
             switch (filterType)
             {
-                case FilterType::Lowpass:
-                    filter.setLowpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
-                    break;
-                case FilterType::Highpass:
-                    filter.setHighpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
-                    break;
-                case FilterType::Bandpass:
-                    filter.setBandpass(modCutoff, filterResonance, static_cast<float>(sampleRate));
-                    break;
+                case FilterType::Lowpass:  filter.setLowpass(interpCutoff, filterResonance, sr);  break;
+                case FilterType::Highpass: filter.setHighpass(interpCutoff, filterResonance, sr); break;
+                case FilterType::Bandpass: filter.setBandpass(interpCutoff, filterResonance, sr); break;
             }
         }
 
-        // Apply filter with smooth enable/disable crossfade
-        filterEnabledMix += filterMixStep;
-        filterEnabledMix = clamp(filterEnabledMix, 0.0f, 1.0f);
+        // Global filter with smooth enable/disable
+        float localFilterMix = filterEnabledMix + filterMixStep * i;
+        localFilterMix = clamp(localFilterMix, 0.0f, 1.0f);
 
-        if (filterEnabledMix > 0.001f)
+        if (localFilterMix > 0.001f)
         {
             float filtered = filter.process(sample);
-
-            // Crossfade between dry and filtered signal
-            if (filterEnabledMix < 0.999f)
-                sample = sample * (1.0f - filterEnabledMix) + filtered * filterEnabledMix;
+            if (localFilterMix < 0.999f)
+                sample = sample * (1.0f - localFilterMix) + filtered * localFilterMix;
             else
                 sample = filtered;
         }
 
-        // Apply master volume with voice count compensation
         sample *= volume * voiceScale;
 
-        // Soft clipper (tanh) instead of hard clamp — prevents crackles on chords
+        // Soft clipper (tanh) instead of hard clamp
         sample = std::tanh(sample);
 
         buffer[i] = sample;
@@ -837,7 +787,7 @@ void ElementsSynth::setFilterType(FilterType type)
     if (type != filterType)
     {
         filterType = type;
-        filter.reset();  // Reset state only on actual type change
+        filter.reset();
     }
 }
 

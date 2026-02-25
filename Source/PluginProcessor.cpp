@@ -17,11 +17,15 @@ ElementsAudioProcessor::createParameterLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
+    // =====================================================================
+    // 1. SYNTH PARAMETERS
+    // =====================================================================
+
     // Filter Cutoff: 20 Hz – 20 kHz, log skew, default 2000 Hz
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"filterCutoff", 1},
-        "Filter Cutoff",
-        juce::NormalisableRange<float>(20.0f, 20000.0f, 0.1f, 0.3f), // skew 0.3 → log-like
+        "Cutoff",
+        juce::NormalisableRange<float>(20.0f, 20000.0f, 0.1f, 0.3f),
         2000.0f,
         juce::String(),
         juce::AudioProcessorParameter::genericParameter,
@@ -32,7 +36,7 @@ ElementsAudioProcessor::createParameterLayout()
     // Filter Resonance: 0.5 – 10, default 1.0
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"filterResonance", 1},
-        "Filter Resonance",
+        "Resonance",
         juce::NormalisableRange<float>(0.5f, 10.0f, 0.01f, 1.0f),
         1.0f));
 
@@ -42,6 +46,84 @@ ElementsAudioProcessor::createParameterLayout()
         "Filter Type",
         juce::StringArray{"Lowpass", "Highpass", "Bandpass"},
         0));
+
+    // Filter Envelope: Attack
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"filterAttack", 1},
+        "Filter Attack",
+        juce::NormalisableRange<float>(0.001f, 2.0f, 0.001f, 0.4f),
+        0.01f));
+
+    // Filter Envelope: Decay
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"filterDecay", 1},
+        "Filter Decay",
+        juce::NormalisableRange<float>(0.001f, 2.0f, 0.001f, 0.4f),
+        0.3f));
+
+    // Filter Envelope: Sustain
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"filterSustain", 1},
+        "Filter Sustain",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.0f));
+
+    // Filter Envelope: Release
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"filterRelease", 1},
+        "Filter Release",
+        juce::NormalisableRange<float>(0.001f, 2.0f, 0.001f, 0.4f),
+        0.3f));
+
+    // Filter Envelope: Amount
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"filterEnvAmount", 1},
+        "Filter Env Amt",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.0f));
+
+    // Amp Envelope: Attack
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"ampAttack", 1},
+        "Attack",
+        juce::NormalisableRange<float>(0.001f, 2.0f, 0.001f, 0.4f),
+        0.01f));
+
+    // Amp Envelope: Decay
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"ampDecay", 1},
+        "Decay",
+        juce::NormalisableRange<float>(0.001f, 2.0f, 0.001f, 0.4f),
+        0.1f));
+
+    // Amp Envelope: Sustain
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"ampSustain", 1},
+        "Sustain",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.7f));
+
+    // Amp Envelope: Release
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"ampRelease", 1},
+        "Release",
+        juce::NormalisableRange<float>(0.001f, 2.0f, 0.001f, 0.4f),
+        0.3f));
+
+    // =====================================================================
+    // 2. 3D WORLD PARAMETERS
+    // =====================================================================
+
+    // Thickness: 0.1 (thin/bright) – 2.0 (thick/dark), default 0.5
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"thickness", 1},
+        "Thickness",
+        juce::NormalisableRange<float>(0.1f, 2.0f, 0.01f, 1.0f),
+        0.5f,
+        juce::String(),
+        juce::AudioProcessorParameter::genericParameter,
+        [](float v, int) { return juce::String(v, 2); },
+        nullptr));
 
     // Rotation X: 0 – 360 degrees, default 0
     layout.add(std::make_unique<juce::AudioParameterFloat>(
@@ -74,17 +156,6 @@ ElementsAudioProcessor::createParameterLayout()
         juce::String(),
         juce::AudioProcessorParameter::genericParameter,
         [](float v, int) { return juce::String(v, 1) + juce::String::fromUTF8("\xC2\xB0"); },
-        nullptr));
-
-    // Thickness: 0.1 (thin/bright) – 2.0 (thick/dark), default 0.5
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"thickness", 1},
-        "Thickness",
-        juce::NormalisableRange<float>(0.1f, 2.0f, 0.01f, 1.0f),
-        0.5f,
-        juce::String(),
-        juce::AudioProcessorParameter::genericParameter,
-        [](float v, int) { return juce::String(v, 2); },
         nullptr));
 
     return layout;
@@ -258,6 +329,19 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     synth.setFilterResonance(apvts.getRawParameterValue("filterResonance")->load());
     synth.setFilterType(static_cast<FilterType>(
         apvts.getRawParameterValue("filterType")->load()));
+
+    // Filter envelope
+    synth.setFilterAttack(apvts.getRawParameterValue("filterAttack")->load());
+    synth.setFilterDecay(apvts.getRawParameterValue("filterDecay")->load());
+    synth.setFilterSustain(apvts.getRawParameterValue("filterSustain")->load());
+    synth.setFilterRelease(apvts.getRawParameterValue("filterRelease")->load());
+    synth.setFilterEnvAmount(apvts.getRawParameterValue("filterEnvAmount")->load());
+
+    // Amp envelope
+    synth.setAttack(apvts.getRawParameterValue("ampAttack")->load());
+    synth.setDecay(apvts.getRawParameterValue("ampDecay")->load());
+    synth.setSustain(apvts.getRawParameterValue("ampSustain")->load());
+    synth.setRelease(apvts.getRawParameterValue("ampRelease")->load());
 
     // Rotation: only update synth when APVTS values actually change
     {

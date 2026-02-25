@@ -2083,6 +2083,78 @@ void LightPanel::setEnabled(bool enabled)
 // LOOK AND FEEL
 // ==============================================================================
 
+void ElementsLookAndFeel::loadKnobFramesFromBinaryData()
+{
+    knobFramesOriginal.clear();
+    knobFrames.clear();
+
+    // Knob frames are named knob_00000_png .. knob_00063_png in BinaryData
+    for (int i = 0; i < BinaryData::namedResourceListSize; ++i)
+    {
+        juce::String name(BinaryData::namedResourceList[i]);
+        if (! name.startsWith("knob_"))
+            continue;
+
+        int size = 0;
+        const char* data = BinaryData::getNamedResource(BinaryData::namedResourceList[i], size);
+        if (data != nullptr && size > 0)
+        {
+            auto img = juce::ImageFileFormat::loadFrom(data, static_cast<size_t>(size));
+            if (img.isValid())
+                knobFramesOriginal.push_back(img);
+        }
+    }
+
+    DBG("Loaded " + juce::String((int)knobFramesOriginal.size()) + " knob frames from BinaryData");
+    rebuildTintedFrames();
+}
+
+void ElementsLookAndFeel::rebuildTintedFrames()
+{
+    knobFrames.clear();
+    if (knobFramesOriginal.empty()) return;
+
+    // Convert accent to normalised RGB for multiply blend
+    float tR = currentAccent.getFloatRed();
+    float tG = currentAccent.getFloatGreen();
+    float tB = currentAccent.getFloatBlue();
+
+    for (auto& src : knobFramesOriginal)
+    {
+        juce::Image tinted(juce::Image::ARGB, src.getWidth(), src.getHeight(), true);
+
+        juce::Image::BitmapData srcData(src, juce::Image::BitmapData::readOnly);
+        juce::Image::BitmapData dstData(tinted, juce::Image::BitmapData::writeOnly);
+
+        for (int y = 0; y < src.getHeight(); ++y)
+        {
+            for (int x = 0; x < src.getWidth(); ++x)
+            {
+                auto px = srcData.getPixelColour(x, y);
+                // Luminance-based tint: preserve brightness, shift hue to accent
+                float lum = px.getFloatRed() * 0.299f
+                          + px.getFloatGreen() * 0.587f
+                          + px.getFloatBlue() * 0.114f;
+
+                // Mix: blend between original luminance (grayscale) and accent-tinted
+                // This keeps highlights/shadows natural while colouring midtones
+                float mixAmt = 0.6f; // tint strength
+                float oR = lum * (1.0f - mixAmt) + lum * tR * mixAmt;
+                float oG = lum * (1.0f - mixAmt) + lum * tG * mixAmt;
+                float oB = lum * (1.0f - mixAmt) + lum * tB * mixAmt;
+
+                dstData.setPixelColour(x, y, juce::Colour::fromFloatRGBA(
+                    juce::jlimit(0.0f, 1.0f, oR),
+                    juce::jlimit(0.0f, 1.0f, oG),
+                    juce::jlimit(0.0f, 1.0f, oB),
+                    px.getFloatAlpha()));
+            }
+        }
+
+        knobFrames.push_back(tinted);
+    }
+}
+
 ElementsLookAndFeel::ElementsLookAndFeel()
 {
     jbmRegular = juce::Typeface::createSystemTypefaceFor(
@@ -2117,36 +2189,26 @@ void ElementsLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int 
                                            float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                                            juce::Slider&)
 {
-    const float PI = juce::MathConstants<float>::pi;
     auto knobSize = static_cast<float>(juce::jmin(width, height));
     auto centreX = static_cast<float>(x) + static_cast<float>(width) * 0.5f;
     auto centreY = static_cast<float>(y) + static_cast<float>(height) * 0.5f;
 
-    // Use JUCE-provided angles (0 = 12 o'clock, CW positive)
-    // Default: ~7 o'clock to ~5 o'clock (280° sweep)
     float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
 
-    // Position helper: JUCE rotary convention (0=top, CW+)
     auto posX = [&](float a, float r) { return centreX + r * std::sin(a); };
     auto posY = [&](float a, float r) { return centreY - r * std::cos(a); };
 
-    // --- 1. Outer ring separator ---
-    float outerRingR = knobSize * 0.46f;
-    g.setColour(ElementsColors::border.withAlpha(0.8f));
-    g.drawEllipse(centreX - outerRingR, centreY - outerRingR,
-                  outerRingR * 2, outerRingR * 2, 0.8f);
-
-    // --- 2. Arc track (full sweep) ---
-    float arcR = knobSize * 0.41f;
+    // --- Arc track (full sweep) ---
+    float arcR = knobSize * 0.46f;
     {
         juce::Path track;
         track.addCentredArc(centreX, centreY, arcR, arcR, 0,
                             rotaryStartAngle, rotaryEndAngle, true);
         g.setColour(ElementsColors::border);
-        g.strokePath(track, juce::PathStrokeType(3.0f));
+        g.strokePath(track, juce::PathStrokeType(2.0f));
     }
 
-    // --- 3. Progress arc with opacity gradient ---
+    // --- Progress arc with opacity gradient ---
     if (sliderPos > 0.001f)
     {
         const int numSegs = 40;
@@ -2160,74 +2222,54 @@ void ElementsLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int 
             float a0 = rotaryStartAngle + t0 * (rotaryEndAngle - rotaryStartAngle);
             float a1 = rotaryStartAngle + t1 * (rotaryEndAngle - rotaryStartAngle);
 
-            // Opacity: 0.08 at arc start → 1.0 at arc end
             float opacity = 0.08f + 0.92f * t1;
 
             juce::Path seg;
             seg.addCentredArc(centreX, centreY, arcR, arcR, 0, a0, a1, true);
             g.setColour(currentAccent.withAlpha(opacity));
-            g.strokePath(seg, juce::PathStrokeType(3.0f));
+            g.strokePath(seg, juce::PathStrokeType(2.0f));
         }
     }
 
-    // Endpoint white dot with glow (always visible)
+    // --- Endpoint dot ---
     {
         float endX = posX(angle, arcR);
         float endY = posY(angle, arcR);
-
         g.setColour(currentAccent.withAlpha(0.25f));
-        g.fillEllipse(endX - 5, endY - 5, 10, 10);
+        g.fillEllipse(endX - 4, endY - 4, 8, 8);
         g.setColour(juce::Colours::white);
-        g.fillEllipse(endX - 2.5f, endY - 2.5f, 5, 5);
+        g.fillEllipse(endX - 2.0f, endY - 2.0f, 4, 4);
     }
 
-    // --- 4. Indicator line (radius 0.22 → 0.60) ---
-    {
-        float r0 = knobSize * 0.11f;
-        float r1 = knobSize * 0.30f;
+    // --- Knob body: filmstrip frame or fallback ---
+    float bodySize = knobSize * 0.82f;
 
-        g.setColour(currentAccent.withAlpha(0.5f));
+    if (hasKnobFrames())
+    {
+        int frameIndex = juce::jlimit(0, (int)knobFramesOriginal.size() - 1,
+                                       (int)(sliderPos * (knobFramesOriginal.size() - 1)));
+        auto& frame = knobFramesOriginal[(size_t)frameIndex];
+
+        g.drawImage(frame,
+                    centreX - bodySize * 0.5f, centreY - bodySize * 0.5f,
+                    bodySize, bodySize,
+                    0, 0, frame.getWidth(), frame.getHeight());
+    }
+    else
+    {
+        // Fallback: simple filled circle when no filmstrip loaded
+        g.setColour(ElementsColors::bg2);
+        g.fillEllipse(centreX - bodySize * 0.5f, centreY - bodySize * 0.5f, bodySize, bodySize);
+
+        g.setColour(ElementsColors::border.withAlpha(0.8f));
+        g.drawEllipse(centreX - bodySize * 0.5f, centreY - bodySize * 0.5f, bodySize, bodySize, 0.8f);
+
+        // Indicator line
+        float r0 = bodySize * 0.15f;
+        float r1 = bodySize * 0.42f;
+        g.setColour(currentAccent.withAlpha(0.6f));
         g.drawLine(posX(angle, r0), posY(angle, r0),
-                   posX(angle, r1), posY(angle, r1), 1.1f);
-    }
-
-    // --- 5. Diaphragm (8 blades) ---
-    {
-        float oR = knobSize * 0.26f;  // outer radius of diaphragm (0.52 * half)
-        float iR = juce::jmap(sliderPos, oR * 0.08f, oR * 0.88f); // aperture radius
-        float bladeLen = oR - iR;
-
-        for (int i = 0; i < 8; ++i)
-        {
-            float bladeAngle = (static_cast<float>(i) / 8.0f) * 2.0f * PI
-                              - sliderPos * PI * 0.18f;
-
-            float pivotX = iR;
-            float rootW = knobSize * 0.04f;
-            float tipW  = knobSize * 0.015f;
-
-            juce::Path blade;
-            blade.startNewSubPath(pivotX, -rootW);
-            blade.lineTo(pivotX + bladeLen, -tipW);
-            blade.lineTo(pivotX + bladeLen,  tipW);
-            blade.lineTo(pivotX,  rootW);
-            blade.closeSubPath();
-
-            auto xf = juce::AffineTransform::rotation(bladeAngle)
-                          .translated(centreX, centreY);
-
-            g.setColour(currentAccent.withAlpha(0.12f));
-            g.fillPath(blade, xf);
-            g.setColour(currentAccent.withAlpha(0.28f));
-            g.strokePath(blade, juce::PathStrokeType(0.6f), xf);
-        }
-
-        // --- 6. Aperture center glow ---
-        float glowR = iR + 2.0f;
-        juce::ColourGradient glow(currentAccent.withAlpha(0.65f), centreX, centreY,
-                                  currentAccent.withAlpha(0.0f), centreX + glowR, centreY, true);
-        g.setGradientFill(glow);
-        g.fillEllipse(centreX - glowR, centreY - glowR, glowR * 2, glowR * 2);
+                   posX(angle, r1), posY(angle, r1), 1.2f);
     }
 }
 
@@ -2348,7 +2390,13 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
     lookAndFeel.setAccent(MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
 
-    // === TOOLBAR: Geometry + Material dropdowns (floating inside viewport) ===
+    // Load custom knob frames from disk (test mode)
+    lookAndFeel.loadKnobFramesFromBinaryData();
+
+    // === TOOLBAR: Logo + Geometry + Material dropdowns ===
+    addAndMakeVisible(elementsLogo);
+
+    // Geometry + Material dropdowns (floating inside viewport)
     geoLabel.setText("GEO", juce::dontSendNotification);
     geoLabel.setFont(juce::Font(10.0f, juce::Font::bold));
     geoLabel.setJustificationType(juce::Justification::centred);
@@ -2480,7 +2528,7 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     resonanceAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "filterResonance", filterResonanceSlider);
     filterTypeAttachment = std::make_unique<ComboBoxAttachment>(audioProcessor.apvts, "filterType", filterTypeCombo);
 
-    // Filter Envelope
+    // Filter Envelope (APVTS attachments)
     setupLabel(filterEnvLabel, "FILTER ENV", 13.0f, true);
     setupLabel(fAttackLabel, "A", 10.0f);
     setupLabel(fDecayLabel, "D", 10.0f);
@@ -2493,6 +2541,12 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     setupLabel(filterEnvAmountLabel, "Amt", 10.0f);
     setupRotarySlider(filterEnvAmountSlider, 0.0, 1.0, 0.0);
 
+    filterAttackAttachment    = std::make_unique<SliderAttachment>(audioProcessor.apvts, "filterAttack", filterAttackSlider);
+    filterDecayAttachment     = std::make_unique<SliderAttachment>(audioProcessor.apvts, "filterDecay", filterDecaySlider);
+    filterSustainAttachment   = std::make_unique<SliderAttachment>(audioProcessor.apvts, "filterSustain", filterSustainSlider);
+    filterReleaseAttachment   = std::make_unique<SliderAttachment>(audioProcessor.apvts, "filterRelease", filterReleaseSlider);
+    filterEnvAmountAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "filterEnvAmount", filterEnvAmountSlider);
+
     // Amplitude Envelope
     setupLabel(envelopeLabel, "AMP ENV", 13.0f, true);
     setupLabel(attackLabel, "A", 10.0f);
@@ -2503,6 +2557,11 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     setupRotarySlider(decaySlider, 0.001, 2, 0.1);
     setupRotarySlider(sustainSlider, 0, 1, 0.7);
     setupRotarySlider(releaseSlider, 0.001, 2, 0.3);
+
+    ampAttackAttachment  = std::make_unique<SliderAttachment>(audioProcessor.apvts, "ampAttack", attackSlider);
+    ampDecayAttachment   = std::make_unique<SliderAttachment>(audioProcessor.apvts, "ampDecay", decaySlider);
+    ampSustainAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "ampSustain", sustainSlider);
+    ampReleaseAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "ampRelease", releaseSlider);
 
     setupLabel(volumeLabel, "VOLUME", 13.0f, true);
     setupRotarySlider(volumeSlider, 0, 1, 0.8);
@@ -2567,14 +2626,11 @@ void ElementsAudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(ElementsColors::bg0);
 
-    // Title
-    g.setColour(ElementsColors::text);
-    g.setFont(juce::Font(28.0f, juce::Font::bold));
-    g.drawText("ELEMENTS", 20, 10, 200, 30, juce::Justification::centredLeft);
-
+    // Subtitle below logo
     g.setColour(lookAndFeel.getAccent());
-    g.setFont(juce::Font(12.0f));
-    g.drawText("Spectral Synthesizer", 20, 38, 200, 16, juce::Justification::centredLeft);
+    g.setFont(juce::Font(11.0f));
+    g.drawText("Spectral Synthesizer", elementsLogo.getX(), elementsLogo.getBottom() - 2,
+               200, 14, juce::Justification::centredLeft);
 
     // Section frames (Microfreak-style rounded borders)
     for (auto& frame : sectionFrames)
@@ -2593,7 +2649,8 @@ void ElementsAudioProcessorEditor::resized()
     auto pianoArea = bounds.removeFromBottom(52);
     pianoRoll.setBounds(pianoArea);
 
-    // === Header (title only, combos are inside viewport) ===
+    // === Header: Logo + subtitle ===
+    elementsLogo.setBounds(14, 8, 220, 38);
     bounds.removeFromTop(56);
 
     // === RIGHT COLUMN: 310px ===
@@ -2772,26 +2829,9 @@ void ElementsAudioProcessorEditor::resized()
 
 void ElementsAudioProcessorEditor::sliderValueChanged(juce::Slider* slider)
 {
-    // Filter cutoff & resonance are handled by APVTS attachments (DAW-automatable)
-    if (slider == &attackSlider)
-        audioProcessor.setAttack(static_cast<float>(slider->getValue()));
-    else if (slider == &decaySlider)
-        audioProcessor.setDecay(static_cast<float>(slider->getValue()));
-    else if (slider == &sustainSlider)
-        audioProcessor.setSustain(static_cast<float>(slider->getValue()));
-    else if (slider == &releaseSlider)
-        audioProcessor.setRelease(static_cast<float>(slider->getValue()));
-    else if (slider == &filterAttackSlider)
-        audioProcessor.setFilterAttack(static_cast<float>(slider->getValue()));
-    else if (slider == &filterDecaySlider)
-        audioProcessor.setFilterDecay(static_cast<float>(slider->getValue()));
-    else if (slider == &filterSustainSlider)
-        audioProcessor.setFilterSustain(static_cast<float>(slider->getValue()));
-    else if (slider == &filterReleaseSlider)
-        audioProcessor.setFilterRelease(static_cast<float>(slider->getValue()));
-    else if (slider == &filterEnvAmountSlider)
-        audioProcessor.setFilterEnvAmount(static_cast<float>(slider->getValue()));
-    else if (slider == &volumeSlider)
+    // Most sliders are handled by APVTS attachments (DAW-automatable via processBlock).
+    // Only volume remains manual (not exposed as DAW parameter).
+    if (slider == &volumeSlider)
         audioProcessor.setVolume(static_cast<float>(slider->getValue()));
 }
 

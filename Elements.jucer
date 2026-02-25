@@ -37,6 +37,74 @@
             resource="1" file="Source/JetBrainsMono-Regular.ttf"/>
       <FILE id="font_jbm_bold" name="JetBrainsMono-Bold.ttf" compile="0"
             resource="1" file="Source/JetBrainsMono-Bold.ttf"/>
+      <FILE id="elements_logo" name="elements-logo.png" compile="0"
+            resource="1" file="Source/elements-logo.png"/>
+      <GROUP id="knobsgroup" name="Knobs">
+        <FILE id="knob_00" name="knob_00000.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00000.png"/>
+        <FILE id="knob_01" name="knob_00001.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00001.png"/>
+        <FILE id="knob_02" name="knob_00002.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00002.png"/>
+        <FILE id="knob_03" name="knob_00003.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00003.png"/>
+        <FILE id="knob_04" name="knob_00004.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00004.png"/>
+        <FILE id="knob_05" name="knob_00005.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00005.png"/>
+        <FILE id="knob_06" name="knob_00006.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00006.png"/>
+        <FILE id="knob_07" name="knob_00007.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00007.png"/>
+        <FILE id="knob_08" name="knob_00008.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00008.png"/>
+        <FILE id="knob_09" name="knob_00009.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00009.png"/>
+        <FILE id="knob_10" name="knob_00010.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00010.png"/>
+        <FILE id="knob_11" name="knob_00011.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00011.png"/>
+        <FILE id="knob_12" name="knob_00012.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00012.png"/>
+        <FILE id="knob_13" name="knob_00013.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00013.png"/>
+        <FILE id="knob_14" name="knob_00014.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00014.png"/>
+        <FILE id="knob_15" name="knob_00015.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00015.png"/>
+        <FILE id="knob_16" name="knob_00016.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00016.png"/>
+        <FILE id="knob_17" name="knob_00017.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00017.png"/>
+        <FILE id="knob_18" name="knob_00018.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00018.png"/>
+        <FILE id="knob_19" name="knob_00019.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00019.png"/>
+        <FILE id="knob_20" name="knob_00020.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00020.png"/>
+        <FILE id="knob_21" name="knob_00021.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00021.png"/>
+        <FILE id="knob_22" name="knob_00022.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00022.png"/>
+        <FILE id="knob_23" name="knob_00023.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00023.png"/>
+        <FILE id="knob_24" name="knob_00024.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00024.png"/>
+        <FILE id="knob_25" name="knob_00025.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00025.png"/>
+        <FILE id="knob_26" name="knob_00026.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00026.png"/>
+        <FILE id="knob_27" name="knob_00027.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00027.png"/>
+        <FILE id="knob_28" name="knob_00028.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00028.png"/>
+        <FILE id="knob_29" name="knob_00029.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00029.png"/>
+        <FILE id="knob_30" name="knob_00030.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00030.png"/>
+        <FILE id="knob_31" name="knob_00031.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00031.png"/>
+        <FILE id="knob_32" name="knob_00032.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00032.png"/>
+        <FILE id="knob_33" name="knob_00033.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00033.png"/>
+        <FILE id="knob_34" name="knob_00034.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00034.png"/>
+        <FILE id="knob_35" name="knob_00035.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00035.png"/>
+        <FILE id="knob_36" name="knob_00036.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00036.png"/>
+        <FILE id="knob_37" name="knob_00037.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00037.png"/>
+        <FILE id="knob_38" name="knob_00038.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00038.png"/>
+        <FILE id="knob_39" name="knob_00039.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00039.png"/>
+        <FILE id="knob_40" name="knob_00040.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00040.png"/>
+        <FILE id="knob_41" name="knob_00041.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00041.png"/>
+        <FILE id="knob_42" name="knob_00042.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00042.png"/>
+        <FILE id="knob_43" name="knob_00043.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00043.png"/>
+        <FILE id="knob_44" name="knob_00044.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00044.png"/>
+        <FILE id="knob_45" name="knob_00045.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00045.png"/>
+        <FILE id="knob_46" name="knob_00046.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00046.png"/>
+        <FILE id="knob_47" name="knob_00047.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00047.png"/>
+        <FILE id="knob_48" name="knob_00048.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00048.png"/>
+        <FILE id="knob_49" name="knob_00049.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00049.png"/>
+        <FILE id="knob_50" name="knob_00050.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00050.png"/>
+        <FILE id="knob_51" name="knob_00051.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00051.png"/>
+        <FILE id="knob_52" name="knob_00052.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00052.png"/>
+        <FILE id="knob_53" name="knob_00053.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00053.png"/>
+        <FILE id="knob_54" name="knob_00054.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00054.png"/>
+        <FILE id="knob_55" name="knob_00055.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00055.png"/>
+        <FILE id="knob_56" name="knob_00056.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00056.png"/>
+        <FILE id="knob_57" name="knob_00057.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00057.png"/>
+        <FILE id="knob_58" name="knob_00058.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00058.png"/>
+        <FILE id="knob_59" name="knob_00059.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00059.png"/>
+        <FILE id="knob_60" name="knob_00060.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00060.png"/>
+        <FILE id="knob_61" name="knob_00061.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00061.png"/>
+        <FILE id="knob_62" name="knob_00062.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00062.png"/>
+        <FILE id="knob_63" name="knob_00063.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00063.png"/>
+      </GROUP>
     </GROUP>
   </MAINGROUP>
   <MODULES>
