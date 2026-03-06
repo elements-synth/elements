@@ -267,6 +267,390 @@ private:
 };
 
 // ==============================================================================
+// HELP OVERLAY - Modal help panel with tabbed content
+// ==============================================================================
+
+namespace HelpContent
+{
+    inline juce::String about()
+    {
+        return
+            "ELEMENTS\n"
+            "Spectral Wavetable Synthesizer\n"
+            "\n"
+            "Elements generates audio by simulating how light interacts\n"
+            "with physical materials. Each material has unique optical\n"
+            "properties that translate into distinct harmonic content.\n"
+            "\n"
+            "The synthesis engine uses real physics data:\n"
+            "  - Refractive indices determine harmonic structure\n"
+            "  - Light absorption curves shape the frequency spectrum\n"
+            "  - Material thickness controls spectral filtering\n"
+            "\n"
+            "Version 1.0 (Beta)";
+    }
+
+    inline juce::String materials()
+    {
+        return
+            "MATERIALS\n"
+            "\n"
+            "Each material produces different timbres based on its\n"
+            "optical properties:\n"
+            "\n"
+            "{#ffa8d8f0}DIAMOND\n"
+            "Highly refractive (n=2.42). Bright, crystalline sound\n"
+            "with strong upper harmonics. Sharp, clear transients.\n"
+            "\n"
+            "{#ff7ec8e3}WATER\n"
+            "Low refraction (n=1.33). Soft, fluid timbre.\n"
+            "Smooth harmonic roll-off.\n"
+            "\n"
+            "{#fff5b942}AMBER\n"
+            "Warm, organic character. Mid-range emphasis.\n"
+            "Gentle high-frequency absorption.\n"
+            "\n"
+            "{#ffe84b6a}RUBY\n"
+            "Rich harmonic content. Warm, saturated tone.\n"
+            "Strong fundamental.\n"
+            "\n"
+            "{#ffd4a843}GOLD\n"
+            "Soft, metallic shimmer. Gentle spectral peaks.\n"
+            "Warm overall character.\n"
+            "\n"
+            "{#ff4ecb8d}EMERALD\n"
+            "Balanced spectrum. Clear, focused sound.\n"
+            "Moderate brightness.\n"
+            "\n"
+            "{#ffb57bee}AMETHYST\n"
+            "Complex harmonic structure.\n"
+            "Slight mid-range emphasis.\n"
+            "\n"
+            "{#ff5b9ef5}SAPPHIRE\n"
+            "Clear, focused tone. Strong upper-mid presence.\n"
+            "\n"
+            "{#ffcf7e46}COPPER\n"
+            "Metallic, warm resonance. Orange-tinted harmonics.\n"
+            "Smooth mid-range with soft high-end roll-off.\n"
+            "\n"
+            "{#ff6a7a8a}OBSIDIAN\n"
+            "Dark, glassy character. Subdued harmonics with\n"
+            "glossy specular highlights. Deep, minimal tone.";
+    }
+
+    inline juce::String geometry()
+    {
+        return
+            "GEOMETRY\n"
+            "\n"
+            "The 3D shape affects how light interacts with the material:\n"
+            "\n"
+            "CUBE\n"
+            "Sharp edges create distinct spectral peaks.\n"
+            "Uniform light distribution. Clear, focused harmonics.\n"
+            "\n"
+            "SPHERE\n"
+            "Smooth surface produces gradual spectral changes.\n"
+            "Even light diffusion. Softer, rounder timbre.\n"
+            "\n"
+            "TORUS\n"
+            "Complex internal reflections. Variable harmonic\n"
+            "emphasis. Rich, evolving spectrum.\n"
+            "\n"
+            "DODECAHEDRON\n"
+            "Multiple facets create complex interactions.\n"
+            "Dense harmonic content. Intricate spectral texture.";
+    }
+
+    inline juce::String lights()
+    {
+        return
+            "LIGHT SOURCES\n"
+            "\n"
+            "Each light type has a unique color temperature:\n"
+            "\n"
+            "{#ffE07830}SUNSET (2000K)\n"
+            "Warm, orange-red spectrum. Emphasizes lower harmonics.\n"
+            "Soft, vintage character.\n"
+            "\n"
+            "{#ffD4A843}DAYLIGHT (5500K)\n"
+            "Neutral, balanced spectrum. Full harmonic range.\n"
+            "Natural, clear sound.\n"
+            "\n"
+            "{#ff7EC8E3}LED COOL (6500K)\n"
+            "Blue-white spectrum. Emphasizes upper harmonics.\n"
+            "Bright, modern character.\n"
+            "\n"
+            "You can enable up to 3 lights simultaneously.\n"
+            "The spectrum combines their contributions.";
+    }
+
+    inline juce::String controls()
+    {
+        return
+            "CONTROLS REFERENCE\n"
+            "\n"
+            "FILTER\n"
+            "  Cutoff: Low-pass filter frequency (20Hz - 20kHz)\n"
+            "  Reso: Filter resonance (emphasis at cutoff)\n"
+            "  Env Amt: Modulation depth from Filter Envelope\n"
+            "\n"
+            "FILTER ENVELOPE\n"
+            "  Attack: Time to reach peak brightness\n"
+            "  Decay: Time to decay to sustain level\n"
+            "  Sustain: Held brightness level\n"
+            "  Release: Fade-out time after note off\n"
+            "\n"
+            "AMP ENVELOPE\n"
+            "  Attack: Volume fade-in time\n"
+            "  Decay: Time to reach sustain level\n"
+            "  Sustain: Held volume level\n"
+            "  Release: Volume fade-out time\n"
+            "\n"
+            "OUTPUT\n"
+            "  Volume: Master output level\n"
+            "\n"
+            "THICKNESS\n"
+            "  Material depth in the light path.\n"
+            "  Affects spectral filtering and absorption.";
+    }
+}
+
+class HelpOverlay : public juce::Component
+{
+public:
+    std::function<void()> onClose;
+
+    HelpOverlay()
+    {
+        setInterceptsMouseClicks(true, true);
+        setWantsKeyboardFocus(true);
+
+        tabs = { "About", "Materials", "Geometry", "Lights", "Controls" };
+        content = {
+            HelpContent::about(),
+            HelpContent::materials(),
+            HelpContent::geometry(),
+            HelpContent::lights(),
+            HelpContent::controls()
+        };
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        // Semi-transparent dark backdrop
+        g.fillAll(juce::Colour(0xF00D1117));
+
+        recalcLayout();
+
+        // Panel background
+        g.setColour(ElementsColors::bg1);
+        g.fillRoundedRectangle(fullPanelBounds.toFloat(), 6.0f);
+        g.setColour(ElementsColors::border);
+        g.drawRoundedRectangle(fullPanelBounds.toFloat(), 6.0f, 1.0f);
+
+        // Tab bar
+        int tabW = tabBarBounds.getWidth() / static_cast<int>(tabs.size());
+
+        for (int i = 0; i < static_cast<int>(tabs.size()); ++i)
+        {
+            auto tabRect = juce::Rectangle<int>(tabBarBounds.getX() + i * tabW,
+                                                 tabBarBounds.getY(), tabW, tabBarBounds.getHeight());
+
+            if (i == activeTab)
+            {
+                g.setColour(ElementsColors::bg3);
+                g.fillRoundedRectangle(tabRect.toFloat().reduced(2, 2), 3.0f);
+                g.setColour(juce::Colour(0xFFa8d8f0));
+            }
+            else
+            {
+                g.setColour(ElementsColors::mid);
+            }
+
+            g.setFont(juce::Font(12.5f, juce::Font::bold));
+            g.drawText(tabs[static_cast<size_t>(i)].toUpperCase(), tabRect, juce::Justification::centred);
+        }
+
+        // Tab bar bottom border
+        g.setColour(ElementsColors::border);
+        g.drawHorizontalLine(tabBarBounds.getBottom(),
+                             static_cast<float>(fullPanelBounds.getX()),
+                             static_cast<float>(fullPanelBounds.getRight()));
+
+        // Content area (below tab bar, with padding)
+        auto contentArea = juce::Rectangle<int>(fullPanelBounds.getX(),
+                                                 tabBarBounds.getBottom(),
+                                                 fullPanelBounds.getWidth(),
+                                                 fullPanelBounds.getBottom() - tabBarBounds.getBottom())
+                               .reduced(32, 24);
+        drawFormattedContent(g, contentArea, content[static_cast<size_t>(activeTab)]);
+
+        // Close button (top-right of panel)
+        g.setColour(ElementsColors::mid);
+        g.setFont(juce::Font(22.0f));
+        g.drawText(juce::String::charToString(0x00D7), closeBounds, juce::Justification::centred);
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        auto pos = e.getPosition();
+
+        // Close button
+        if (closeBounds.contains(pos))
+        {
+            dismiss();
+            return;
+        }
+
+        // Tab clicks
+        if (tabBarBounds.contains(pos))
+        {
+            int tabW = tabBarBounds.getWidth() / static_cast<int>(tabs.size());
+            int clickedTab = (pos.x - tabBarBounds.getX()) / tabW;
+            if (clickedTab >= 0 && clickedTab < static_cast<int>(tabs.size()))
+            {
+                activeTab = clickedTab;
+                scrollOffset = 0;
+                repaint();
+            }
+            return;
+        }
+
+        // Click outside panel = close
+        if (!fullPanelBounds.contains(pos))
+            dismiss();
+    }
+
+    void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) override
+    {
+        scrollOffset -= static_cast<int>(wheel.deltaY * 120.0f);
+        scrollOffset = juce::jmax(0, scrollOffset);
+        repaint();
+    }
+
+    bool keyPressed(const juce::KeyPress& key) override
+    {
+        if (key == juce::KeyPress::escapeKey)
+        {
+            dismiss();
+            return true;
+        }
+        return false;
+    }
+
+    void dismiss()
+    {
+        setVisible(false);
+        if (onClose) onClose();
+    }
+
+private:
+    void drawFormattedContent(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& text)
+    {
+        auto lines = juce::StringArray::fromLines(text);
+        float lineH = 22.0f;
+        float totalH = lines.size() * lineH;
+        float visibleH = static_cast<float>(area.getHeight());
+        int maxScroll = juce::jmax(0, static_cast<int>(totalH - visibleH));
+        scrollOffset = juce::jmin(scrollOffset, maxScroll);
+
+        // Reserve space for scrollbar if content overflows
+        int scrollBarW = (totalH > visibleH) ? 6 : 0;
+        auto textArea = area.withTrimmedRight(scrollBarW + 4);
+
+        float y = static_cast<float>(area.getY()) - scrollOffset;
+        float x = static_cast<float>(textArea.getX());
+        float w = static_cast<float>(textArea.getWidth());
+
+        // Clip to content area
+        g.saveState();
+        g.reduceClipRegion(area);
+
+        for (auto& line : lines)
+        {
+            if (y + lineH > area.getY() - lineH && y < area.getBottom() + lineH)
+            {
+                // Check for color tag: {#AARRGGBB}TEXT
+                juce::String displayLine = line;
+                juce::Colour titleColour(0xFFa8d8f0);
+                bool hasColorTag = line.startsWith("{#") && line.indexOf("}") == 10;
+
+                if (hasColorTag)
+                {
+                    auto hex = line.substring(2, 10);
+                    titleColour = juce::Colour(static_cast<juce::uint32>(hex.getHexValue64()));
+                    displayLine = line.substring(11);
+                }
+
+                bool isTitle = displayLine.isNotEmpty()
+                               && displayLine == displayLine.toUpperCase()
+                               && !displayLine.startsWith(" ");
+
+                if (isTitle)
+                {
+                    g.setFont(juce::Font(15.0f, juce::Font::bold));
+                    g.setColour(titleColour);
+                    g.drawText(displayLine, static_cast<int>(x), static_cast<int>(y), static_cast<int>(w),
+                               static_cast<int>(lineH), juce::Justification::centredLeft);
+                }
+                else
+                {
+                    g.setFont(juce::Font(13.0f));
+                    g.setColour(ElementsColors::text);
+                    g.drawText(displayLine, static_cast<int>(x), static_cast<int>(y), static_cast<int>(w),
+                               static_cast<int>(lineH), juce::Justification::centredLeft);
+                }
+            }
+            y += lineH;
+        }
+
+        // Scrollbar
+        if (totalH > visibleH)
+        {
+            float trackX = static_cast<float>(area.getRight() - scrollBarW);
+            float trackY = static_cast<float>(area.getY());
+            float trackH = visibleH;
+
+            // Track
+            g.setColour(ElementsColors::bg3.withAlpha(0.4f));
+            g.fillRoundedRectangle(trackX, trackY, static_cast<float>(scrollBarW), trackH, 3.0f);
+
+            // Thumb
+            float thumbRatio = visibleH / totalH;
+            float thumbH = juce::jmax(20.0f, trackH * thumbRatio);
+            float scrollRange = trackH - thumbH;
+            float thumbY = trackY + (maxScroll > 0 ? scrollRange * (static_cast<float>(scrollOffset) / maxScroll) : 0.0f);
+
+            g.setColour(ElementsColors::mid.withAlpha(0.6f));
+            g.fillRoundedRectangle(trackX, thumbY, static_cast<float>(scrollBarW), thumbH, 3.0f);
+        }
+
+        g.restoreState();
+    }
+
+    void recalcLayout()
+    {
+        auto area = getLocalBounds();
+        int panelW = juce::jmin(680, area.getWidth() - 40);
+        int panelH = juce::jmin(520, area.getHeight() - 40);
+        fullPanelBounds = juce::Rectangle<int>(0, 0, panelW, panelH).withCentre(area.getCentre());
+        tabBarBounds = juce::Rectangle<int>(fullPanelBounds.getX(), fullPanelBounds.getY(),
+                                             fullPanelBounds.getWidth(), 36);
+        closeBounds = juce::Rectangle<int>(fullPanelBounds.getRight() - 34,
+                                            fullPanelBounds.getY() + 2, 32, 32);
+    }
+
+    std::vector<juce::String> tabs;
+    std::vector<juce::String> content;
+    int activeTab = 0;
+    int scrollOffset = 0;
+    juce::Rectangle<int> fullPanelBounds;
+    juce::Rectangle<int> tabBarBounds;
+    juce::Rectangle<int> closeBounds;
+};
+
+// ==============================================================================
 // PIANO ROLL - Visual keyboard
 // ==============================================================================
 
@@ -404,8 +788,10 @@ private:
     ElementsAudioProcessor& audioProcessor;
     ElementsLookAndFeel lookAndFeel;
 
-    // === TOOLBAR: Logo + Geometry + Material dropdowns ===
+    // === TOOLBAR: Logo + Geometry + Material dropdowns + Help ===
     ElementsLogo elementsLogo;
+    juce::TextButton helpButton{"?"};
+    HelpOverlay helpOverlay;
     juce::ComboBox geoCombo, matCombo;
     juce::Label geoLabel, matLabel;
 

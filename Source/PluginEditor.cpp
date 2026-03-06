@@ -2393,8 +2393,17 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     // Load custom knob frames from disk (test mode)
     lookAndFeel.loadKnobFramesFromBinaryData();
 
-    // === TOOLBAR: Logo + Geometry + Material dropdowns ===
+    // === TOOLBAR: Logo + Geometry + Material dropdowns + Help ===
     addAndMakeVisible(elementsLogo);
+
+    helpButton.setColour(juce::TextButton::buttonColourId, ElementsColors::bg3);
+    helpButton.setColour(juce::TextButton::textColourOffId, ElementsColors::mid);
+    helpButton.addListener(this);
+    addAndMakeVisible(helpButton);
+
+    helpOverlay.setVisible(false);
+    helpOverlay.onClose = [this]() { viewport3D.setVisible(true); };
+    addChildComponent(helpOverlay);
 
     // Geometry + Material dropdowns (floating inside viewport)
     geoLabel.setText("GEO", juce::dontSendNotification);
@@ -2649,8 +2658,10 @@ void ElementsAudioProcessorEditor::resized()
     auto pianoArea = bounds.removeFromBottom(52);
     pianoRoll.setBounds(pianoArea);
 
-    // === Header: Logo + subtitle ===
+    // === Header: Logo + subtitle + Help button ===
     elementsLogo.setBounds(14, 8, 220, 38);
+    helpButton.setBounds(bounds.getWidth() - 14 - 28, 14, 28, 28);
+    helpOverlay.setBounds(getLocalBounds());
     bounds.removeFromTop(56);
 
     // === RIGHT COLUMN: 310px ===
@@ -2844,6 +2855,16 @@ void ElementsAudioProcessorEditor::buttonClicked(juce::Button* button)
     else if (button == &resetRotationButton)
     {
         viewport3D.resetRotation();
+    }
+    else if (button == &helpButton)
+    {
+        bool show = !helpOverlay.isVisible();
+        helpOverlay.setVisible(show);
+        viewport3D.setVisible(!show);
+        if (show)
+        {
+            helpOverlay.toFront(true);
+        }
     }
 }
 
