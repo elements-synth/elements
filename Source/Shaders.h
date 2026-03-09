@@ -42,6 +42,7 @@ static constexpr const char* pbrFragmentShader = R"(
     uniform vec3 u_lightPos[3];
     uniform vec3 u_lightColor[3];
     uniform int u_lightEnabled[3];
+    uniform float u_lightIntensity[3];
 
     uniform vec3 u_cameraPos;
 
@@ -141,7 +142,7 @@ static constexpr const char* pbrFragmentShader = R"(
 
             float distance = length(u_lightPos[i] - v_worldPos);
             float attenuation = 1.0 / (distance * distance);
-            vec3 radiance = u_lightColor[i] * attenuation * 12.0;
+            vec3 radiance = u_lightColor[i] * attenuation * 12.0 * u_lightIntensity[i];
 
             // Cook-Torrance BRDF
             float D = distributionGGX(N, H, u_roughness);

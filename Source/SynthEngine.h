@@ -276,6 +276,7 @@ struct LightConfig
     bool enabled = false;
     int sourceIndex = 0;     // Index into getLightSources()
     int positionIndex = 0;   // 0=key, 1=fill, 2=rim
+    float intensity = 0.5f;  // 0.0-1.0, default 0.5 (equilibrium — no pitch effect)
 };
 
 // ==============================================================================
@@ -324,6 +325,17 @@ public:
     void noteOff(int noteNumber);
     void allNotesOff();
 
+    /** Query which notes are currently active (for piano roll visualization). */
+    void getActiveNotes(std::array<bool, 128>& notes) const
+    {
+        notes.fill(false);
+        for (const auto& voice : voices)
+        {
+            if (voice.active && voice.noteId >= 0 && voice.noteId < 128)
+                notes[static_cast<size_t>(voice.noteId)] = true;
+        }
+    }
+
     // --- Material & Light ---
 
     void setMaterial(int materialIndex);
@@ -334,8 +346,10 @@ public:
 
     void setLightEnabled(int lightIndex, bool enabled);
     void setLightSource(int lightIndex, int sourceIndex);
+    void setLightIntensity(int lightIndex, float intensity);
     bool isLightEnabled(int lightIndex) const { return lightIndex >= 0 && lightIndex < 3 && lights[static_cast<size_t>(lightIndex)].enabled; }
     int getLightSource(int lightIndex) const { return (lightIndex >= 0 && lightIndex < 3) ? lights[static_cast<size_t>(lightIndex)].sourceIndex : 0; }
+    float getLightIntensity(int lightIndex) const { return (lightIndex >= 0 && lightIndex < 3) ? lights[static_cast<size_t>(lightIndex)].intensity : 0.5f; }
 
     // Rotation - use matrix version for gimbal-lock-free rotation
     void setObjectRotation(float x, float y, float z);  // DEPRECATED: has gimbal lock
@@ -356,11 +370,18 @@ public:
     void setSustain(float level);
     void setRelease(float seconds);
 
-    // ADSR getters (for UI visualization)
-    float getAttack() const { return envelope.attack; }
-    float getDecay() const { return envelope.decay; }
-    float getSustain() const { return envelope.sustain; }
-    float getRelease() const { return envelope.release; }
+    // Envelope mode: 0=Classic ADSR, 1=Physical (derived from optics)
+    void setEnvelopeMode(int mode);
+    int getEnvelopeMode() const { return envelopeMode; }
+
+    // ADSR getters — return active envelope values (Classic or Physical)
+    float getAttack() const { return getActiveEnvelope().attack; }
+    float getDecay() const { return getActiveEnvelope().decay; }
+    float getSustain() const { return getActiveEnvelope().sustain; }
+    float getRelease() const { return getActiveEnvelope().release; }
+
+    // Pitch offset from light intensity (for UI display)
+    float getPitchOffsetSemitones() const { return pitchOffsetSemitones; }
 
     // --- Filter Envelope ---
 
@@ -400,6 +421,8 @@ private:
 
     void updateSpectrum();
     void regenerateWavetables();
+    void updatePhysicalEnvelope();
+    const ADSREnvelope& getActiveEnvelope() const;
 
     float generateEnvelopeSample(Voice& voice);
     float generateFilterEnvelopeSample(int numSamples);
@@ -452,6 +475,14 @@ private:
 
     // Amplitude Envelope
     ADSREnvelope envelope;
+
+    // Physical envelope mode
+    int envelopeMode = 0;  // 0=Classic ADSR, 1=Physical (derived from optics)
+    ADSREnvelope physicalEnvelope;
+
+    // Pitch modulation from light intensity
+    float pitchOffsetSemitones = 0.0f;
+    float pitchOffsetTarget = 0.0f;
 
     // Filter Envelope (global, not per-voice)
     ADSREnvelope filterEnvelope{0.01f, 0.3f, 0.0f, 0.3f};

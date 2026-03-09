@@ -307,7 +307,7 @@ void Viewport3D::paint(juce::Graphics& g)
     auto bounds = getLocalBounds();
     g.setColour(ElementsColors::text.withAlpha(0.35f));
     g.setFont(juce::Font(10.5f));
-    int hintY = bounds.getBottom() - 62;
+    int hintY = bounds.getBottom() - 82;
     g.drawText("RMB  Orbit    Scroll  Zoom", 12, hintY, 250, 14,
                juce::Justification::centredLeft);
 }
@@ -345,16 +345,19 @@ void Viewport3D::timerCallback()
     int matIndex = processor.getMaterial();
     Geometry geom = processor.getGeometry();
 
-    // Check light changes
+    // Check light changes (enabled, source, intensity)
     bool lightsChanged = false;
     for (int i = 0; i < 3; ++i)
     {
         bool enabled = processor.isLightEnabled(i);
         int source = processor.getLightSource(i);
-        if (enabled != lastLightEnabled[i] || source != lastLightSource[i])
+        float intensity = processor.getSynth().getLightIntensity(i);
+        if (enabled != lastLightEnabled[i] || source != lastLightSource[i] ||
+            std::abs(intensity - lastLightIntensity[i]) > 0.001f)
         {
             lastLightEnabled[i] = enabled;
             lastLightSource[i] = source;
+            lastLightIntensity[i] = intensity;
             lightsChanged = true;
         }
     }
@@ -1170,6 +1173,9 @@ void Viewport3D::renderGeometryPBR()
 
         std::snprintf(buf, sizeof(buf), "u_lightEnabled[%d]", i);
         setInt(buf, enabled ? 1 : 0);
+
+        std::snprintf(buf, sizeof(buf), "u_lightIntensity[%d]", i);
+        setFloat(buf, processor.getSynth().getLightIntensity(i));
     }
 
     // Select VBO
@@ -1321,8 +1327,12 @@ void Viewport3D::drawLightIndicators()
     {
         bool enabled = processor.isLightEnabled(li);
         int sourceIdx = processor.getLightSource(li);
-        const float* col = enabled ? lightColors[sourceIdx] : offColor;
-        float alpha = enabled ? 0.92f : 0.35f;
+        float intensity = processor.getSynth().getLightIntensity(li);
+        const float* baseCol = enabled ? lightColors[sourceIdx] : offColor;
+        // Modulate bulb color by intensity (0 = dim, 1 = full brightness)
+        float brightnessFactor = enabled ? (0.3f + 0.7f * intensity) : 1.0f;
+        float col[3] = { baseCol[0] * brightnessFactor, baseCol[1] * brightnessFactor, baseCol[2] * brightnessFactor };
+        float alpha = enabled ? (0.5f + 0.42f * intensity) : 0.35f;
         Vec3 pos = positions[li];
 
         glPushMatrix();
@@ -1381,7 +1391,9 @@ void Viewport3D::drawLightIndicators()
         // === EMIT RAYS (short lines radiating outward when ON) ===
         if (enabled)
         {
-            glColor4f(col[0], col[1], col[2], 0.5f);
+            float rayAlpha = 0.2f + 0.5f * intensity;
+            float scaledRayLen = rayLen * (0.4f + 0.6f * intensity);
+            glColor4f(col[0], col[1], col[2], rayAlpha);
             glLineWidth(1.5f);
             glBegin(GL_LINES);
             for (int i = 0; i < 8; ++i)
@@ -1389,7 +1401,7 @@ void Viewport3D::drawLightIndicators()
                 float a = 2.0f * PI * i / 8.0f;
                 float rx = std::cos(a), rz = std::sin(a);
                 glVertex3f(bulbR * rx, bulbR * 0.3f, bulbR * rz);
-                glVertex3f((bulbR + rayLen) * rx, bulbR * 0.3f, (bulbR + rayLen) * rz);
+                glVertex3f((bulbR + scaledRayLen) * rx, bulbR * 0.3f, (bulbR + scaledRayLen) * rz);
             }
             glEnd();
             glLineWidth(1.0f);
@@ -1497,10 +1509,11 @@ void Viewport3D::setupLighting()
         glEnable(GL_LIGHT0);
         int sourceIdx = processor.getLightSource(0);
         const GLfloat* color = lightColors[sourceIdx];
+        float ki = processor.getSynth().getLightIntensity(0);
 
-        GLfloat keyAmbient[] = { color[0] * 0.1f, color[1] * 0.1f, color[2] * 0.1f, 1.0f };
-        GLfloat keyDiffuse[] = { color[0] * 0.9f, color[1] * 0.9f, color[2] * 0.9f, 1.0f };
-        GLfloat keySpecular[] = { color[0], color[1], color[2], 1.0f };
+        GLfloat keyAmbient[] = { color[0] * 0.1f * ki, color[1] * 0.1f * ki, color[2] * 0.1f * ki, 1.0f };
+        GLfloat keyDiffuse[] = { color[0] * 0.9f * ki, color[1] * 0.9f * ki, color[2] * 0.9f * ki, 1.0f };
+        GLfloat keySpecular[] = { color[0] * ki, color[1] * ki, color[2] * ki, 1.0f };
 
         glLightfv(GL_LIGHT0, GL_POSITION, keyLightPos);
         glLightfv(GL_LIGHT0, GL_AMBIENT, keyAmbient);
@@ -1518,11 +1531,12 @@ void Viewport3D::setupLighting()
         glEnable(GL_LIGHT1);
         int sourceIdx = processor.getLightSource(1);
         const GLfloat* color = lightColors[sourceIdx];
+        float fi = processor.getSynth().getLightIntensity(1);
 
         // Fill light is softer (lower intensity)
-        GLfloat fillAmbient[] = { color[0] * 0.05f, color[1] * 0.05f, color[2] * 0.05f, 1.0f };
-        GLfloat fillDiffuse[] = { color[0] * 0.4f, color[1] * 0.4f, color[2] * 0.4f, 1.0f };
-        GLfloat fillSpecular[] = { color[0] * 0.2f, color[1] * 0.2f, color[2] * 0.2f, 1.0f };
+        GLfloat fillAmbient[] = { color[0] * 0.05f * fi, color[1] * 0.05f * fi, color[2] * 0.05f * fi, 1.0f };
+        GLfloat fillDiffuse[] = { color[0] * 0.4f * fi, color[1] * 0.4f * fi, color[2] * 0.4f * fi, 1.0f };
+        GLfloat fillSpecular[] = { color[0] * 0.2f * fi, color[1] * 0.2f * fi, color[2] * 0.2f * fi, 1.0f };
 
         glLightfv(GL_LIGHT1, GL_POSITION, fillLightPos);
         glLightfv(GL_LIGHT1, GL_AMBIENT, fillAmbient);
@@ -1540,11 +1554,12 @@ void Viewport3D::setupLighting()
         glEnable(GL_LIGHT2);
         int sourceIdx = processor.getLightSource(2);
         const GLfloat* color = lightColors[sourceIdx];
+        float ri = processor.getSynth().getLightIntensity(2);
 
         // Rim light emphasizes edges
         GLfloat rimAmbient[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-        GLfloat rimDiffuse[] = { color[0] * 0.6f, color[1] * 0.6f, color[2] * 0.6f, 1.0f };
-        GLfloat rimSpecular[] = { color[0] * 0.8f, color[1] * 0.8f, color[2] * 0.8f, 1.0f };
+        GLfloat rimDiffuse[] = { color[0] * 0.6f * ri, color[1] * 0.6f * ri, color[2] * 0.6f * ri, 1.0f };
+        GLfloat rimSpecular[] = { color[0] * 0.8f * ri, color[1] * 0.8f * ri, color[2] * 0.8f * ri, 1.0f };
 
         glLightfv(GL_LIGHT2, GL_POSITION, rimLightPos);
         glLightfv(GL_LIGHT2, GL_AMBIENT, rimAmbient);
@@ -1863,7 +1878,23 @@ PianoRoll::~PianoRoll()
 
 void PianoRoll::timerCallback()
 {
-    repaint();
+    // Poll active voices from the synth engine (catches MIDI controller input)
+    std::array<bool, 128> synthNotes{};
+    processor.getSynth().getActiveNotes(synthNotes);
+
+    // Merge: a note is active if the synth is playing it OR it's being mouse-clicked
+    bool changed = false;
+    for (int i = 0; i < 128; ++i)
+    {
+        bool shouldBeActive = synthNotes[static_cast<size_t>(i)] || (i == currentNote);
+        if (shouldBeActive != activeNotes[static_cast<size_t>(i)])
+        {
+            activeNotes[static_cast<size_t>(i)] = shouldBeActive;
+            changed = true;
+        }
+    }
+    if (changed)
+        repaint();
 }
 
 void PianoRoll::resized()
@@ -1891,11 +1922,21 @@ void PianoRoll::paint(juce::Graphics& g)
 
             juce::Rectangle<int> keyRect(x, 0, whiteKeyWidth - 1, bounds.getHeight());
 
-            bool isActive = (note < 128 && activeNotes[static_cast<size_t>(note)]) || note == currentNote;
-            g.setColour(isActive ? juce::Colour(0xFF4A90E2) : juce::Colours::white);
+            bool isActive = (note < 128 && activeNotes[static_cast<size_t>(note)]);
+            g.setColour(isActive ? highlightColour : juce::Colours::white);
             g.fillRect(keyRect);
             g.setColour(juce::Colour(0xFF2A2A3A));
             g.drawRect(keyRect);
+
+            // Label C notes with octave number
+            if (noteInOctave[key] == 0)
+            {
+                g.setColour(isActive ? juce::Colours::white : juce::Colour(0xFF888888));
+                g.setFont(juce::Font(9.0f));
+                g.drawText("C" + juce::String(startOctave + oct),
+                           keyRect.withTrimmedTop(keyRect.getHeight() - 14),
+                           juce::Justification::centred);
+            }
 
             x += whiteKeyWidth;
         }
@@ -1915,8 +1956,8 @@ void PianoRoll::paint(juce::Graphics& g)
                 int bx = x + whiteKeyWidth - blackKeyWidth / 2;
                 juce::Rectangle<int> keyRect(bx, 0, blackKeyWidth, blackKeyHeight);
 
-                bool isActive = (note >= 0 && note < 128 && activeNotes[static_cast<size_t>(note)]) || note == currentNote;
-                g.setColour(isActive ? juce::Colour(0xFF4A90E2) : juce::Colour(0xFF1A1A2A));
+                bool isActive = (note >= 0 && note < 128 && activeNotes[static_cast<size_t>(note)]);
+                g.setColour(isActive ? highlightColour : juce::Colour(0xFF1A1A2A));
                 g.fillRect(keyRect);
             }
             x += whiteKeyWidth;
@@ -1928,20 +1969,14 @@ void PianoRoll::mouseDown(const juce::MouseEvent& e)
 {
     currentNote = getNoteFromPosition(e.getPosition());
     if (currentNote >= 0 && currentNote < 128)
-    {
         processor.getSynth().noteOn(currentNote, 0.8f);
-        activeNotes[static_cast<size_t>(currentNote)] = true;
-    }
     repaint();
 }
 
 void PianoRoll::mouseUp(const juce::MouseEvent&)
 {
     if (currentNote >= 0 && currentNote < 128)
-    {
         processor.getSynth().noteOff(currentNote);
-        activeNotes[static_cast<size_t>(currentNote)] = false;
-    }
     currentNote = -1;
     repaint();
 }
@@ -1952,16 +1987,10 @@ void PianoRoll::mouseDrag(const juce::MouseEvent& e)
     if (newNote != currentNote)
     {
         if (currentNote >= 0 && currentNote < 128)
-        {
             processor.getSynth().noteOff(currentNote);
-            activeNotes[static_cast<size_t>(currentNote)] = false;
-        }
         currentNote = newNote;
         if (currentNote >= 0 && currentNote < 128)
-        {
             processor.getSynth().noteOn(currentNote, 0.8f);
-            activeNotes[static_cast<size_t>(currentNote)] = true;
-        }
     }
     repaint();
 }
@@ -2044,6 +2073,20 @@ LightPanel::LightPanel(ElementsAudioProcessor& p, int idx, const juce::String& n
     sourceCombo.setColour(juce::ComboBox::textColourId, getLightSourceColour(idx + 1));
     sourceCombo.addListener(this);
     addAndMakeVisible(sourceCombo);
+
+    intensityLabel.setText("Intensity", juce::dontSendNotification);
+    intensityLabel.setFont(juce::Font(11.0f));
+    intensityLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFAABBCC));
+    intensityLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(intensityLabel);
+
+    intensitySlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    intensitySlider.setRange(0.0, 1.0, 0.01);
+    intensitySlider.setValue(0.5);
+    intensitySlider.setDoubleClickReturnValue(true, 0.5);
+    intensitySlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 36, 18);
+    intensitySlider.setNumDecimalPlacesToDisplay(2);
+    addAndMakeVisible(intensitySlider);
 }
 
 LightPanel::~LightPanel() {}
@@ -2057,9 +2100,17 @@ void LightPanel::paint(juce::Graphics& g)
 void LightPanel::resized()
 {
     auto bounds = getLocalBounds().reduced(4);
-    enableButton.setBounds(bounds.removeFromLeft(80));
-    bounds.removeFromLeft(4);
-    sourceCombo.setBounds(bounds);
+    auto topRow = bounds.removeFromTop(bounds.getHeight() / 2);
+    auto bottomRow = bounds;
+
+    // Top row: toggle + source combo
+    enableButton.setBounds(topRow.removeFromLeft(56));
+    topRow.removeFromLeft(2);
+    sourceCombo.setBounds(topRow);
+
+    // Bottom row: "Intensity" label + slider
+    intensityLabel.setBounds(bottomRow.removeFromLeft(48));
+    intensitySlider.setBounds(bottomRow);
 }
 
 void LightPanel::buttonClicked(juce::Button*)
@@ -2388,7 +2439,9 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
 {
     setLookAndFeel(&lookAndFeel);
     juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
-    lookAndFeel.setAccent(MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
+    auto initAccent = MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial());
+    lookAndFeel.setAccent(initAccent);
+    pianoRoll.setHighlightColour(initAccent);
 
     // Load custom knob frames from disk (test mode)
     lookAndFeel.loadKnobFramesFromBinaryData();
@@ -2504,6 +2557,14 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     viewport3D.addAndMakeVisible(fillLightPanel.get());
     viewport3D.addAndMakeVisible(rimLightPanel.get());
 
+    // Light intensity APVTS attachments
+    keyIntensityAttachment = std::make_unique<SliderAttachment>(
+        audioProcessor.apvts, "lightIntensityKey", keyLightPanel->getIntensitySlider());
+    fillIntensityAttachment = std::make_unique<SliderAttachment>(
+        audioProcessor.apvts, "lightIntensityFill", fillLightPanel->getIntensitySlider());
+    rimIntensityAttachment = std::make_unique<SliderAttachment>(
+        audioProcessor.apvts, "lightIntensityRim", rimLightPanel->getIntensitySlider());
+
     // === CENTER COLUMN: Viewport + Piano ===
     addAndMakeVisible(viewport3D);
     addAndMakeVisible(pianoRoll);
@@ -2571,6 +2632,13 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     ampDecayAttachment   = std::make_unique<SliderAttachment>(audioProcessor.apvts, "ampDecay", decaySlider);
     ampSustainAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "ampSustain", sustainSlider);
     ampReleaseAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "ampRelease", releaseSlider);
+
+    // Envelope mode combo (Classic / Physical)
+    envModeCombo.addItem("Classic", 1);
+    envModeCombo.addItem("Physical", 2);
+    envModeCombo.setSelectedId(1, juce::dontSendNotification);
+    addAndMakeVisible(envModeCombo);
+    envModeAttachment = std::make_unique<ComboBoxAttachment>(audioProcessor.apvts, "envMode", envModeCombo);
 
     setupLabel(volumeLabel, "VOLUME", 13.0f, true);
     setupRotarySlider(volumeSlider, 0, 1, 0.8);
@@ -2737,7 +2805,11 @@ void ElementsAudioProcessorEditor::resized()
     // --- AMP ENV section (framed) ---
     int ampFrameTop = rightCol.getY();
     rightCol.removeFromTop(6); // inner padding top
-    envelopeLabel.setBounds(rightCol.removeFromTop(16));
+    {
+        auto ampHeaderRow = rightCol.removeFromTop(16);
+        envelopeLabel.setBounds(ampHeaderRow.removeFromLeft(80));
+        envModeCombo.setBounds(ampHeaderRow.removeFromRight(90));
+    }
     rightCol.removeFromTop(4);
     {
         auto envRow = rightCol.removeFromTop(50);
@@ -2822,8 +2894,8 @@ void ElementsAudioProcessorEditor::resized()
     ry += rotH + 4;
     resetRotationButton.setBounds(rotLx, ry, rotLabelW + 2 + rotFieldW, rotH);
 
-    // --- Bottom: Lights bar (no thickness anymore) ---
-    int barH = 44;
+    // --- Bottom: Lights bar (two-row panels: toggle+combo / intensity slider) ---
+    int barH = 64;
     int barY = vpH - barH - 6;
     int lx = 8;
 
@@ -2885,6 +2957,7 @@ void ElementsAudioProcessorEditor::comboBoxChanged(juce::ComboBox* combo)
         oscilloscopeDisplay.setWaveformColour(accent);
         adsrDisplay.setEnvelopeColour(accent);
         filterAdsrDisplay.setEnvelopeColour(accent);
+        pianoRoll.setHighlightColour(accent);
         repaint();
     }
     // Filter type is handled by APVTS attachment (DAW-automatable)
