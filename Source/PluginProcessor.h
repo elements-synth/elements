@@ -150,6 +150,8 @@ private:
     float lastRotY = 0.0f;
     float lastRotZ = 0.0f;
     float lastThickness = 1.0f;
+    float lastLightIntensity[3] = {0.5f, 0.5f, 0.5f};
+    int lastEnvMode = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ElementsAudioProcessor)
 };

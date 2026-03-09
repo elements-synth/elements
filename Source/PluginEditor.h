@@ -98,6 +98,7 @@ private:
     int rotVersion = 0;
     bool lastLightEnabled[3] = {false, false, false};
     int lastLightSource[3] = {0, 0, 0};
+    float lastLightIntensity[3] = {0.5f, 0.5f, 0.5f};
 
     // Light positions for visualization
     struct Vec3 { float x, y, z; };
@@ -328,6 +329,9 @@ namespace HelpContent
             "\n"
             "{#ff5b9ef5}SAPPHIRE\n"
             "Clear, focused tone. Strong upper-mid presence.\n"
+            "Note: Sapphire only transmits blue wavelengths.\n"
+            "It will not produce sound with Sunset light.\n"
+            "Use Daylight or LED Cool for best results.\n"
             "\n"
             "{#ffcf7e46}COPPER\n"
             "Metallic, warm resonance. Orange-tinted harmonics.\n"
@@ -382,7 +386,51 @@ namespace HelpContent
             "Bright, modern character.\n"
             "\n"
             "You can enable up to 3 lights simultaneously.\n"
-            "The spectrum combines their contributions.";
+            "The spectrum combines their contributions.\n"
+            "\n"
+            "INTENSITY\n"
+            "Each light has an intensity slider (0.0 - 1.0).\n"
+            "Intensity controls how much each light contributes\n"
+            "to the spectrum and to the 3D viewport lighting.\n"
+            "\n"
+            "  0.5 = equilibrium (default, no pitch effect)\n"
+            "  > 0.5 = brighter light, pitch shifts up\n"
+            "  < 0.5 = dimmer light, pitch shifts down\n"
+            "\n"
+            "Pitch modulation range: +/- 2 semitones.\n"
+            "The effect is cumulative: more lights at high\n"
+            "intensity push pitch further up. Double-click\n"
+            "the slider to reset to 0.5.";
+    }
+
+    inline juce::String viewport()
+    {
+        return
+            "3D VIEWPORT\n"
+            "\n"
+            "CAMERA\n"
+            "  Right-click + drag: Orbit camera around object\n"
+            "  Scroll wheel: Zoom in / out\n"
+            "\n"
+            "ROTATION GIZMO\n"
+            "  Drag the colored rings to rotate the object:\n"
+            "  Red ring (X), Green ring (Y), Blue ring (Z)\n"
+            "  Rotation affects the Fresnel angle between light\n"
+            "  and surface, changing the timbre.\n"
+            "\n"
+            "ROTATION FIELDS\n"
+            "  Type exact rotation values (0-360) in the X/Y/Z\n"
+            "  fields on the left side. Click Reset to return\n"
+            "  to default orientation.\n"
+            "\n"
+            "LIGHT INDICATORS\n"
+            "  The 3 light bulbs show position and color of\n"
+            "  each active light. Bulb brightness reflects the\n"
+            "  intensity slider value.\n"
+            "\n"
+            "THICKNESS\n"
+            "  Top-right slider. Controls material depth in\n"
+            "  the light path (Beer-Lambert absorption).";
     }
 
     inline juce::String controls()
@@ -407,6 +455,19 @@ namespace HelpContent
             "  Sustain: Held volume level\n"
             "  Release: Volume fade-out time\n"
             "\n"
+            "  Mode selector (Classic / Physical):\n"
+            "\n"
+            "  Classic: Standard ADSR controlled by knobs.\n"
+            "\n"
+            "  Physical: ADSR values are derived from optics.\n"
+            "  The envelope shape changes automatically based\n"
+            "  on material, thickness, and light intensity:\n"
+            "    Attack  = light intensity (brighter = faster)\n"
+            "    Decay   = thickness x absorption (thick = slow)\n"
+            "    Sustain = refractive index (Diamond high, Water low)\n"
+            "    Release = IOR x thickness (dense = long release)\n"
+            "  In Physical mode the ADSR knobs are overridden.\n"
+            "\n"
             "OUTPUT\n"
             "  Volume: Master output level\n"
             "\n"
@@ -426,12 +487,13 @@ public:
         setInterceptsMouseClicks(true, true);
         setWantsKeyboardFocus(true);
 
-        tabs = { "About", "Materials", "Geometry", "Lights", "Controls" };
+        tabs = { "About", "Materials", "Geometry", "Lights", "Viewport", "Controls" };
         content = {
             HelpContent::about(),
             HelpContent::materials(),
             HelpContent::geometry(),
             HelpContent::lights(),
+            HelpContent::viewport(),
             HelpContent::controls()
         };
     }
@@ -669,6 +731,8 @@ public:
     void mouseUp(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
 
+    void setHighlightColour(juce::Colour c) { highlightColour = c; }
+
 private:
     ElementsAudioProcessor& processor;
 
@@ -681,6 +745,7 @@ private:
     bool isBlackKey(int note);
 
     std::array<bool, 128> activeNotes{};
+    juce::Colour highlightColour { 0xFF4A90E2 };
 };
 
 // ==============================================================================
@@ -704,6 +769,8 @@ public:
     void setEnabled(bool enabled);
     bool isLightEnabled() const { return enableButton.getToggleState(); }
 
+    juce::Slider& getIntensitySlider() { return intensitySlider; }
+
 private:
     ElementsAudioProcessor& processor;
     int lightIndex;
@@ -711,6 +778,8 @@ private:
 
     juce::ToggleButton enableButton;
     juce::ComboBox sourceCombo;
+    juce::Label intensityLabel;
+    juce::Slider intensitySlider;
 };
 
 // ==============================================================================
@@ -842,6 +911,9 @@ private:
     juce::Slider attackSlider, decaySlider, sustainSlider, releaseSlider;
     juce::Label attackLabel, decayLabel, sustainLabel, releaseLabel;
 
+    // Envelope mode (Classic/Physical)
+    juce::ComboBox envModeCombo;
+
     // Volume
     juce::Label volumeLabel;
     juce::Slider volumeSlider;
@@ -863,6 +935,10 @@ private:
     std::unique_ptr<SliderAttachment> ampSustainAttachment;
     std::unique_ptr<SliderAttachment> ampReleaseAttachment;
     std::unique_ptr<SliderAttachment> thicknessAttachment;
+    std::unique_ptr<SliderAttachment> keyIntensityAttachment;
+    std::unique_ptr<SliderAttachment> fillIntensityAttachment;
+    std::unique_ptr<SliderAttachment> rimIntensityAttachment;
+    std::unique_ptr<ComboBoxAttachment> envModeAttachment;
 
     // === Helpers ===
     void setupRotarySlider(juce::Slider& slider, double min, double max, double def);

@@ -210,9 +210,9 @@ void WavetableGenerator::normalize(std::array<float, WAVETABLE_SIZE>& wavetable)
 ElementsSynth::ElementsSynth()
 {
     // Initialize lights (key light enabled by default with Sunset)
-    lights[0] = { true, 0, 0 };   // Key light, Sunset, position 0
-    lights[1] = { false, 1, 1 };  // Fill light, Daylight, position 1
-    lights[2] = { false, 2, 2 };  // Rim light, LED Cool, position 2
+    lights[0] = { true, 0, 0, 0.5f };   // Key light, Sunset, position 0, intensity 0.5
+    lights[1] = { false, 1, 1, 0.5f };  // Fill light, Daylight, position 1, intensity 0.5
+    lights[2] = { false, 2, 2, 0.5f };  // Rim light, LED Cool, position 2, intensity 0.5
 
     // Initialize voice order tracking
     voiceOrder.fill(-1);
@@ -291,6 +291,9 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     // Smooth spectral amplitude (controls volume based on angle) - gentler
     spectralAmplitude += (spectralAmplitudeTarget - spectralAmplitude) * 0.05f;
 
+    // Smooth pitch offset from light intensity
+    pitchOffsetSemitones += (pitchOffsetTarget - pitchOffsetSemitones) * 0.05f;
+
     // Filter envelope: compute start and end values for per-sample interpolation
     float filterEnvStart = filterEnvValue;
     filterEnvValue = generateFilterEnvelopeSample(numSamples);
@@ -356,7 +359,9 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             ? &crossfade.oldTables.getForFrequency(voice.frequency)
             : nullptr;
 
-        float phaseIncrement = voice.frequency / static_cast<float>(sampleRate);
+        // Apply pitch modulation from light intensity (+-2 semitones)
+        float pitchMod = std::pow(2.0f, pitchOffsetSemitones / 12.0f);
+        float phaseIncrement = (voice.frequency * pitchMod) / static_cast<float>(sampleRate);
 
         for (int i = 0; i < numSamples; ++i)
         {
@@ -527,11 +532,11 @@ void ElementsSynth::noteOn(int noteNumber, float velocity)
         Voice& voice = voices[existingVoice];
 
         // Calculate the CURRENT envelope level before resetting
-        // This is crucial for smooth crossfade - we need to know where we're fading FROM
+        const ADSREnvelope& env = getActiveEnvelope();
         float currentEnvLevel = 0.0f;
-        int attackSamples = static_cast<int>(envelope.attack * sampleRate);
-        int decaySamples = static_cast<int>(envelope.decay * sampleRate);
-        int releaseSamples = static_cast<int>(envelope.release * sampleRate);
+        int attackSamples = static_cast<int>(env.attack * sampleRate);
+        int decaySamples = static_cast<int>(env.decay * sampleRate);
+        int releaseSamples = static_cast<int>(env.release * sampleRate);
         if (attackSamples < 1) attackSamples = 1;
         if (decaySamples < 1) decaySamples = 1;
         if (releaseSamples < 1) releaseSamples = 1;
@@ -551,12 +556,12 @@ void ElementsSynth::noteOn(int noteNumber, float velocity)
         {
             // In decay phase
             float decayProgress = static_cast<float>(voice.age - attackSamples) / decaySamples;
-            currentEnvLevel = 1.0f - (1.0f - envelope.sustain) * decayProgress;
+            currentEnvLevel = 1.0f - (1.0f - env.sustain) * decayProgress;
         }
         else
         {
             // In sustain phase
-            currentEnvLevel = envelope.sustain;
+            currentEnvLevel = env.sustain;
         }
 
         // Set up retrigger crossfade FROM current level TO new envelope
@@ -644,8 +649,9 @@ void ElementsSynth::noteOff(int noteNumber)
         Voice& voice = voices[voiceIndex];
 
         // Calculate current envelope level to start release from there (prevents clicks)
-        int attackSamples = static_cast<int>(envelope.attack * sampleRate);
-        int decaySamples = static_cast<int>(envelope.decay * sampleRate);
+        const ADSREnvelope& env = getActiveEnvelope();
+        int attackSamples = static_cast<int>(env.attack * sampleRate);
+        int decaySamples = static_cast<int>(env.decay * sampleRate);
         if (attackSamples < 1) attackSamples = 1;
         if (decaySamples < 1) decaySamples = 1;
 
@@ -659,12 +665,12 @@ void ElementsSynth::noteOff(int noteNumber)
         {
             // In decay
             float decayProgress = static_cast<float>(voice.age - attackSamples) / decaySamples;
-            currentLevel = 1.0f - (1.0f - envelope.sustain) * decayProgress;
+            currentLevel = 1.0f - (1.0f - env.sustain) * decayProgress;
         }
         else
         {
             // In sustain
-            currentLevel = envelope.sustain;
+            currentLevel = env.sustain;
         }
 
         voice.releaseStartLevel = currentLevel;
@@ -704,6 +710,7 @@ void ElementsSynth::setThickness(float t)
 {
     thickness = clamp(t, 0.1f, 3.0f);
     updateSpectrum();
+    updatePhysicalEnvelope();
 }
 
 void ElementsSynth::setMaterial(int materialIndex)
@@ -712,6 +719,7 @@ void ElementsSynth::setMaterial(int materialIndex)
     {
         currentMaterialIndex = materialIndex;
         updateSpectrum();
+        updatePhysicalEnvelope();
     }
 }
 
@@ -727,6 +735,7 @@ void ElementsSynth::setLightEnabled(int lightIndex, bool enabled)
     {
         lights[lightIndex].enabled = enabled;
         updateSpectrum();
+        updatePhysicalEnvelope();
     }
 }
 
@@ -736,7 +745,78 @@ void ElementsSynth::setLightSource(int lightIndex, int sourceIndex)
     {
         lights[lightIndex].sourceIndex = sourceIndex;
         updateSpectrum();
+        updatePhysicalEnvelope();
     }
+}
+
+void ElementsSynth::setLightIntensity(int lightIndex, float intensity)
+{
+    if (lightIndex >= 0 && lightIndex < 3)
+    {
+        lights[lightIndex].intensity = clamp(intensity, 0.0f, 1.0f);
+        updateSpectrum();
+        updatePhysicalEnvelope();
+    }
+}
+
+void ElementsSynth::setEnvelopeMode(int mode)
+{
+    envelopeMode = (mode == 1) ? 1 : 0;
+    if (envelopeMode == 1)
+        updatePhysicalEnvelope();
+}
+
+const ADSREnvelope& ElementsSynth::getActiveEnvelope() const
+{
+    return (envelopeMode == 1) ? physicalEnvelope : envelope;
+}
+
+void ElementsSynth::updatePhysicalEnvelope()
+{
+    // Sum intensity of active lights (not averaged — more lights = more effect)
+    float totalIntensity = 0.0f;
+    int activeCount = 0;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (lights[i].enabled)
+        {
+            totalIntensity += lights[i].intensity;
+            ++activeCount;
+        }
+    }
+
+    // Average intensity (0-1 range) for envelope parameters
+    float avgIntensity = (activeCount > 0) ? (totalIntensity / activeCount) : 0.5f;
+
+    // Get current material properties
+    const auto& materials = getMaterials();
+    const Material& material = materials[currentMaterialIndex];
+    float ior = material.refractiveIndex;
+    float avgTransmission = calculateAverageTransmission(material);
+
+    // Attack: higher intensity = faster attack (more photon energy)
+    physicalEnvelope.attack = lerp(0.5f, 0.005f, avgIntensity);
+    physicalEnvelope.attack = clamp(physicalEnvelope.attack, 0.001f, 2.0f);
+
+    // Decay: thick + absorptive = long decay
+    physicalEnvelope.decay = thickness * (1.0f - avgTransmission) * 1.5f;
+    physicalEnvelope.decay = clamp(physicalEnvelope.decay, 0.01f, 2.0f);
+
+    // Sustain: high IOR = more internal reflections = higher sustain
+    physicalEnvelope.sustain = clamp(ior / 2.42f, 0.1f, 0.95f);
+
+    // Release: high IOR + thick = long release (trapped light)
+    physicalEnvelope.release = ior * 0.2f * thickness;
+    physicalEnvelope.release = clamp(physicalEnvelope.release, 0.01f, 2.0f);
+
+    // Pitch offset: SUM-based deviation from equilibrium (0.5 per light)
+    // More lights at high intensity = more pitch shift
+    // Equilibrium = activeCount * 0.5, max deviation = activeCount * 0.5
+    // Range: +-2 semitones at max deviation
+    float equilibrium = activeCount * 0.5f;
+    float deviation = totalIntensity - equilibrium;
+    float maxDeviation = std::max(activeCount * 0.5f, 0.001f);
+    pitchOffsetTarget = clamp((deviation / maxDeviation) * 2.0f, -2.0f, 2.0f);
 }
 
 void ElementsSynth::setObjectRotation(float x, float y, float z)
@@ -910,10 +990,11 @@ void ElementsSynth::updateSpectrum()
         calculateSpectrumMultiFace(material, light, lightPos.position,
                                    objectRotationMatrix, currentGeometry, lightSpectrum);
 
+        float effectiveIntensity = lights[i].intensity;
         for (int w = 0; w < NUM_WAVELENGTHS; ++w)
-            combinedSpectrum[w] += lightSpectrum[w] * lightPos.intensity;
+            combinedSpectrum[w] += lightSpectrum[w] * effectiveIntensity;
 
-        totalIntensity += lightPos.intensity;
+        totalIntensity += effectiveIntensity;
     }
 
     // PROBLEM 1 FIX: Normalize by total light intensity so volume stays
@@ -1036,9 +1117,10 @@ void ElementsSynth::regenerateWavetables()
 
 float ElementsSynth::generateEnvelopeSample(Voice& voice)
 {
-    int attackSamples = static_cast<int>(envelope.attack * sampleRate);
-    int decaySamples = static_cast<int>(envelope.decay * sampleRate);
-    int releaseSamples = static_cast<int>(envelope.release * sampleRate);
+    const ADSREnvelope& env = getActiveEnvelope();
+    int attackSamples = static_cast<int>(env.attack * sampleRate);
+    int decaySamples = static_cast<int>(env.decay * sampleRate);
+    int releaseSamples = static_cast<int>(env.release * sampleRate);
 
     if (attackSamples < 1) attackSamples = 1;
     if (decaySamples < 1) decaySamples = 1;
@@ -1050,9 +1132,9 @@ float ElementsSynth::generateEnvelopeSample(Voice& voice)
         if (voice.releaseAge >= releaseSamples)
             return -1.0f;  // Voice is dead
 
-        float env = voice.releaseStartLevel * (1.0f - static_cast<float>(voice.releaseAge) / releaseSamples);
+        float envLevel = voice.releaseStartLevel * (1.0f - static_cast<float>(voice.releaseAge) / releaseSamples);
         voice.releaseAge++;
-        return env;
+        return envLevel;
     }
     else
     {
@@ -1066,12 +1148,12 @@ float ElementsSynth::generateEnvelopeSample(Voice& voice)
         {
             // Decay
             float decayProgress = static_cast<float>(voice.age - attackSamples) / decaySamples;
-            return 1.0f - (1.0f - envelope.sustain) * decayProgress;
+            return 1.0f - (1.0f - env.sustain) * decayProgress;
         }
         else
         {
             // Sustain
-            return envelope.sustain;
+            return env.sustain;
         }
     }
 }

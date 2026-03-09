@@ -158,6 +158,38 @@ ElementsAudioProcessor::createParameterLayout()
         [](float v, int) { return juce::String(v, 1) + juce::String::fromUTF8("\xC2\xB0"); },
         nullptr));
 
+    // =====================================================================
+    // 3. LIGHT INTENSITY PARAMETERS
+    // =====================================================================
+
+    // Key Light Intensity: 0.0 – 1.0, default 0.5 (equilibrium)
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"lightIntensityKey", 1},
+        "Key Intensity",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.5f));
+
+    // Fill Light Intensity: 0.0 – 1.0, default 0.5
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"lightIntensityFill", 1},
+        "Fill Intensity",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.5f));
+
+    // Rim Light Intensity: 0.0 – 1.0, default 0.5
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"lightIntensityRim", 1},
+        "Rim Intensity",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.5f));
+
+    // Envelope Mode: 0=Classic, 1=Physical
+    layout.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"envMode", 1},
+        "Envelope Mode",
+        juce::StringArray{"Classic", "Physical"},
+        0));
+
     return layout;
 }
 
@@ -365,6 +397,32 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         {
             lastThickness = newThickness;
             synth.setThickness(newThickness);
+        }
+    }
+
+    // Light intensities: sync from APVTS to synth
+    {
+        static const char* intensityParamIds[] = {
+            "lightIntensityKey", "lightIntensityFill", "lightIntensityRim"
+        };
+        for (int i = 0; i < 3; ++i)
+        {
+            float newInt = apvts.getRawParameterValue(intensityParamIds[i])->load();
+            if (newInt != lastLightIntensity[i])
+            {
+                lastLightIntensity[i] = newInt;
+                synth.setLightIntensity(i, newInt);
+            }
+        }
+    }
+
+    // Envelope mode
+    {
+        int newMode = static_cast<int>(apvts.getRawParameterValue("envMode")->load());
+        if (newMode != lastEnvMode)
+        {
+            lastEnvMode = newMode;
+            synth.setEnvelopeMode(newMode);
         }
     }
 

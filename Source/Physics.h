@@ -368,3 +368,9 @@ const LightPosition& getLightPosition(int index);
  * Generate standard wavelength array (380-780nm, 50 points).
  */
 std::array<float, NUM_WAVELENGTHS> generateWavelengths();
+
+/**
+ * Calculate average transmission of a material across all wavelength samples.
+ * Used by Physical Envelope mode to derive decay time from absorption.
+ */
+float calculateAverageTransmission(const Material& material);

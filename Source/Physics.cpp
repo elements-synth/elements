@@ -133,6 +133,14 @@ std::array<float, NUM_WAVELENGTHS> generateWavelengths()
     return wavelengths;
 }
 
+float calculateAverageTransmission(const Material& material)
+{
+    float sum = 0.0f;
+    for (int i = 0; i < 8; ++i)
+        sum += material.transmission[static_cast<size_t>(i)];
+    return sum / 8.0f;
+}
+
 /**
  * Inicializa las fuentes de luz.
  *
