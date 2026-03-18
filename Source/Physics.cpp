@@ -938,15 +938,116 @@ void calculateSpectrumMultiFace(const Material& material,
                                 const Vec3& lightPosition,
                                 const RotationMatrix& rotMatrix,
                                 Geometry geometry,
-                                std::array<float, NUM_WAVELENGTHS>& output)
+                                std::array<float, NUM_WAVELENGTHS>& output,
+                                float deformAmount,
+                                float deformFrequency,
+                                float noiseTimeOffset)
 {
     std::fill(output.begin(), output.end(), 0.0f);
 
-    // Sphere: rotation doesn't change light interaction
-    // A sphere always presents the same curved surface to the light.
+    // Sphere: when undeformed, rotation doesn't change light interaction.
+    // A perfect sphere always presents the same curved surface to the light.
+    // When deformed (deformAmount > 0), noise bumps tilt surface normals,
+    // making Fresnel angles vary with rotation — just like a faceted geometry.
+    // We crossfade between the two paths to avoid volume jumps at the threshold.
     if (geometry == Geometry::Sphere)
     {
-        calculateSpectrum(material, light, 10.0f, output);
+        // Always compute the undeformed baseline spectrum
+        std::array<float, NUM_WAVELENGTHS> undeformed{};
+        calculateSpectrum(material, light, 10.0f, undeformed);
+
+        if (deformAmount <= 0.001f)
+        {
+            output = undeformed;
+            return;
+        }
+
+        // Sample 12 uniformly-distributed directions (icosahedron vertices)
+        // and compute displaced normals from simplex noise
+        static const float phi = (1.0f + std::sqrt(5.0f)) / 2.0f;
+        static const float icosaLen = std::sqrt(1.0f + phi * phi);
+        static const Vec3 icosaDirs[12] = {
+            Vec3( 0.0f,  1.0f / icosaLen,  phi / icosaLen),
+            Vec3( 0.0f, -1.0f / icosaLen,  phi / icosaLen),
+            Vec3( 0.0f,  1.0f / icosaLen, -phi / icosaLen),
+            Vec3( 0.0f, -1.0f / icosaLen, -phi / icosaLen),
+            Vec3( 1.0f / icosaLen,  phi / icosaLen,  0.0f),
+            Vec3(-1.0f / icosaLen,  phi / icosaLen,  0.0f),
+            Vec3( 1.0f / icosaLen, -phi / icosaLen,  0.0f),
+            Vec3(-1.0f / icosaLen, -phi / icosaLen,  0.0f),
+            Vec3( phi / icosaLen,  0.0f,  1.0f / icosaLen),
+            Vec3(-phi / icosaLen,  0.0f,  1.0f / icosaLen),
+            Vec3( phi / icosaLen,  0.0f, -1.0f / icosaLen),
+            Vec3(-phi / icosaLen,  0.0f, -1.0f / icosaLen)
+        };
+
+        // Compute displaced normals via noise gradient (finite differences)
+        Vec3 deformedNormals[12];
+        constexpr float eps = 0.01f;
+        const float freq = deformFrequency;
+        const float scale = deformAmount * 0.3f;
+
+        for (int i = 0; i < 12; ++i)
+        {
+            const Vec3& p = icosaDirs[i];
+            float px = p.x * freq + noiseTimeOffset, py = p.y * freq, pz = p.z * freq;
+
+            float dndx = (simplex3D(px + eps, py, pz) - simplex3D(px - eps, py, pz)) / (2.0f * eps);
+            float dndy = (simplex3D(px, py + eps, pz) - simplex3D(px, py - eps, pz)) / (2.0f * eps);
+            float dndz = (simplex3D(px, py, pz + eps) - simplex3D(px, py, pz - eps)) / (2.0f * eps);
+            Vec3 grad(dndx, dndy, dndz);
+
+            float radialComp = grad.dot(p);
+            Vec3 gradTan(grad.x - p.x * radialComp,
+                         grad.y - p.y * radialComp,
+                         grad.z - p.z * radialComp);
+
+            Vec3 displaced(p.x - gradTan.x * scale,
+                           p.y - gradTan.y * scale,
+                           p.z - gradTan.z * scale);
+            deformedNormals[i] = displaced.normalized();
+        }
+
+        // Multi-face Fresnel with deformed normals
+        std::array<float, NUM_WAVELENGTHS> deformedOutput{};
+        std::array<float, NUM_WAVELENGTHS> materialCurve;
+        interpolateMaterial(material, light.wavelengths, materialCurve);
+
+        std::array<float, NUM_WAVELENGTHS> fresnelCurve;
+        float totalWeight = 0.0f;
+
+        for (int face = 0; face < 12; ++face)
+        {
+            Vec3 rotatedNormal = rotMatrix.apply(deformedNormals[face]);
+            float cosAngle = lightPosition.dot(rotatedNormal);
+            if (cosAngle <= 0.0f)
+                continue;
+
+            float angleDeg = std::acos(clamp(cosAngle, -1.0f, 1.0f)) * 180.0f / 3.14159265359f;
+            float weight = cosAngle * cosAngle;
+
+            calculateFresnelSpectral(angleDeg, light.wavelengths, fresnelCurve, material.refractiveIndex);
+
+            for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+                deformedOutput[w] += weight * light.intensity[w] * materialCurve[w] * fresnelCurve[w];
+
+            totalWeight += weight;
+        }
+
+        if (totalWeight > 0.0f)
+        {
+            for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+                deformedOutput[w] /= totalWeight;
+        }
+
+        // Crossfade: smooth transition between undeformed and deformed spectra.
+        // At deformAmount=0 → 100% undeformed, at >=0.15 → 100% deformed.
+        constexpr float blendRange = 0.15f;
+        float blend = std::min(deformAmount / blendRange, 1.0f);
+
+        for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+            output[w] = undeformed[w] * (1.0f - blend) + deformedOutput[w] * blend;
+
         return;
     }
 
@@ -1064,4 +1165,92 @@ void calculateSpectrumMultiFace(const Material& material,
             output[w] /= totalWeight;
         }
     }
+}
+
+// ==============================================================================
+// 3D SIMPLEX NOISE
+// ==============================================================================
+
+namespace {
+
+static const int snPerm[512] = {
+    151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,
+    8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,
+    35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,
+    134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,
+    55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,
+    18,169,200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,
+    250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,
+    189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,
+    172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,
+    228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,
+    107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,
+    138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180,
+    151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,
+    8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,
+    35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,
+    134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,
+    55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,
+    18,169,200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,
+    250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,
+    189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,
+    172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,
+    228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,
+    107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,
+    138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
+};
+
+static float snGrad3(int hash, float x, float y, float z)
+{
+    int h = hash & 15;
+    float u = h < 8 ? x : y;
+    float v = h < 4 ? y : (h == 12 || h == 14 ? x : z);
+    return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
+}
+
+} // anonymous namespace
+
+float simplex3D(float x, float y, float z)
+{
+    constexpr float F3 = 1.0f / 3.0f;
+    constexpr float G3 = 1.0f / 6.0f;
+
+    float s = (x + y + z) * F3;
+    int i = static_cast<int>(std::floor(x + s));
+    int j = static_cast<int>(std::floor(y + s));
+    int k = static_cast<int>(std::floor(z + s));
+
+    float t = (i + j + k) * G3;
+    float x0 = x - (i - t);
+    float y0 = y - (j - t);
+    float z0 = z - (k - t);
+
+    int i1, j1, k1, i2, j2, k2;
+    if (x0 >= y0) {
+        if (y0 >= z0)      { i1=1; j1=0; k1=0; i2=1; j2=1; k2=0; }
+        else if (x0 >= z0) { i1=1; j1=0; k1=0; i2=1; j2=0; k2=1; }
+        else               { i1=0; j1=0; k1=1; i2=1; j2=0; k2=1; }
+    } else {
+        if (y0 < z0)       { i1=0; j1=0; k1=1; i2=0; j2=1; k2=1; }
+        else if (x0 < z0)  { i1=0; j1=1; k1=0; i2=0; j2=1; k2=1; }
+        else               { i1=0; j1=1; k1=0; i2=1; j2=1; k2=0; }
+    }
+
+    float x1 = x0 - i1 + G3, y1 = y0 - j1 + G3, z1 = z0 - k1 + G3;
+    float x2 = x0 - i2 + 2*G3, y2 = y0 - j2 + 2*G3, z2 = z0 - k2 + 2*G3;
+    float x3 = x0 - 1 + 3*G3, y3 = y0 - 1 + 3*G3, z3 = z0 - 1 + 3*G3;
+
+    int ii = i & 255, jj = j & 255, kk = k & 255;
+
+    float n = 0.0f;
+    float t0 = 0.6f - x0*x0 - y0*y0 - z0*z0;
+    if (t0 > 0) { t0 *= t0; n += t0 * t0 * snGrad3(snPerm[ii + snPerm[jj + snPerm[kk]]], x0, y0, z0); }
+    float t1 = 0.6f - x1*x1 - y1*y1 - z1*z1;
+    if (t1 > 0) { t1 *= t1; n += t1 * t1 * snGrad3(snPerm[ii+i1 + snPerm[jj+j1 + snPerm[kk+k1]]], x1, y1, z1); }
+    float t2 = 0.6f - x2*x2 - y2*y2 - z2*z2;
+    if (t2 > 0) { t2 *= t2; n += t2 * t2 * snGrad3(snPerm[ii+i2 + snPerm[jj+j2 + snPerm[kk+k2]]], x2, y2, z2); }
+    float t3 = 0.6f - x3*x3 - y3*y3 - z3*z3;
+    if (t3 > 0) { t3 *= t3; n += t3 * t3 * snGrad3(snPerm[ii+1 + snPerm[jj+1 + snPerm[kk+1]]], x3, y3, z3); }
+
+    return 32.0f * n;
 }

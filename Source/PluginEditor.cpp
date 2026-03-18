@@ -14,6 +14,9 @@
 #define STBI_ONLY_HDR
 #include "stb_image.h"
 
+// simplex3D() is defined in Physics.cpp and declared in Physics.h
+// (available here via PluginProcessor.h → SynthEngine.h → Physics.h)
+
 // ==============================================================================
 // VIEWPORT 3D
 // ==============================================================================
@@ -369,6 +372,24 @@ void Viewport3D::timerCallback()
         currentThickness = newThickness;
         needsRepaint = true;
     }
+
+    // Deform noise animation (sphere only)
+    float deformAmt = processor.getSynth().getDeformAmount();
+    float deformFreq = processor.getSynth().getDeformFrequency();
+    if (geom == Geometry::Sphere && deformAmt > 0.001f)
+    {
+        noiseTimeOffset += 0.02f;
+        displacedVBODirty = true;
+        needsRepaint = true;
+    }
+    if (std::abs(deformAmt - lastDeformAmount) > 0.001f ||
+        std::abs(deformFreq - lastDeformFrequency) > 0.01f)
+    {
+        displacedVBODirty = true;
+        needsRepaint = true;
+    }
+    lastDeformAmount = deformAmt;
+    lastDeformFrequency = deformFreq;
 
     bool changed = (matIndex != lastMaterial) ||
                    (geom != lastGeometry) ||
@@ -865,6 +886,17 @@ void Viewport3D::createVBOs()
     uploadVBO(sphereVBO, sphereVerts.data(), sphereVerts.size() * sizeof(PBRVertex));
     uploadVBO(torusVBO, torusVerts.data(), torusVerts.size() * sizeof(PBRVertex));
     uploadVBO(dodecaVBO, dodecaVerts.data(), dodecaVerts.size() * sizeof(PBRVertex));
+
+    // Store base sphere vertices for noise displacement
+    baseSphereVerts = sphereVerts;
+
+    // Create dynamic VBO for displaced sphere
+    glGenBuffers(1, &displacedSphereVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, displacedSphereVBO);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(sphereVerts.size() * sizeof(PBRVertex)),
+                 sphereVerts.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void Viewport3D::destroyVBOs()
@@ -874,6 +906,84 @@ void Viewport3D::destroyVBOs()
     if (sphereVBO) { glDeleteBuffers(1, &sphereVBO); sphereVBO = 0; }
     if (torusVBO)  { glDeleteBuffers(1, &torusVBO);  torusVBO = 0; }
     if (dodecaVBO) { glDeleteBuffers(1, &dodecaVBO); dodecaVBO = 0; }
+    if (displacedSphereVBO) { glDeleteBuffers(1, &displacedSphereVBO); displacedSphereVBO = 0; }
+}
+
+void Viewport3D::updateDisplacedSphere(float amount, float frequency)
+{
+    using namespace juce::gl;
+
+    if (baseSphereVerts.empty()) return;
+
+    const size_t numVerts = baseSphereVerts.size();
+    std::vector<PBRVertex> displaced(numVerts);
+
+    constexpr float eps = 0.01f;
+    const float dispScale = amount * 0.3f;
+    const float normalScale = dispScale * frequency;
+
+    for (size_t i = 0; i < numVerts; ++i)
+    {
+        const auto& base = baseSphereVerts[i];
+        float nx = base.normal[0], ny = base.normal[1], nz = base.normal[2];
+        float px = base.position[0], py = base.position[1], pz = base.position[2];
+
+        // Sample coordinates (position * frequency + animated offset)
+        float sx = px * frequency + noiseTimeOffset;
+        float sy = py * frequency + noiseTimeOffset * 0.7f;
+        float sz = pz * frequency + noiseTimeOffset * 0.3f;
+
+        // Noise value for position displacement
+        float noise = simplex3D(sx, sy, sz);
+
+        // Displace position along base normal
+        float displacement = noise * dispScale;
+        displaced[i].position[0] = px + nx * displacement;
+        displaced[i].position[1] = py + ny * displacement;
+        displaced[i].position[2] = pz + nz * displacement;
+
+        // Analytical smooth normal via noise gradient (same approach as Physics.cpp)
+        // Compute gradient of noise in sample-coordinate space
+        float dndx = (simplex3D(sx + eps, sy, sz) - simplex3D(sx - eps, sy, sz)) / (2.0f * eps);
+        float dndy = (simplex3D(sx, sy + eps, sz) - simplex3D(sx, sy - eps, sz)) / (2.0f * eps);
+        float dndz = (simplex3D(sx, sy, sz + eps) - simplex3D(sx, sy, sz - eps)) / (2.0f * eps);
+
+        // Project gradient onto tangent plane (remove radial/normal component)
+        float radialComp = dndx * nx + dndy * ny + dndz * nz;
+        float tanX = dndx - nx * radialComp;
+        float tanY = dndy - ny * radialComp;
+        float tanZ = dndz - nz * radialComp;
+
+        // Tilt base normal by tangential gradient
+        // Chain rule: d(displacement)/d(pos) = frequency * d(noise)/d(sample) * dispScale
+        float newNx = nx - tanX * normalScale;
+        float newNy = ny - tanY * normalScale;
+        float newNz = nz - tanZ * normalScale;
+
+        // Normalize (always points outward since tilt is small relative to base normal)
+        float len = std::sqrt(newNx * newNx + newNy * newNy + newNz * newNz);
+        if (len > 1e-6f)
+        {
+            displaced[i].normal[0] = newNx / len;
+            displaced[i].normal[1] = newNy / len;
+            displaced[i].normal[2] = newNz / len;
+        }
+        else
+        {
+            displaced[i].normal[0] = nx;
+            displaced[i].normal[1] = ny;
+            displaced[i].normal[2] = nz;
+        }
+    }
+
+    // Upload to GPU
+    glBindBuffer(GL_ARRAY_BUFFER, displacedSphereVBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0,
+                    static_cast<GLsizeiptr>(numVerts * sizeof(PBRVertex)),
+                    displaced.data());
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    displacedVBODirty = false;
 }
 
 void Viewport3D::createEnvironmentMap()
@@ -1184,7 +1294,19 @@ void Viewport3D::renderGeometryPBR()
     switch (currentGeometry)
     {
         case Geometry::Cube:          vbo = cubeVBO;   vertexCount = cubeVertexCount;   break;
-        case Geometry::Sphere:        vbo = sphereVBO; vertexCount = sphereVertexCount; break;
+        case Geometry::Sphere:
+            if (lastDeformAmount > 0.001f && displacedSphereVBO != 0)
+            {
+                if (displacedVBODirty)
+                    updateDisplacedSphere(lastDeformAmount, lastDeformFrequency);
+                vbo = displacedSphereVBO;
+            }
+            else
+            {
+                vbo = sphereVBO;
+            }
+            vertexCount = sphereVertexCount;
+            break;
         case Geometry::Torus:         vbo = torusVBO;  vertexCount = torusVertexCount;  break;
         case Geometry::Dodecahedron:  vbo = dodecaVBO; vertexCount = dodecaVertexCount; break;
     }
@@ -2544,6 +2666,21 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     viewport3D.addAndMakeVisible(thicknessSlider);
     thicknessAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "thickness", thicknessSlider);
 
+    // Deform / Wavefolding — horizontal slider in viewport, below thickness
+    deformLabel.setText("Deform", juce::dontSendNotification);
+    deformLabel.setFont(juce::Font(13.0f, juce::Font::bold));
+    deformLabel.setJustificationType(juce::Justification::centredLeft);
+    deformLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(deformLabel);
+
+    deformSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    deformSlider.setRange(0.0, 1.0, 0.01);
+    deformSlider.setValue(0.0);
+    deformSlider.setDoubleClickReturnValue(true, 0.0);
+    deformSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    viewport3D.addAndMakeVisible(deformSlider);
+    deformAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "deformAmount", deformSlider);
+
     lightsLabel.setText("LIGHTS", juce::dontSendNotification);
     lightsLabel.setFont(juce::Font(10.0f, juce::Font::bold));
     lightsLabel.setJustificationType(juce::Justification::centred);
@@ -2659,6 +2796,11 @@ void ElementsAudioProcessorEditor::timerCallback()
     int geo = static_cast<int>(audioProcessor.getGeometry()) + 1;
     if (geoCombo.getSelectedId() != geo)
         geoCombo.setSelectedId(geo, juce::dontSendNotification);
+
+    // Deform slider only active for Sphere
+    bool isSphere = (geo == 2);
+    deformSlider.setEnabled(isSphere);
+    deformLabel.setAlpha(isSphere ? 1.0f : 0.35f);
 
     int mat = audioProcessor.getMaterial() + 1;
     if (matCombo.getSelectedId() != mat)
@@ -2876,6 +3018,11 @@ void ElementsAudioProcessorEditor::resized()
     thicknessLabel.setBounds(vpW - 8 - thkSliderW - thkLabelW, comboY, thkLabelW, comboH);
     thicknessSlider.setBounds(vpW - 8 - thkSliderW, comboY + 2, thkSliderW, comboH - 4);
 
+    // Deform — right, below thickness
+    int deformY = comboY + comboH + 4;
+    deformLabel.setBounds(vpW - 8 - thkSliderW - thkLabelW, deformY, thkLabelW, comboH);
+    deformSlider.setBounds(vpW - 8 - thkSliderW, deformY + 2, thkSliderW, comboH - 4);
+
     // --- Left side: Rotation X Y Z (vertical stack) + Reset ---
     int rotFieldW = 44;
     int rotLabelW = 28;
@@ -2946,6 +3093,9 @@ void ElementsAudioProcessorEditor::comboBoxChanged(juce::ComboBox* combo)
     {
         int id = geoCombo.getSelectedId();  // 1=Sphere, 2=Cube, 3=Torus, 4=Dodeca
         audioProcessor.setGeometry(static_cast<Geometry>(id - 1));
+        bool isSphere = (id == 2);
+        deformSlider.setEnabled(isSphere);
+        deformLabel.setAlpha(isSphere ? 1.0f : 0.35f);
     }
     else if (combo == &matCombo)
     {

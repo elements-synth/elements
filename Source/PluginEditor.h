@@ -164,6 +164,15 @@ private:
     bool compileShader();
     void renderGeometryPBR();
 
+    // Displaced sphere (simplex noise deformation)
+    std::vector<PBRVertex> baseSphereVerts;
+    GLuint displacedSphereVBO = 0;
+    bool displacedVBODirty = true;
+    float lastDeformAmount = 0.0f;
+    float lastDeformFrequency = 2.0f;
+    float noiseTimeOffset = 0.0f;
+    void updateDisplacedSphere(float amount, float frequency);
+
     // Environment map (equirectangular HDR loaded as GL_TEXTURE_2D)
     GLuint envTexture = 0;
     int envWidth = 0, envHeight = 0;
@@ -877,6 +886,10 @@ private:
     juce::Label thicknessLabel;
     juce::Slider thicknessSlider;
 
+    // Deform / Wavefolding
+    juce::Label deformLabel;
+    juce::Slider deformSlider;
+
     // Rotation (floating inside viewport)
     juce::Label rotXLabel, rotYLabel, rotZLabel;
     juce::Label rotXValue, rotYValue, rotZValue;
@@ -935,6 +948,7 @@ private:
     std::unique_ptr<SliderAttachment> ampSustainAttachment;
     std::unique_ptr<SliderAttachment> ampReleaseAttachment;
     std::unique_ptr<SliderAttachment> thicknessAttachment;
+    std::unique_ptr<SliderAttachment> deformAttachment;
     std::unique_ptr<SliderAttachment> keyIntensityAttachment;
     std::unique_ptr<SliderAttachment> fillIntensityAttachment;
     std::unique_ptr<SliderAttachment> rimIntensityAttachment;

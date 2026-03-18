@@ -397,6 +397,13 @@ public:
     float getFilterRelease() const { return filterEnvelope.release; }
     float getFilterEnvAmount() const { return filterEnvAmount; }
 
+    // --- Wavefolding ---
+
+    void setDeformAmount(float amount);
+    void setDeformFrequency(float freq);
+    float getDeformAmount() const { return deformAmount; }
+    float getDeformFrequency() const { return deformFrequency; }
+
     // --- Thickness (Beer-Lambert) ---
 
     void setThickness(float t);
@@ -484,6 +491,14 @@ private:
     float pitchOffsetSemitones = 0.0f;
     float pitchOffsetTarget = 0.0f;
 
+    // Wavefolding
+    float deformAmount = 0.0f;
+    float deformAmountTarget = 0.0f;
+    float deformFrequency = 2.0f;
+    float lastSpectrumDeformAmount = 0.0f;
+    float deformNoiseTimeOffset = 0.0f;
+    int deformAnimBlockCounter = 0;
+
     // Filter Envelope (global, not per-voice)
     ADSREnvelope filterEnvelope{0.01f, 0.3f, 0.0f, 0.3f};
     float filterEnvValue = 0.0f;
@@ -514,6 +529,9 @@ private:
 
     // Track previous active voice count (for filter reset on silence→sound)
     int prevActiveVoiceCount = 0;
+
+    // Smoothed voice scaling (prevents clicks when voice count changes)
+    float voiceScaleSmoothed = 1.0f;
 
     // Smoothing coefficient for filter parameters
     static constexpr float FILTER_SMOOTH = 0.92f;

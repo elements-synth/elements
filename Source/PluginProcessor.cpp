@@ -190,6 +190,19 @@ ElementsAudioProcessor::createParameterLayout()
         juce::StringArray{"Classic", "Physical"},
         0));
 
+    // Deform / Wavefolding
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"deformAmount", 1},
+        "Deform Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
+        0.0f));
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"deformFrequency", 1},
+        "Deform Frequency",
+        juce::NormalisableRange<float>(0.5f, 10.0f, 0.1f),
+        2.0f));
+
     return layout;
 }
 
@@ -423,6 +436,23 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         {
             lastEnvMode = newMode;
             synth.setEnvelopeMode(newMode);
+        }
+    }
+
+    // Deform / Wavefolding
+    {
+        float newDeformAmt = apvts.getRawParameterValue("deformAmount")->load();
+        if (std::abs(newDeformAmt - lastDeformAmount) > 0.001f)
+        {
+            lastDeformAmount = newDeformAmt;
+            synth.setDeformAmount(newDeformAmt);
+        }
+
+        float newDeformFreq = apvts.getRawParameterValue("deformFrequency")->load();
+        if (std::abs(newDeformFreq - lastDeformFrequency) > 0.01f)
+        {
+            lastDeformFrequency = newDeformFreq;
+            synth.setDeformFrequency(newDeformFreq);
         }
     }
 

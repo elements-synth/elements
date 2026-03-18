@@ -288,11 +288,53 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     filterCutoff += (filterCutoffTarget - filterCutoff) * filterSmoothCoeff;
     filterResonance += (filterResonanceTarget - filterResonance) * filterSmoothCoeff;
 
-    // Smooth spectral amplitude (controls volume based on angle) - gentler
+    // Smooth spectral amplitude (controls volume based on angle)
+    // Compute start/end for per-sample interpolation within the block
+    float spectralAmpStart = spectralAmplitude;
     spectralAmplitude += (spectralAmplitudeTarget - spectralAmplitude) * 0.05f;
+    float spectralAmpEnd = spectralAmplitude;
 
     // Smooth pitch offset from light intensity
     pitchOffsetSemitones += (pitchOffsetTarget - pitchOffsetSemitones) * 0.05f;
+
+    // Smooth deform amount for wavefolding (0.15 = ~0.35s settle time at 86 blocks/sec)
+    float prevDeformAmount = deformAmount;
+    deformAmount += (deformAmountTarget - deformAmount) * 0.15f;
+
+    // Snap to zero when close enough (avoids lingering near-zero tail)
+    if (deformAmountTarget <= 0.0f && deformAmount < 0.001f)
+        deformAmount = 0.0f;
+
+    // Spectrum tracks smoothed deformAmount (not target) to avoid volume jumps
+    // Also animates noise time offset for timbral movement when deforming
+    if (currentGeometry == Geometry::Sphere)
+    {
+        bool settled = (prevDeformAmount > 0.001f && deformAmount <= 0.001f);
+
+        // Animate noise offset for timbral drift when actively deforming
+        bool animatedUpdate = false;
+        if (deformAmount > 0.001f)
+        {
+            deformNoiseTimeOffset += 0.005f;  // ~0.43 units/sec at 86 blocks/sec
+            deformAnimBlockCounter++;
+            if (deformAnimBlockCounter >= 11)  // ~8Hz spectrum updates
+            {
+                deformAnimBlockCounter = 0;
+                animatedUpdate = true;
+            }
+        }
+        else
+        {
+            deformNoiseTimeOffset = 0.0f;
+            deformAnimBlockCounter = 0;
+        }
+
+        if (settled || animatedUpdate || std::abs(deformAmount - lastSpectrumDeformAmount) > 0.001f)
+        {
+            lastSpectrumDeformAmount = deformAmount;
+            updateSpectrum();
+        }
+    }
 
     // Filter envelope: compute start and end values for per-sample interpolation
     float filterEnvStart = filterEnvValue;
@@ -371,7 +413,8 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                 float sample = readWavetable(voice.phase, wavetable);
 
                 float fadeGain = static_cast<float>(voice.stealFadeRemaining) / Voice::FADE_SAMPLES;
-                sample *= fadeGain * voice.amplitude * voice.velocity * spectralAmplitude;
+                float interpSpectralAmpSteal = spectralAmpStart + (spectralAmpEnd - spectralAmpStart) * (static_cast<float>(i) / numSamples);
+                sample *= fadeGain * voice.amplitude * voice.velocity * interpSpectralAmpSteal;
 
                 buffer[i] += sample;
 
@@ -421,8 +464,17 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                     voice.retriggering = false;
             }
 
-            // Apply amplitude and spectral amplitude
-            sample *= envWithVelocity * voice.amplitude * spectralAmplitude;
+            // Apply amplitude and spectral amplitude (interpolated per-sample to avoid zipper noise)
+            float interpSpectralAmp = spectralAmpStart + (spectralAmpEnd - spectralAmpStart) * (static_cast<float>(i) / numSamples);
+            sample *= envWithVelocity * voice.amplitude * interpSpectralAmp;
+
+            // Wavefolding: sinusoidal fold driven by deform amount (Sphere only)
+            // drive=1 → sin(x)≈x (transparent), drive=15 → heavy folding + harmonics
+            if (currentGeometry == Geometry::Sphere && deformAmount > 0.001f)
+            {
+                float drive = 1.0f + deformAmount * 14.0f;  // 1 to 15
+                sample = std::sin(drive * sample);
+            }
 
             // Anti-click fade-in for NEW voices
             if (voice.fadeInRemaining > 0)
@@ -457,11 +509,18 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     filterEnabledMix = clamp(filterEnabledMix, 0.0f, 1.0f);
 
     // Voice count compensation: 1 voice = 1.0, 2 = 0.71, 4 = 0.50, 8 = 0.35
-    float voiceScale = 1.0f / std::sqrt(static_cast<float>(std::max(activeVoiceCount, 1)));
+    // Smoothed to prevent clicks when voice count changes between blocks
+    float voiceScaleTarget = 1.0f / std::sqrt(static_cast<float>(std::max(activeVoiceCount, 1)));
+    float voiceScaleStart = voiceScaleSmoothed;
+    // Per-sample smoothing coefficient: ~5ms ramp at 44.1kHz
+    float voiceScaleSmoothCoeff = 1.0f - std::exp(-1.0f / (0.005f * static_cast<float>(sampleRate)));
 
     // Master processing: Global filter + Volume + Soft clipper
     for (int i = 0; i < numSamples; ++i)
     {
+        // Smooth voice scale per-sample toward target
+        voiceScaleSmoothed += (voiceScaleTarget - voiceScaleSmoothed) * voiceScaleSmoothCoeff;
+
         float sample = buffer[i];
 
         // Update global filter coefficients every 32 samples for smooth envelope interpolation
@@ -491,7 +550,7 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                 sample = filtered;
         }
 
-        sample *= volume * voiceScale;
+        sample *= volume * voiceScaleSmoothed;
 
         // Soft clipper (tanh) instead of hard clamp
         sample = std::tanh(sample);
@@ -547,7 +606,7 @@ void ElementsSynth::noteOn(int noteNumber, float velocity)
             if (voice.releaseAge < releaseSamples)
                 currentEnvLevel = voice.releaseStartLevel * (1.0f - static_cast<float>(voice.releaseAge) / releaseSamples);
         }
-        else if (voice.age < attackSamples)
+        else if (voice.age <= attackSamples)
         {
             // In attack phase
             currentEnvLevel = static_cast<float>(voice.age) / attackSamples;
@@ -656,7 +715,7 @@ void ElementsSynth::noteOff(int noteNumber)
         if (decaySamples < 1) decaySamples = 1;
 
         float currentLevel;
-        if (voice.age < attackSamples)
+        if (voice.age <= attackSamples)
         {
             // Still in attack
             currentLevel = static_cast<float>(voice.age) / attackSamples;
@@ -711,6 +770,24 @@ void ElementsSynth::setThickness(float t)
     thickness = clamp(t, 0.1f, 3.0f);
     updateSpectrum();
     updatePhysicalEnvelope();
+}
+
+void ElementsSynth::setDeformAmount(float amount)
+{
+    deformAmountTarget = clamp(amount, 0.0f, 1.0f);
+    // Spectrum update is driven by the smoothed value in processBlock
+}
+
+void ElementsSynth::setDeformFrequency(float freq)
+{
+    float clamped = clamp(freq, 0.5f, 10.0f);
+    if (std::abs(clamped - deformFrequency) > 0.01f)
+    {
+        deformFrequency = clamped;
+        // Force spectrum recalc if actively deforming
+        if (currentGeometry == Geometry::Sphere && deformAmount > 0.001f)
+            updateSpectrum();
+    }
 }
 
 void ElementsSynth::setMaterial(int materialIndex)
@@ -988,7 +1065,8 @@ void ElementsSynth::updateSpectrum()
 
         std::array<float, NUM_WAVELENGTHS> lightSpectrum{};
         calculateSpectrumMultiFace(material, light, lightPos.position,
-                                   objectRotationMatrix, currentGeometry, lightSpectrum);
+                                   objectRotationMatrix, currentGeometry, lightSpectrum,
+                                   deformAmount, deformFrequency, deformNoiseTimeOffset);
 
         float effectiveIntensity = lights[i].intensity;
         for (int w = 0; w < NUM_WAVELENGTHS; ++w)
@@ -1129,8 +1207,15 @@ float ElementsSynth::generateEnvelopeSample(Voice& voice)
     if (voice.releasing)
     {
         // Release phase - start from the level when release was triggered (not sustain!)
-        if (voice.releaseAge >= releaseSamples)
-            return -1.0f;  // Voice is dead
+        if (voice.releaseAge > releaseSamples)
+            return -1.0f;  // Voice is dead (previous sample was 0)
+
+        // Ensure final sample is exactly 0 before killing voice
+        if (voice.releaseAge == releaseSamples)
+        {
+            voice.releaseAge++;
+            return 0.0f;
+        }
 
         float envLevel = voice.releaseStartLevel * (1.0f - static_cast<float>(voice.releaseAge) / releaseSamples);
         voice.releaseAge++;
@@ -1139,9 +1224,9 @@ float ElementsSynth::generateEnvelopeSample(Voice& voice)
     else
     {
         // Attack/Decay/Sustain
-        if (voice.age < attackSamples)
+        if (voice.age <= attackSamples)
         {
-            // Attack
+            // Attack: reaches exactly 1.0 at age == attackSamples
             return static_cast<float>(voice.age) / attackSamples;
         }
         else if (voice.age < attackSamples + decaySamples)
