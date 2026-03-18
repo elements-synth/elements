@@ -22,8 +22,14 @@ Builds/MacOSX/Elements.xcodeproj/project.xcworkspace/xcuserdata/
 .vscode/
 .idea/
 
-# Large assets (EXR not needed, HDR is used)
+# Large assets and work files
 *.exr
+*.exr.rat
+*.hipnc
+*.aep
+custom_knob_render/
+elements-logo.png
+elements-logo.svg
 
 # JUCE auto-generated (can be regenerated from .jucer)
 # JuceLibraryCode/
