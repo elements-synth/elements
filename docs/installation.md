@@ -78,3 +78,7 @@ If your DAW does not find the plugin after scanning, verify that the files are i
 ---
 
 *Windows support is planned for v1.1.*
+
+---
+
+[← Back to Elements](index)
