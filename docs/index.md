@@ -11,7 +11,7 @@ description: A synthesizer where light meets sound.
 **[Download Beta 1.0 — macOS](https://github.com/elements-synth/elements/releases)**  
 *VST3 · AU · macOS only for now · Free*
 
-[Installation](installation) · [Known Issues](known-issues)
+[Installation](installation) · [Materials & Geometry](materials-and-geometry) · [Known Issues](known-issues)
 
 ---
 
