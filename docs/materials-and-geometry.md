@@ -5,7 +5,7 @@ title: Materials & Geometry — Elements
 
 # Materials & Geometry
 
-The sound of Elements is determined by two things working together: the **material** the geometry is made of, and the **shape** of the geometry itself. This page explains what to expect from each combination.
+The sound of Elements emerges from the interaction of three ingredients: a **geometry**, a **material**, and a **light source**. The specific combination of all three determines what you hear — change any one of them and the result changes entirely. This page explains what each ingredient brings to that interaction.
 
 ---
 
