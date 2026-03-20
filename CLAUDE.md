@@ -10,21 +10,26 @@ Audio plugin (VST3/AU/Standalone) — a spectral synthesizer where materials (di
 
 ## Tech Stack
 - **Framework**: JUCE 7+ (C++17)
-- **Build**: Projucer → Xcode (macOS, arm64+x86_64)
+- **Build**: Projucer → Xcode (macOS, Universal Binary)
 - **OpenGL**: juce_opengl module for 3D viewport
-- **Target**: macOS 11.0+, formats: Standalone, AU, VST3
+- **Target**: macOS 11.0+, Universal Binary (arm64 + x86_64), formats: Standalone, AU, VST3
 
 ## Build Commands
 ```bash
-# Build from Xcode project (Debug)
-xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - Standalone Plugin" -configuration Debug build 2>&1 | tail -20
+# Build VST3 Release — Universal Binary (ALWAYS use this for distribution)
+xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - VST3" -configuration Release ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO build 2>&1 | tail -20
 
-# Build Release
-xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - Standalone Plugin" -configuration Release build 2>&1 | tail -20
+# Build Standalone Release — Universal Binary
+xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - Standalone Plugin" -configuration Release ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO build 2>&1 | tail -20
+
+# Build Debug (active arch only, faster iteration)
+xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - Standalone Plugin" -configuration Debug build 2>&1 | tail -20
 
 # Run standalone
 open Builds/MacOSX/build/Debug/Elements.app
 ```
+
+> **IMPORTANT**: Release builds MUST always include `ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO` flags to produce Universal Binaries. Projucer defaults to active arch only; these flags override that. Debug builds can use single arch for faster iteration.
 
 ## Source Files
 
