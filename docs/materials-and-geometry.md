@@ -156,37 +156,50 @@ Sound is only produced where the light emission overlaps with the material's tra
 
 ## Geometry
 
-The geometry determines how the material presents itself to the light — the number of faces, their angles, and the nature of the surface all shape the timbral response.
-
-**Cube**
-
-Six faces meeting at sharp 90° angles. With only 8 vertices, the transitions between faces are abrupt — the Fresnel response jumps rather than glides as the geometry rotates. Produces a narrow, focused timbral range with sudden changes at specific rotation angles. Good for percussive, angular sounds.
-
-> Few harmonics, abrupt transitions. Limited timbral range. Rotation produces sudden jumps.
+Geometry determines how many surface normals interact with the light and how their Fresnel contributions are weighted — which directly defines how much timbral variation rotation produces.
 
 ---
 
-**Sphere**
+**Cube** — 6 faces
 
-The only geometry with no faces or edges — a continuous, smooth surface. Without the Deformer active, the sphere presents the same curvature to the light at every angle, meaning rotation has almost no effect on timbre. When the **Deformer** is active, the smooth surface breaks open: displaced normals create variation across the surface, timbral drift sets in, and the sphere becomes the most expressive geometry in Elements.
+The most aggressive geometry. Six axis-aligned normals with a steep weighting (cos⁴) — the face pointing most directly at the light dominates almost completely. Rotating the cube produces discrete jumps between six distinct spectral positions rather than smooth transitions. Good for rhythmic or sequenced sounds where automation produces clear, differentiated changes.
 
-> Uniform, stable. Minimal timbral variation without Deformer. Maximum expressiveness with Deformer active.
-
----
-
-**Torus**
-
-A continuous surface like the sphere, but with inner and outer curvature — the inner ring faces the light differently than the outer ring. This creates more timbral variation than the sphere at rest, with a smoother transition profile than the cube. A middle ground between stability and movement.
-
-> Similar to Sphere but with more built-in timbral variation. Smooth transitions.
+> Angular, punchy. Dramatic timbral jumps on rotation.
 
 ---
 
-**Dodecahedron**
+**Sphere** — continuous surface
 
-Twelve pentagonal faces — far more than the cube, but still faceted. The higher face count means the transitions between angles are more gradual and the timbral range is wider than the cube. Think of it as a faceted sphere: more variation than a cube, more movement than a sphere at rest, with a character somewhere between geometric and organic.
+Without the Deformer, the sphere does not respond to rotation at all — a perfect sphere always presents the same curved surface to the light from any angle. Stable, smooth, predictable. When the **Deformer** is active, the symmetry breaks: 12 displaced normals introduce rotation sensitivity, continuous timbral drift sets in, and the wavefolding adds harmonic density. The deformed sphere has the highest expressive range of any geometry.
 
-> Wide timbral range. More gradual transitions than Cube. Between geometric and organic character.
+> Stable and uniform without Deformer. Maximum movement with Deformer active.
+
+---
+
+**Torus** — 12 normals + concave/convex geometry
+
+The torus simulates caustics on its inner concave surface — light concentrates as it reflects off the cavity, producing a gaussian boost centered on the mid harmonics. This caustic emphasis is unique to the torus and gives it a inherently rich midrange character that no other geometry produces. Rotation is smooth and continuous thanks to 12 normals with quadratic weighting.
+
+> Rich, evolving. Caustic midrange emphasis. The most spectrally complex geometry without Deformer.
+
+---
+
+**Dodecahedron** — 12 pentagonal faces
+
+Twelve faces distributed uniformly across the sphere using icosahedral symmetry. Like the cube, each face is flat and uses direct Fresnel — but with 12 faces instead of 6, and no axis alignment, the dominant face shifts gradually rather than jumping. Multiple faces always contribute to the spectrum simultaneously, producing a dense, intricate timbre.
+
+> Dense, multifaceted. Continuous variation without the sharp jumps of the Cube.
+
+---
+
+| | Faces | Rotation response | Character |
+|---|---|---|---|
+| **Cube** | 6 (axis-aligned) | Discrete, dramatic | Angular, punchy |
+| **Sphere** | Continuous | None (or full with Deformer) | Smooth, stable |
+| **Torus** | 12 + caustics | Continuous, smooth | Rich, mid-heavy |
+| **Dodecahedron** | 12 (uniform) | Continuous, textured | Dense, intricate |
+
+**Sound design rule:** Cube for stepped timbral changes, Dodecahedron for constant texture, Torus for midrange richness, Sphere for stability — or maximum movement with the Deformer.
 
 ---
 
