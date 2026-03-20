@@ -11,7 +11,7 @@ description: A synthesizer where light meets sound.
 **[Download Beta 1.0 — macOS](https://github.com/elements-synth/elements/releases)**  
 *VST3 · AU · macOS only for now · Free*
 
-[Installation](installation) · [Materials & Geometry](materials-and-geometry) · [Known Issues](known-issues)
+[Installation](installation) · [Known Issues](known-issues)
 
 ---
 
@@ -60,5 +60,5 @@ This bidirectional relationship between light and pitch is at the heart of what 
 
 ---
 
-*Elements is currently in beta. Windows support is planned for v1.1.*  
-*macOS 12 or later · Apple Silicon and Intel native*
+*Elements is currently in beta. Intel Mac and Windows support are planned for future releases.*
+*macOS 12 or later · Apple Silicon (arm64) only*
