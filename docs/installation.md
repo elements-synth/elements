@@ -8,7 +8,7 @@ title: Installation — Elements
 ## Requirements
 
 - macOS 12 (Monterey) or later
-- Apple Silicon or Intel Mac
+- Apple Silicon (arm64) — Intel Mac not supported in Beta 1.0
 - A VST3 or AU compatible host (Ableton Live, Logic Pro, Reaper, Bitwig, etc.)
 
 ---
