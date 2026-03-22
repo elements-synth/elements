@@ -3,6 +3,8 @@ layout: default
 title: Known Issues & Limitations — Elements
 ---
 
+[← Back to Elements](index)
+
 # Known Issues & Limitations
 
 Elements Beta 1.0 is functional and stable, but there are known limitations to be aware of before using it in a production context.
@@ -54,7 +56,7 @@ Elements uses JUCE's generic VST3 and AU implementation with no host-specific wo
 
 **Occasional saturation** — With spectrally dense materials and high polyphony, the output signal can clip. A soft clipper (tanh) is in place but there is no full limiter. If you experience saturation, reduce the light intensities or the number of simultaneous voices.
 
-**Apple Silicon only** — The Beta 1.0 build is arm64 exclusively. Intel Mac and Windows builds are planned for future releases.
+**Apple Silicon + Intel** — Beta 1.0 is a Universal Binary, running natively on both Apple Silicon and Intel Macs. Windows builds are planned for a future release.
 
 **Deformer is Sphere-only** — The Geometric Deformer is currently implemented for the Sphere geometry only. Support for other geometries is planned.
 
