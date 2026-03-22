@@ -4,14 +4,10 @@ title: Elements
 description: A synthesizer where light meets sound.
 ---
 
-# Elements
-
-### A synthesizer where light meets sound.
-
 **[Download Beta 1.0 — macOS](https://github.com/elements-synth/elements/releases)**  
-*VST3 · AU · macOS only for now · Free*
+*VST3 · AU · Universal Binary (Apple Silicon + Intel) · Free*
 
-[Quick Start](quick-start) · [Installation](installation) · [Materials & Geometry](materials-and-geometry) · [Parameters](parameters) · [Known Issues](known-issues)
+[Installation](installation) · [Known Issues](known-issues)
 
 ---
 
@@ -60,5 +56,9 @@ This bidirectional relationship between light and pitch is at the heart of what 
 
 ---
 
-*Elements is currently in beta. Intel Mac and Windows support are planned for future releases.*
-*macOS 12 or later · Apple Silicon (arm64) only*
+*Elements is currently in beta. Windows support is planned for a future release.*
+*macOS 12 or later · Universal Binary (Apple Silicon + Intel)*
+
+---
+
+*Elements is free and always will be. If it made your music better, [buy me a coffee](https://ko-fi.com/matiasderose).*
