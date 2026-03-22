@@ -3,12 +3,14 @@ layout: default
 title: Installation — Elements
 ---
 
+[← Back to Elements](index)
+
 # Installation
 
 ## Requirements
 
 - macOS 12 (Monterey) or later
-- Apple Silicon (arm64) — Intel Mac not supported in Beta 1.0
+- Apple Silicon or Intel Mac (Universal Binary)
 - A VST3 or AU compatible host (Ableton Live, Logic Pro, Reaper, Bitwig, etc.)
 
 ---
