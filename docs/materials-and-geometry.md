@@ -3,6 +3,8 @@ layout: default
 title: Materials & Geometry — Elements
 ---
 
+[← Back to Elements](index)
+
 # Materials & Geometry
 
 The sound of Elements emerges from the interaction of three ingredients: a **geometry**, a **material**, and a **light source**. The specific combination of all three determines what you hear — change any one of them and the result changes entirely. This page explains what each ingredient brings to that interaction.
