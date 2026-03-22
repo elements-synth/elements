@@ -64,4 +64,6 @@ Elements uses JUCE's generic VST3 and AU implementation with no host-specific wo
 
 *Found something not listed here? Please [open an issue](https://github.com/elements-synth/elements/issues) on GitHub.*
 
+*Elements is free. If you find it useful, [buy me a coffee](https://ko-fi.com/matiasderose).*
+
 [← Back to Elements](index)
