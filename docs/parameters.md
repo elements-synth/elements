@@ -3,6 +3,8 @@ layout: default
 title: Parameters — Elements
 ---
 
+[← Back to Elements](index)
+
 # Parameters
 
 Elements has 22 automatable parameters exposed to your DAW, plus 5 manual parameters controlled directly from the UI. This page documents all of them.
