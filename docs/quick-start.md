@@ -9,6 +9,8 @@ title: Quick Start — Elements
 
 Your first sound in five steps.
 
+*Elements is free. If you find it useful, [buy me a coffee](https://ko-fi.com/matiasderose).*
+
 ---
 
 ## 1. Load Elements in your DAW
