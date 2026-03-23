@@ -3,27 +3,6 @@ layout: default
 title: The Science — Elements
 ---
 
-## Further reading
-
-**Fresnel equations**
-- [Fresnel equations — Wikipedia](https://en.wikipedia.org/wiki/Fresnel_equations) — comprehensive reference with derivations
-- [Fresnel equations — HyperPhysics](http://hyperphysics.phy-astr.gsu.edu/hbase/phyopt/freseq.html) — concise, accessible explainer
-- [Fresnel equations — RP Photonics](https://www.rp-photonics.com/fresnel_equations.html) — technical reference with FAQ
-- [Reflection and Transmission — Physics LibreTexts](https://phys.libretexts.org/Bookshelves/Optics/Physical_Optics_(Tatum)/02:_Reflection_and_Transmission_at_Boundaries_and_the_Fresnel_Equations) — university-level treatment
-
-**Beer-Lambert law**
-- [Beer-Lambert law — Wikipedia](https://en.wikipedia.org/wiki/Beer%E2%80%93Lambert_law) — full reference
-- [The Beer-Lambert Law — Chemistry LibreTexts](https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Spectroscopy/Electronic_Spectroscopy/Electronic_Spectroscopy_Basics/The_Beer-Lambert_Law) — clear, accessible explanation
-- [Beer-Lambert law — RP Photonics](https://www.rp-photonics.com/beer_lambert_law.html) — technical reference
-
-**Schlick approximation**
-- Schlick, C. (1994). *An Inexpensive BDRF Model for Physically-based Rendering*. Computer Graphics Forum, 13(3), 233–246. — original paper describing the Fresnel approximation used for metals in Elements
-
-**Simplex noise**
-- Perlin, K. (2001). *Noise hardware*. Real-Time Shading SIGGRAPH Course Notes. — original description of Simplex Noise
-
----
-
 [← Back to Elements](index)
 
 # The Science
@@ -309,6 +288,27 @@ The transmission curves of the 10 materials are based on real optical data:
 | Amber | Conjugated organic absorption in fossil resin |
 | Water | O-H vibrational overtones in infrared/red |
 | Obsidian | Fe₃O₄/Fe₂O₃ inclusions in amorphous volcanic glass |
+
+---
+
+## Further reading
+
+**Fresnel equations**
+- [Fresnel equations — Wikipedia](https://en.wikipedia.org/wiki/Fresnel_equations) — comprehensive reference with derivations
+- [Fresnel equations — HyperPhysics](http://hyperphysics.phy-astr.gsu.edu/hbase/phyopt/freseq.html) — concise, accessible explainer
+- [Fresnel equations — RP Photonics](https://www.rp-photonics.com/fresnel_equations.html) — technical reference with FAQ
+- [Reflection and Transmission — Physics LibreTexts](https://phys.libretexts.org/Bookshelves/Optics/Physical_Optics_(Tatum)/02:_Reflection_and_Transmission_at_Boundaries_and_the_Fresnel_Equations) — university-level treatment
+
+**Beer-Lambert law**
+- [Beer-Lambert law — Wikipedia](https://en.wikipedia.org/wiki/Beer%E2%80%93Lambert_law) — full reference
+- [The Beer-Lambert Law — Chemistry LibreTexts](https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Spectroscopy/Electronic_Spectroscopy/Electronic_Spectroscopy_Basics/The_Beer-Lambert_Law) — clear, accessible explanation
+- [Beer-Lambert law — RP Photonics](https://www.rp-photonics.com/beer_lambert_law.html) — technical reference
+
+**Schlick approximation**
+- Schlick, C. (1994). *An Inexpensive BDRF Model for Physically-based Rendering*. Computer Graphics Forum, 13(3), 233–246. — original paper describing the Fresnel approximation used for metals in Elements
+
+**Simplex noise**
+- Perlin, K. (2001). *Noise hardware*. Real-Time Shading SIGGRAPH Course Notes. — original description of Simplex Noise
 
 ---
 
