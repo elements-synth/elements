@@ -1,0 +1,38 @@
+name: Weekly Docs Update
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9:00 AM UTC
+  workflow_dispatch:      # Allow manual trigger
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install anthropic requests
+
+      - name: Run docs update script
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: python scripts/update_docs.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "elements-docs-bot"
+          git config user.email "bot@elements-synth.github.io"
+          git add docs/
+          git diff --staged --quiet || git commit -m "docs: weekly automated update [$(date +'%Y-%m-%d')]"
+          git push
