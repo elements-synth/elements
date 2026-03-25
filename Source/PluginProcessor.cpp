@@ -519,6 +519,13 @@ void ElementsAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     state->setAttribute("geometry", static_cast<int>(synth.getGeometry()));
     state->setAttribute("volume", static_cast<double>(synth.getVolume()));
 
+    // Guardar estado de luces (enabled + source)
+    for (int i = 0; i < 3; ++i)
+    {
+        state->setAttribute("lightEnabled" + juce::String(i), synth.isLightEnabled(i));
+        state->setAttribute("lightSource" + juce::String(i), synth.getLightSource(i));
+    }
+
     // Guardar parámetros APVTS (filter cutoff, resonance, type)
     auto apvtsState = apvts.copyState();
     auto apvtsXml = apvtsState.createXml();
@@ -547,6 +554,14 @@ void ElementsAudioProcessor::setStateInformation (const void* data, int sizeInBy
         synth.setGeometry(static_cast<Geometry>(state->getIntAttribute("geometry", 0)));
 
         synth.setVolume(static_cast<float>(state->getDoubleAttribute("volume", 0.95)));
+
+        // Restaurar estado de luces (enabled + source)
+        for (int i = 0; i < 3; ++i)
+        {
+            bool defaultEnabled = (i == 0);  // Key light on by default for old projects
+            synth.setLightEnabled(i, state->getBoolAttribute("lightEnabled" + juce::String(i), defaultEnabled));
+            synth.setLightSource(i, state->getIntAttribute("lightSource" + juce::String(i), i));
+        }
 
         // Restaurar parámetros APVTS
         auto* apvtsXml = state->getChildByName(apvts.state.getType());

@@ -2184,15 +2184,16 @@ LightPanel::LightPanel(ElementsAudioProcessor& p, int idx, const juce::String& n
     : processor(p), lightIndex(idx), lightName(name)
 {
     enableButton.setButtonText(name);
-    enableButton.setToggleState(idx == 0, juce::dontSendNotification);  // Key light on by default
+    enableButton.setToggleState(p.isLightEnabled(idx), juce::dontSendNotification);
     enableButton.addListener(this);
     addAndMakeVisible(enableButton);
 
     sourceCombo.addItem("Sunset", 1);
     sourceCombo.addItem("Daylight", 2);
     sourceCombo.addItem("LED Cool", 3);
-    sourceCombo.setSelectedId(idx + 1);
-    sourceCombo.setColour(juce::ComboBox::textColourId, getLightSourceColour(idx + 1));
+    int sourceId = p.getLightSource(idx) + 1;  // sourceIndex is 0-based, combo IDs are 1-based
+    sourceCombo.setSelectedId(sourceId);
+    sourceCombo.setColour(juce::ComboBox::textColourId, getLightSourceColour(sourceId));
     sourceCombo.addListener(this);
     addAndMakeVisible(sourceCombo);
 
