@@ -7,7 +7,16 @@ description: A synthesizer where light meets sound.
 **[Download Beta 1.0 — macOS](https://github.com/elements-synth/elements/releases)**  
 *VST3 · AU · Universal Binary (Apple Silicon + Intel) · Free*
 
-[Quick Start](quick-start) · [Installation](installation) · [Materials & Geometry](materials-and-geometry) · [Parameters](parameters) · [Known Issues](known-issues) · [The Science](science)
+[Installation](installation) · [Known Issues](known-issues)
+
+---
+
+## Video demos
+
+- [The Deformer](https://www.youtube.com/watch?v=lJhoasqMsv8) — Simplex Noise + Wavefolding in action
+- [Light × Material](https://www.youtube.com/watch?v=kIsSFacwmfY) — Light intensity controls pitch, material controls timbre
+- [Geometry × Rotation](https://www.youtube.com/watch?v=xloh2gQo6ps) — Same material, same light, four different sounds
+- [3D Viewport](https://www.youtube.com/watch?v=WOz9LchJtqY) — The instrument in three dimensions
 
 ---
 
@@ -58,6 +67,8 @@ This bidirectional relationship between light and pitch is at the heart of what 
 
 *Elements is currently in beta. Windows support is planned for a future release.*
 *macOS 12 or later · Universal Binary (Apple Silicon + Intel)*
+
+[Quick Start](quick-start) · [Installation](installation) · [Materials & Geometry](materials-and-geometry) · [Parameters](parameters) · [Known Issues](known-issues) · [The Science](science)
 
 ---
 
