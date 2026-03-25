@@ -27,6 +27,7 @@ Builds/MacOSX/Elements.xcodeproj/project.xcworkspace/xcuserdata/
 *.exr.rat
 *.hipnc
 *.aep
+*.mov
 custom_knob_render/
 elements-logo.png
 elements-logo.svg
