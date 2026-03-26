@@ -722,6 +722,113 @@ private:
 };
 
 // ==============================================================================
+// SPLASH OVERLAY - Startup branding screen
+// ==============================================================================
+
+class SplashOverlay : public juce::Component,
+                      private juce::Timer
+{
+public:
+    std::function<void()> onClose;
+
+    SplashOverlay()
+    {
+        setInterceptsMouseClicks(true, false);
+        logoImage = juce::ImageFileFormat::loadFrom(
+            BinaryData::elementslogo_png,
+            static_cast<size_t>(BinaryData::elementslogo_pngSize));
+
+        // Start 2-second delay before fade begins
+        startTimer(2000);
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.setOpacity(currentAlpha);
+
+        // Dark backdrop
+        g.setColour(juce::Colour(0xFF0D1117));
+        g.fillRect(getLocalBounds());
+
+        auto area = getLocalBounds();
+        auto cx = area.getCentreX();
+        auto cy = area.getCentreY();
+
+        // Logo (centered)
+        if (logoImage.isValid())
+        {
+            int logoW = 220;
+            int logoH = static_cast<int>(logoW * (static_cast<float>(logoImage.getHeight()) / logoImage.getWidth()));
+            g.drawImage(logoImage,
+                        cx - logoW / 2, cy - logoH / 2 - 20, logoW, logoH,
+                        0, 0, logoImage.getWidth(), logoImage.getHeight());
+        }
+
+        // Version text
+        juce::String versionStr = "v" + juce::String(JucePlugin_VersionString);
+        g.setFont(juce::Font(14.0f));
+        g.setColour(ElementsColors::mid.withAlpha(currentAlpha));
+        int versionW = g.getCurrentFont().getStringWidth(versionStr);
+
+        // BETA badge
+        juce::String betaStr = "BETA";
+        auto boldFont = juce::Font(11.0f, juce::Font::bold);
+        int betaW = boldFont.getStringWidth(betaStr);
+        int badgePad = 8;
+        int badgeH = 18;
+        int gap = 8;
+
+        int totalW = versionW + gap + betaW + badgePad * 2;
+        int startX = cx - totalW / 2;
+        int textY = cy + 24;
+
+        // Draw version
+        g.setFont(juce::Font(14.0f));
+        g.setColour(ElementsColors::mid.withAlpha(currentAlpha));
+        g.drawText(versionStr, startX, textY, versionW, 20, juce::Justification::centredLeft);
+
+        // Draw BETA badge
+        int badgeX = startX + versionW + gap;
+        auto badgeColour = MaterialAccents::diamond;
+        g.setColour(badgeColour.withAlpha(currentAlpha * 0.15f));
+        g.fillRoundedRectangle(static_cast<float>(badgeX), static_cast<float>(textY + 1),
+                                static_cast<float>(betaW + badgePad * 2), static_cast<float>(badgeH), 4.0f);
+        g.setColour(badgeColour.withAlpha(currentAlpha));
+        g.drawRoundedRectangle(static_cast<float>(badgeX), static_cast<float>(textY + 1),
+                                static_cast<float>(betaW + badgePad * 2), static_cast<float>(badgeH), 4.0f, 1.0f);
+        g.setFont(boldFont);
+        g.drawText(betaStr, badgeX + badgePad, textY + 1, betaW, badgeH, juce::Justification::centred);
+    }
+
+private:
+    void timerCallback() override
+    {
+        if (!fading)
+        {
+            // First callback: 3s elapsed, start fading
+            fading = true;
+            startTimerHz(30);  // Switch to 30Hz for smooth fade
+            return;
+        }
+
+        // Fade out over ~500ms (30Hz * ~15 frames)
+        currentAlpha -= 1.0f / 15.0f;
+        if (currentAlpha <= 0.0f)
+        {
+            currentAlpha = 0.0f;
+            stopTimer();
+            setVisible(false);
+            if (onClose) onClose();
+        }
+        repaint();
+    }
+
+    juce::Image logoImage;
+    float currentAlpha = 1.0f;
+    bool fading = false;
+};
+
+// ==============================================================================
 // PIANO ROLL - Visual keyboard
 // ==============================================================================
 
@@ -870,6 +977,7 @@ private:
     ElementsLogo elementsLogo;
     juce::TextButton helpButton{"?"};
     HelpOverlay helpOverlay;
+    SplashOverlay splashOverlay;
     juce::ComboBox geoCombo, matCombo;
     juce::Label geoLabel, matLabel;
 

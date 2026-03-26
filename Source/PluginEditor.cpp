@@ -2581,6 +2581,8 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     helpOverlay.onClose = [this]() { viewport3D.setVisible(true); };
     addChildComponent(helpOverlay);
 
+    addChildComponent(splashOverlay);
+
     // Geometry + Material dropdowns (floating inside viewport)
     geoLabel.setText("GEO", juce::dontSendNotification);
     geoLabel.setFont(juce::Font(10.0f, juce::Font::bold));
@@ -2783,6 +2785,12 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
 
     startTimerHz(30);
     setSize(1100, 770);
+
+    // Show splash overlay on top of everything (must be after setSize triggers resized)
+    splashOverlay.onClose = [this]() { viewport3D.setVisible(true); };
+    splashOverlay.setVisible(true);
+    splashOverlay.toFront(true);
+    viewport3D.setVisible(false);  // OpenGL paints over everything; hide it during splash
 }
 
 ElementsAudioProcessorEditor::~ElementsAudioProcessorEditor()
@@ -2873,6 +2881,7 @@ void ElementsAudioProcessorEditor::resized()
     elementsLogo.setBounds(14, 8, 220, 38);
     helpButton.setBounds(bounds.getWidth() - 14 - 28, 14, 28, 28);
     helpOverlay.setBounds(getLocalBounds());
+    splashOverlay.setBounds(getLocalBounds());
     bounds.removeFromTop(56);
 
     // === RIGHT COLUMN: 310px ===
