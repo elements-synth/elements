@@ -2762,11 +2762,15 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     startTimerHz(30);
     setSize(1100, 770);
 
-    // Show splash overlay on top of everything (must be after setSize triggers resized)
-    splashOverlay.onClose = [this]() { viewport3D.setVisible(true); };
-    splashOverlay.setVisible(true);
-    splashOverlay.toFront(true);
-    viewport3D.setVisible(false);  // OpenGL paints over everything; hide it during splash
+    // Show splash overlay only once per plugin instance (processor survives editor destroy/recreate)
+    if (!audioProcessor.splashShown)
+    {
+        audioProcessor.splashShown = true;
+        splashOverlay.onClose = [this]() { viewport3D.setVisible(true); };
+        splashOverlay.setVisible(true);
+        splashOverlay.toFront(true);
+        viewport3D.setVisible(false);  // OpenGL paints over everything; hide it during splash
+    }
 }
 
 ElementsAudioProcessorEditor::~ElementsAudioProcessorEditor()

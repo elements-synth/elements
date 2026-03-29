@@ -141,6 +141,9 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
+    // Splash screen: only show once per plugin instance (survives editor destroy/recreate)
+    bool splashShown = false;
+
 private:
     // The synthesis engine
     ElementsSynth synth;
