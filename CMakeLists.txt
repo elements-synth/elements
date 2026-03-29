@@ -49,6 +49,7 @@ juce_add_binary_data(ElementsBinaryData
         Source/JetBrainsMono-Regular.ttf
         Source/JetBrainsMono-Bold.ttf
         Source/elements-logo.png
+        studio_kontrast_03_2k.hdr
         ${KNOB_FRAMES}
 )
 

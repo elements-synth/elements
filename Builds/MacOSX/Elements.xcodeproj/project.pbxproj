@@ -44,6 +44,7 @@
 		2D2C2CEC861C0F8248CB998C /* include_juce_graphics_Harfbuzz.cpp */ = {isa = PBXBuildFile; fileRef = CF8365F180CD449613DF1E14; };
 		2D8B4621D4C4D169B6337B93 /* Security.framework */ = {isa = PBXBuildFile; fileRef = C2F524FE1DCE8AB37401A8B2; };
 		357CC132FA939B39332C2B0D /* include_juce_data_structures.mm */ = {isa = PBXBuildFile; fileRef = E39C1BB995EDE4E88BD13971; };
+		3E167BF2FAEDD5E7E3D3FF54 /* BinaryData4.cpp */ = {isa = PBXBuildFile; fileRef = 6EAC59C0FD2D4F4BBA1871DE; };
 		410699AF9B92319BD6253ACD /* RecentFilesMenuTemplate.nib */ = {isa = PBXBuildFile; fileRef = 0AB79B15E0F23A964ABE81F8; };
 		46D566E6FA74CDD4E6187924 /* include_juce_audio_processors.mm */ = {isa = PBXBuildFile; fileRef = D8A050939678C46099DFA81D; };
 		49AF5D28779DA578E0FC8C52 /* include_juce_audio_processors_headless_lv2_libs.cpp */ = {isa = PBXBuildFile; fileRef = 1F3FC6789337C3BA44517B3D; };
@@ -84,6 +85,7 @@
 /* Begin PBXFileReference section */
 		0029357751EDC604FB2E4856 /* Accelerate.framework */ /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		0455061BF6CD3F3561C90B5E /* knob_00032.png */ /* knob_00032.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00032.png; path = ../../custom_knob_render/knob/knob_00032.png; sourceTree = SOURCE_ROOT; };
+		059274F7B961B0BE5DC15274 /* studio_kontrast_03_2k.hdr */ /* studio_kontrast_03_2k.hdr */ = {isa = PBXFileReference; lastKnownFileType = file.hdr; name = studio_kontrast_03_2k.hdr; path = ../../studio_kontrast_03_2k.hdr; sourceTree = SOURCE_ROOT; };
 		05BE1BE0CD8B1D3E752234E6 /* knob_00005.png */ /* knob_00005.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00005.png; path = ../../custom_knob_render/knob/knob_00005.png; sourceTree = SOURCE_ROOT; };
 		06CFD3ED16AA31EB683DAF05 /* juce_VST3ManifestHelper.mm */ /* juce_VST3ManifestHelper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = juce_VST3ManifestHelper.mm; path = "$(HOME)/JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.mm"; sourceTree = "<absolute>"; };
 		080D890514148A53D5D0C8B3 /* knob_00017.png */ /* knob_00017.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00017.png; path = ../../custom_knob_render/knob/knob_00017.png; sourceTree = SOURCE_ROOT; };
@@ -143,6 +145,7 @@
 		66472E2FBE96F3AA5ADD4269 /* knob_00042.png */ /* knob_00042.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00042.png; path = ../../custom_knob_render/knob/knob_00042.png; sourceTree = SOURCE_ROOT; };
 		67521E606AFFAC9E36C31ACA /* IOKit.framework */ /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		6D7DC2806F196135F16C1AFF /* Foundation.framework */ /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		6EAC59C0FD2D4F4BBA1871DE /* BinaryData4.cpp */ /* BinaryData4.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = BinaryData4.cpp; path = ../../JuceLibraryCode/BinaryData4.cpp; sourceTree = SOURCE_ROOT; };
 		6FFACB6898AB8A2025A58199 /* include_juce_audio_formats.mm */ /* include_juce_audio_formats.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_formats.mm; path = ../../JuceLibraryCode/include_juce_audio_formats.mm; sourceTree = SOURCE_ROOT; };
 		7549B68833B6E23490EA0E14 /* knob_00033.png */ /* knob_00033.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00033.png; path = ../../custom_knob_render/knob/knob_00033.png; sourceTree = SOURCE_ROOT; };
 		75BA38B6642F8F9C64589BB9 /* AudioToolbox.framework */ /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
@@ -342,6 +345,7 @@
 				FB2D95F548C8B2D621227185,
 				EF5F2B80E123038BD7A5E185,
 				6532B16C344451952D371F9F,
+				059274F7B961B0BE5DC15274,
 				70F70E7FF75CBA28BDE94D54,
 			);
 			name = Source;
@@ -481,6 +485,7 @@
 				619060F917589435E333A11F,
 				ADEF1AC45B8ABDAF805A45B9,
 				50D1776FB07829307A090A59,
+				6EAC59C0FD2D4F4BBA1871DE,
 				7F4844CE950A1CEE56623B19,
 				AA938938E62E65B1A0BCE854,
 				6FFACB6898AB8A2025A58199,
@@ -885,6 +890,7 @@
 				67732DA89A6E5756CA7B87F0,
 				FC1CF6D86405572FFB39B4C6,
 				0C8A3A31BB8A951686A68103,
+				3E167BF2FAEDD5E7E3D3FF54,
 				05E0F23D9E7CF55D8869AB73,
 				2A9B2831E186C9894110886E,
 				A9D3BD7F2BA136829A21518E,

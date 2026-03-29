@@ -17,6 +17,9 @@ namespace BinaryData
     extern const char*   elementslogo_png;
     const int            elementslogo_pngSize = 70083;
 
+    extern const char*   studio_kontrast_03_2k_hdr;
+    const int            studio_kontrast_03_2k_hdrSize = 5909219;
+
     extern const char*   knob_00000_png;
     const int            knob_00000_pngSize = 114110;
 
@@ -210,7 +213,7 @@ namespace BinaryData
     const int            knob_00063_pngSize = 112179;
 
     // Number of elements in the namedResourceList and originalFileNames arrays.
-    const int namedResourceListSize = 67;
+    const int namedResourceListSize = 68;
 
     // Points to the start of a list of resource names.
     extern const char* namedResourceList[];

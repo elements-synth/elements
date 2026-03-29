@@ -39,6 +39,8 @@
             resource="1" file="Source/JetBrainsMono-Bold.ttf"/>
       <FILE id="elements_logo" name="elements-logo.png" compile="0"
             resource="1" file="Source/elements-logo.png"/>
+      <FILE id="env_hdr" name="studio_kontrast_03_2k.hdr" compile="0"
+            resource="1" file="studio_kontrast_03_2k.hdr"/>
       <GROUP id="knobsgroup" name="Knobs">
         <FILE id="knob_00" name="knob_00000.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00000.png"/>
         <FILE id="knob_01" name="knob_00001.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00001.png"/>

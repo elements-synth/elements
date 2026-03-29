@@ -990,39 +990,15 @@ void Viewport3D::createEnvironmentMap()
 {
     using namespace juce::gl;
 
-    // Locate HDR file next to the plugin binary or in Source folder
-    juce::File hdrFile;
-
-    // Try several paths: next to executable, Source folder, project root
-    auto exeDir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
-    juce::File candidates[] = {
-        exeDir.getChildFile("studio_kontrast_03_2k.hdr"),
-        exeDir.getParentDirectory().getChildFile("studio_kontrast_03_2k.hdr"),
-        juce::File("/Users/matiasderose/Documents/JUCE_Projects/Elements/studio_kontrast_03_2k.hdr"),
-        juce::File("/Users/matiasderose/Documents/JUCE_Projects/Elements/Source/studio_kontrast_03_2k.hdr")
-    };
-
-    for (auto& f : candidates)
-    {
-        if (f.existsAsFile())
-        {
-            hdrFile = f;
-            break;
-        }
-    }
-
-    if (!hdrFile.existsAsFile())
-    {
-        DBG("Environment HDR not found — reflections will be black");
-        return;
-    }
-
-    // Load HDR with stb_image (returns float RGB)
+    // Load HDR from embedded BinaryData
     int w, h, channels;
-    float* hdrData = stbi_loadf(hdrFile.getFullPathName().toRawUTF8(), &w, &h, &channels, 3);
+    float* hdrData = stbi_loadf_from_memory(
+        reinterpret_cast<const stbi_uc*>(BinaryData::studio_kontrast_03_2k_hdr),
+        BinaryData::studio_kontrast_03_2k_hdrSize,
+        &w, &h, &channels, 3);
     if (!hdrData)
     {
-        DBG("Failed to load HDR: " + juce::String(stbi_failure_reason()));
+        DBG("Failed to load HDR from BinaryData: " + juce::String(stbi_failure_reason()));
         return;
     }
 
