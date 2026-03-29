@@ -1,0 +1,32 @@
+name: Build Windows VST3
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: juce-8.0.6-windows
+
+      - name: Configure CMake
+        run: cmake -B build -A x64
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target Elements_VST3
+
+      - name: Upload VST3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Elements-VST3-Windows-x64
+          path: build/Elements_artefacts/Release/VST3/Elements.vst3
