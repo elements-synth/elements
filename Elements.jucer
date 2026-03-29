@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="elements01" name="Elements" projectType="audioplug" useAppConfig="0"
+<JUCERPROJECT id="elements01" name="Elements" projectType="audioplug" version="0.9.2" useAppConfig="0"
               addUsingNamespaceToJuceHeader="1" jucerFormatVersion="1" companyName="ElementsSynth"
               companyCopyright="2025" companyWebsite="https://github.com/elements-synth"
               pluginFormats="buildAU,buildStandalone,buildVST3" pluginCharacteristicsValue="pluginIsSynth,pluginWantsMidiIn,pluginEditorRequiresKeys"
