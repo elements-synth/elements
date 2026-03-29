@@ -30,6 +30,9 @@ juce_add_plugin(Elements
     COPY_PLUGIN_AFTER_BUILD FALSE
 )
 
+# Generate JuceHeader.h (needed by source files that #include <JuceHeader.h>)
+juce_generate_juce_header(Elements)
+
 # Source files
 target_sources(Elements
     PRIVATE
@@ -61,7 +64,6 @@ target_compile_definitions(Elements
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
-        JUCE_DISPLAY_SPLASH_SCREEN=1
 )
 
 # Link JUCE modules + binary data
