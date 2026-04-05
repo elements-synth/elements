@@ -2,7 +2,7 @@
 
 A VST3 synthesizer where **light generates sound**. Materials with real optical properties (Fresnel equations, wavelength-dependent transmission) shape harmonic spectra through physics simulation.
 
-**[Download Beta v0.9.2](https://github.com/elements-synth/elements/releases)** — macOS & Windows · Free
+**[Download Beta v0.9.3](https://github.com/elements-synth/elements/releases)** — macOS & Windows · Free
 
 **[Documentation](https://elements-synth.github.io/elements/)**
 
@@ -18,7 +18,9 @@ Rotating the object changes the angle between each face and the lights, producin
 
 ## Current State
 
-**v0.9.2-beta** — Core functionality working:
+**v0.9.3-beta** — Bugfix: Volume now persists across editor close/reopen and is DAW-automatable.
+
+Core functionality working:
 
 - 8 materials with distinct spectral signatures
 - 4 geometries (Cube, Sphere, Torus, Dodecahedron)

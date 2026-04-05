@@ -1061,6 +1061,7 @@ private:
     std::unique_ptr<SliderAttachment> fillIntensityAttachment;
     std::unique_ptr<SliderAttachment> rimIntensityAttachment;
     std::unique_ptr<ComboBoxAttachment> envModeAttachment;
+    std::unique_ptr<SliderAttachment> volumeAttachment;
 
     // === Helpers ===
     void setupRotarySlider(juce::Slider& slider, double min, double max, double def);

@@ -124,9 +124,8 @@ public:
     float getFilterRelease() const { return synth.getFilterRelease(); }
     float getFilterEnvAmount() const { return synth.getFilterEnvAmount(); }
 
-    // Volume
-    void setVolume(float vol) { synth.setVolume(vol); }
-    float getVolume() const { return synth.getVolume(); }
+    // Volume — APVTS is the source of truth (automatable from DAW)
+    float getVolume() const { return apvts.getRawParameterValue("volume")->load(); }
 
     // Spectrum (for visualization)
     const std::array<float, NUM_WAVELENGTHS>& getSpectrum() const { return synth.getCurrentSpectrum(); }
@@ -157,6 +156,7 @@ private:
     int lastEnvMode = 0;
     float lastDeformAmount = 0.0f;
     float lastDeformFrequency = 2.0f;
+    float lastVolume = 0.95f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ElementsAudioProcessor)
 };

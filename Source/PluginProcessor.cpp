@@ -203,6 +203,13 @@ ElementsAudioProcessor::createParameterLayout()
         juce::NormalisableRange<float>(0.5f, 10.0f, 0.1f),
         2.0f));
 
+    // Volume: 0.0 – 1.0, default 0.95
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"volume", 1},
+        "Volume",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
+        0.95f));
+
     return layout;
 }
 
@@ -456,6 +463,16 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }
 
+    // Volume
+    {
+        float newVolume = apvts.getRawParameterValue("volume")->load();
+        if (std::abs(newVolume - lastVolume) > 0.001f)
+        {
+            lastVolume = newVolume;
+            synth.setVolume(newVolume);
+        }
+    }
+
     // =========================================================================
     // GENERAR AUDIO
     // =========================================================================
@@ -517,7 +534,6 @@ void ElementsAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // Guardar parámetros manuales
     state->setAttribute("material", synth.getMaterial());
     state->setAttribute("geometry", static_cast<int>(synth.getGeometry()));
-    state->setAttribute("volume", static_cast<double>(synth.getVolume()));
 
     // Guardar estado de luces (enabled + source)
     for (int i = 0; i < 3; ++i)
@@ -553,8 +569,6 @@ void ElementsAudioProcessor::setStateInformation (const void* data, int sizeInBy
         synth.setMaterial(state->getIntAttribute("material", 0));
         synth.setGeometry(static_cast<Geometry>(state->getIntAttribute("geometry", 0)));
 
-        synth.setVolume(static_cast<float>(state->getDoubleAttribute("volume", 0.95)));
-
         // Restaurar estado de luces (enabled + source)
         for (int i = 0; i < 3; ++i)
         {
@@ -577,6 +591,13 @@ void ElementsAudioProcessor::setStateInformation (const void* data, int sizeInBy
             px->setValueNotifyingHost(px->convertTo0to1(static_cast<float>(state->getDoubleAttribute("rotationX", 0.0))));
             py->setValueNotifyingHost(py->convertTo0to1(static_cast<float>(state->getDoubleAttribute("rotationY", 0.0))));
             pz->setValueNotifyingHost(pz->convertTo0to1(static_cast<float>(state->getDoubleAttribute("rotationZ", 0.0))));
+        }
+
+        // Migration: old projects stored volume as XML attribute (not in APVTS)
+        if (state->hasAttribute("volume"))
+        {
+            auto* pv = apvts.getParameter("volume");
+            pv->setValueNotifyingHost(pv->convertTo0to1(static_cast<float>(state->getDoubleAttribute("volume", 0.95))));
         }
     }
 }

@@ -2757,7 +2757,8 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     envModeAttachment = std::make_unique<ComboBoxAttachment>(audioProcessor.apvts, "envMode", envModeCombo);
 
     setupLabel(volumeLabel, "VOLUME", 13.0f, true);
-    setupRotarySlider(volumeSlider, 0, 1, 0.8);
+    setupRotarySlider(volumeSlider, 0, 1, 0.95);
+    volumeAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "volume", volumeSlider);
 
     startTimerHz(30);
     setSize(1100, 770);
@@ -3049,10 +3050,8 @@ void ElementsAudioProcessorEditor::resized()
 
 void ElementsAudioProcessorEditor::sliderValueChanged(juce::Slider* slider)
 {
-    // Most sliders are handled by APVTS attachments (DAW-automatable via processBlock).
-    // Only volume remains manual (not exposed as DAW parameter).
-    if (slider == &volumeSlider)
-        audioProcessor.setVolume(static_cast<float>(slider->getValue()));
+    // All sliders are handled by APVTS attachments (DAW-automatable via processBlock).
+    juce::ignoreUnused(slider);
 }
 
 void ElementsAudioProcessorEditor::buttonClicked(juce::Button* button)
