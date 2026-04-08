@@ -104,7 +104,7 @@ Diamond, Ruby, Gold, Emerald, Sapphire, Amber, Amethyst, Topaz, Opal, Quartz —
 - Soft clipper (tanh) on master output
 - Audio buffer exposed for oscilloscope display
 
-## Current State (as of Apr 7, 2026)
+## Current State (as of Apr 8, 2026)
 - Full working prototype with **PBR shader rendering** (Cook-Torrance BRDF)
 - All features functional: materials, geometries, 3-point lighting, Fresnel physics, synth, MIDI
 - Hybrid rendering pipeline: GLSL shaders for geometry, fixed-function for grid/axes/gizmo/light indicators
@@ -113,6 +113,7 @@ Diamond, Ruby, Gold, Emerald, Sapphire, Amber, Amethyst, Topaz, Opal, Quartz —
 - **Volume is now APVTS parameter** (Apr 5, 2026) — DAW-automatable
 - **Soft clipper implemented** — tanh output limiting reduces clipping
 - **Single-oscillator architecture** — one wavetable oscillator per voice with physics-driven spectral morphing
+- **Dual-oscillator infrastructure in progress** — branch `mix_materials`, points 1-3/6 done (APVTS params, dual WavetableSets, dual spectrum generation)
 
 ### PBR Shader Pipeline (implemented)
 - `Source/Shaders.h` — vertex + fragment GLSL shaders as `constexpr const char*`
@@ -201,155 +202,91 @@ All parameters exposed to DAW automation:
 
 ## Pending Work / Future Features
 
-### Dual-Oscillator Material Mixing (PLANNED - NOT IMPLEMENTED)
+### Dual-Oscillator Material Mixing (IN PROGRESS — branch `mix_materials`)
 
-**Status**: Designed, ready for implementation (Apr 7, 2026)
+**Status**: Points 1-3 of 6 complete (commit `becb016`, Apr 8, 2026)
 
 **Goal**: Add a second independent oscillator to enable richer timbres and advanced sound design through spectral interaction, not just linear mixing.
 
 #### Why Not Simple Mixing?
 Testing with two separate Elements instances in Bitwig (each with different material) showed that **mere addition of curves doesn't generate interesting timbres**. We need **interaction between spectra** to create complex, evolving sounds.
 
-#### Architecture Design
+#### Implementation Plan — 6 Points
 
-**Two Independent Oscillators**:
-- Oscillator A: Material A (existing single-osc architecture)
-- Oscillator B: Material B (new, parallel architecture)
-- Each oscillator has:
-  - Independent material selection (10 materials available)
-  - Independent wavetable generation from physics spectrum
-  - Independent playback with phase interpolation
-  - Shared ADSR envelope (both oscs use same envelope)
-  - **Detune parameter**: Oscillator B can be detuned relative to A (cents)
+**[DONE] Point 1 — APVTS Parameters**
+- `materialA` (0-9) — Material for Oscillator A (maps to legacy `material`)
+- `materialB` (0-9) — Material for Oscillator B
+- `blendMode` (0-4) — 0=Ring Mod, 1=Spectral Max, 2=AM, 3=XOR, 4=Interleave
+- `mixAmount` (0.0-1.0) — Dry/wet (0=only Osc A, 1=full blend)
+- `amDepth` (0.0-1.0) — AM modulation depth (mode 2 only)
+- `oscBDetune` (±100 cents) — Detune Oscillator B relative to A
+- Migration: legacy `material` state → `materialA`, `materialB=0`, `mixAmount=0`
 
-**Why Two Wavetables, Not Mix-Then-Generate?**:
-- Mixing spectra first, then generating one wavetable would be limiting
-- Two independent wavetables allow features like:
-  - **Detune** between oscillators (frequency offset)
-  - **Phase offset** between oscillators
-  - Independent spectral evolution when materials change
-  - Per-oscillator filters (future enhancement)
+**[DONE] Point 2 — SynthEngine Dual-Osc Infrastructure**
+- `spectrumA[50]`, `spectrumB[50]`, `pendingSpectrumA/B` fields
+- `currentWavetablesA`, `currentWavetablesB` (`WavetableSet`)
+- `crossfadeA`, `crossfadeB` (`CrossfadeState`)
+- Fields: `blendMode`, `mixAmount`, `mixAmountSmooth`, `amDepth`, `oscBDetune`
+- Per-voice `phaseB` for independent Oscillator B phase
+- Methods: `setMaterialA/B()`, `setBlendMode()`, `setMixAmount()`, `setAMDepth()`, `setOscBDetune()`
+- Legacy: `setMaterial()` maps to `setMaterialA()`
 
-#### Five Blend Modes (Spectral Interaction)
+**[DONE] Point 3 — Physics: Independent Spectrum Calculation + Dual Wavetable Generation**
+- `calculateSpectrumForMaterial(int matIdx, spectrum[])` — full physics pipeline per material
+- `updateSpectrum()`: calculates `spectrumA` always, `spectrumB` only when `mixAmount > 0`
+- `regenerateWavetables()`: crossfadeA setup + generate `currentWavetablesA`; crossfadeB + `currentWavetablesB` when active
+- Both spectra share same rotation/lights/thickness (same physical context, independent optical properties)
 
-Each mode creates unique timbral characteristics by combining the two spectra in different ways:
+**[TODO] Point 4 — SynthEngine processBlock: Oscillator B Playback + Blend Modes**
+- Replace stale refs: `currentWavetables` → `currentWavetablesA`, `crossfade` → `crossfadeA`
+- In `regenerateWavetables()`: compute blended spectrum for spectral modes (0, 1, 3, 4) → `currentWavetablesBlended`
+- Per-voice inner loop additions:
+  - Oscillator B reads `currentWavetablesBlended` (spectral modes) or `currentWavetablesB` (AM) at detuned frequency (`voice.phaseB`)
+  - Advance `phaseB` with `phaseIncrement * detuneRatio`
+  - Blend modes at sample level:
+    - Modes 0/1/3/4 (spectral): `output = lerp(sampleA, sampleBlended, mixAmountSmooth)`
+    - Mode 2 (AM): `output = sampleA * (1.0 + amDepth * sampleB)`
+- `mixAmountSmooth`: per-block smoothing to avoid zipper noise on mix changes
+- Guard: when `mixAmount < 0.001`, skip all Osc B work (backward compatible, zero CPU overhead)
+- Update `crossfadeA/B` progress at end of block (replace old `crossfade` block)
 
-**1. RING MODULATION (Multiplication)**
-- **Formula**: `output[h] = spectrum_A[h] * spectrum_B[h]`
-- **Interaction**: Multiplies harmonic amplitudes point-by-point
-- **Effect**: Generates **sidebands** (sum/difference frequencies), metallic/enharmonic timbres
-- **Characteristic**: If one spectrum has weak harmonic, that harmonic is suppressed in output
-- **Use case**: Metallic bells, inharmonic textures, aggressive timbres
+**[TODO] Point 5 — Viewport3D: Visual Material Blending in PBR Shader**
+- Pass `materialA`, `materialB`, `mixAmount` as uniforms to fragment shader
+- Interpolate PBR visual properties: `color = mix(colorA, colorB, mixAmount)`; same for `metallic`, `roughness`
+- Blend mode visual variants (optional): Ring Mod → `colorA * colorB`; Max → `max(colorA, colorB)`
+- Physics/audio still uses **separate, pure material properties** — visual blend is cosmetic only
 
-**2. SPECTRAL MAX (Peak Picking)**
-- **Formula**: `output[h] = max(spectrum_A[h], spectrum_B[h])`
-- **Interaction**: Takes the **stronger harmonic** at each frequency
-- **Effect**: Creates composite spectral envelope that dynamically shifts based on which material dominates
-- **Characteristic**: No volume accumulation (avoids saturation), hybrid spectrum
-- **Use case**: Dynamic hybrid timbres, morphing materials, smooth transitions
+**[TODO] Point 6 — UI: Dual Material Controls**
+- Material selector becomes **dual row**: Material A (top) | Material B (bottom), 10 buttons each
+- Blend mode selector: 5 buttons (RING / MAX / AM / XOR / INT) with icons
+- Mix Amount slider (0-100%) — always visible
+- Detune slider ±100 cents — always visible
+- AM Depth slider — visible only when blend mode = AM
+- Spectrum display: show spectrumA (dim) + spectrumB (dim) + blended result (bright) as overlaid curves
 
-**3. AM (Amplitude Modulation - Carrier/Modulator)**
-- **Formula**: `output = wavetable_A * (1.0 + depth * wavetable_B)`
-- **Interaction**: Oscillator A is carrier, Oscillator B modulates its amplitude
-- **Effect**: Generates sidebands like ring mod, but **maintains fundamental** from carrier
-- **Characteristic**: More musical than pure ring mod, preserves pitch
-- **Additional parameter**: `depth` (0.0 - 1.0) controls modulation intensity
-- **Use case**: Rich harmonic movement, tremolo-like effects at low detune, sidebands at higher detune
+#### Architecture Notes
 
-**4. SPECTRAL XOR (Difference)**
-- **Formula**: `output[h] = |spectrum_A[h] - spectrum_B[h]|`
-- **Interaction**: Takes **absolute difference** between harmonic amplitudes
-- **Effect**: Similar harmonics cancel out, different ones reinforce → creates "opposite" timbres
-- **Characteristic**: Can create spectral holes/notches, emphasizes differences
-- **Use case**: Experimental timbres, evolving spectral gaps, subtractive-style interaction
-
-**5. HARMONIC INTERLEAVING (Alternating)**
-- **Formula**: `output[h] = (h % 2 == 0) ? spectrum_A[h] : spectrum_B[h]`
-- **Interaction**: **Even harmonics** from Material A, **odd harmonics** from Material B
-- **Effect**: Creates "entangled" spectra impossible with single material
-- **Characteristic**: Alternating harmonic sources, can create hollow/nasal timbres
-- **Use case**: Unique timbral hybrids, formant-like characteristics, unusual harmonic series
-
-#### New Parameters (APVTS)
-
-**Material & Mixing**:
-- `materialA` (0-9, default: current material) — Material for Oscillator A
-- `materialB` (0-9, default: 0) — Material for Oscillator B
-- `blendMode` (0-4) — Blend mode selector:
-  - 0 = Ring Modulation
-  - 1 = Spectral Max
-  - 2 = AM (Carrier/Modulator)
-  - 3 = Spectral XOR
-  - 4 = Harmonic Interleaving
-- `mixAmount` (0.0 - 1.0, default: 0.0) — Dry/wet mix (0 = only Osc A, 1 = full blend)
-- `amDepth` (0.0 - 1.0, default: 0.5) — AM modulation depth (only used in mode 2)
-
-**Oscillator B Tuning**:
-- `oscBDetune` (-100 to +100 cents, default: 0) — Detune Oscillator B relative to A
-- `oscBPhase` (0.0 - 1.0, default: 0.0) — Phase offset for Oscillator B (future enhancement)
-
-**Enable/Disable**:
-- When `mixAmount = 0.0`, only Oscillator A plays (backward compatible, no CPU overhead)
-- When `mixAmount > 0.0`, both oscillators are active and blended
-
-#### Implementation Notes
-
-**SynthEngine Changes Required**:
-1. Add second wavetable set per voice: `wavetableB[5][WAVETABLE_SIZE]`
-2. Add Oscillator B playback in `processBlock()` with detune support
-3. Implement blend mode mixing functions (5 variants)
-4. Crossfade support for both wavetables when spectra change
-5. `mixAmount` parameter for dry/wet control
-
-**Physics Changes Required**:
-1. **Calculate two completely independent spectra**:
-   - `spectrumA[50]`: Full physics calculation with Material A properties
-     - Uses `IOR_A`, `transmission_A[]`, `metallic_A`, `roughness_A`
-     - Fresnel calculations with `IOR_A`
-   - `spectrumB[50]`: Full physics calculation with Material B properties
-     - Uses `IOR_B`, `transmission_B[]`, `metallic_B`, `roughness_B`
-     - Fresnel calculations with `IOR_B`
-   - **Shared physical context**: Both spectra respond to same rotation/lights/thickness
-   - **No mixing of physical properties**: Each material maintains its physical identity
-2. Generate two wavetables via `WavetableGenerator::generateFromSpectrum()` (called twice)
-3. Blend modes apply to **spectra or wavetables**, NOT to physical properties (IOR, transmission, etc.)
-
-**UI Changes Required**:
-1. Material selector becomes **dual selector**: Material A | Material B
-2. Blend mode dropdown/buttons (5 modes with visual icons)
-3. Mix amount slider (0-100%)
-4. Detune slider for Osc B (±100 cents)
-5. AM Depth slider (visible only when blend mode = AM)
-6. Visual indicator in spectrum display showing both spectra + blend result
-
-**Viewport 3D Visualization**:
-- **Single object** rendered (not two separate geometries)
-- **Visual material blending** (for rendering only, does NOT affect physics/audio):
-  ```glsl
-  // PBR shader visual properties (interpolated by mixAmount)
-  vec3 color = mix(colorA, colorB, mixAmount);
-  float metallic = mix(metallicA, metallicB, mixAmount);
-  float roughness = mix(roughnessA, roughnessB, mixAmount);
-  ```
-- Visual blend represents the "aleación" (alloy) appearance
-- Physics calculations still use **separate, pure material properties** for spectrumA and spectrumB
-- Alternative: Color could reflect blend mode (e.g., Ring Mod → `colorA * colorB`, Max → `max(colorA, colorB)`)
+**Spectral vs Sample-Level Blend Modes**:
+- Modes 0 (Ring Mod), 1 (Spectral Max), 3 (XOR), 4 (Interleave): blend happens at **spectrum level** in `regenerateWavetables` → generates `currentWavetablesBlended`; processBlock plays one oscillator per voice from blended wavetable plus optionally a detuned second oscillator for thickness
+- Mode 2 (AM): blend happens at **sample level** in processBlock; true two-oscillator playback (A as carrier, B as modulator)
 
 **Why Separate Spectra, Not Mixed Material Properties?**
-- **Physically coherent**: Each material maintains its true optical properties (IOR, transmission)
-- **Musically flexible**: Blend modes create interaction at spectral/audio level, not by "averaging" physics
-- **Future-proof**: Enables features like independent rotation per material, per-material lighting, etc.
-- **IOR mixing is not physically valid**: Emerald IOR + Gold IOR averaged ≠ realistic alloy IOR
-- **True independence**: Two oscillators are genuinely separate, enabling proper detune/phase offset
+- IOR mixing is not physically valid (Emerald IOR + Gold IOR averaged ≠ realistic alloy)
+- Each material maintains true optical properties through full physics pipeline
+- Blend modes create interaction at spectral/audio level — musically flexible
+- Enables future: independent rotation per material, per-material lighting
 
-#### Benefits for Sound Design
+**Backward Compatibility**: `mixAmount = 0.0` → behaves exactly as single-osc version, no CPU overhead
 
-- **Richer timbres**: Interaction modes create harmonics not present in either material alone
-- **Evolving textures**: Rotation affects both materials differently → dynamic spectral morphing
-- **Detuning**: Classic analog-style thickness and chorusing
-- **Material exploration**: Discover combinations impossible with single material
-- **Performance control**: `mixAmount` can be automated for live morphing between timbres
-- **Backward compatible**: With `mixAmount = 0`, behaves exactly like current single-osc version
+#### Five Blend Modes Reference
+
+| # | Name | Formula | Effect |
+|---|------|---------|--------|
+| 0 | Ring Mod | `C[h] = A[h] * B[h]` | Metallic, suppresses weak harmonics |
+| 1 | Spectral Max | `C[h] = max(A[h], B[h])` | Hybrid envelope, no saturation |
+| 2 | AM | `out = A * (1 + depth * B)` | Sidebands, preserves fundamental |
+| 3 | XOR | `C[h] = |A[h] - B[h]|` | Spectral holes, difference timbres |
+| 4 | Interleave | even→A, odd→B | Hollow/nasal entangled spectrum |
 
 ### Task: ADSR Envelope Graph
 - [ ] ADSRDisplay component (visual curve of current ADSR)
