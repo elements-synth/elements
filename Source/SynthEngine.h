@@ -107,7 +107,8 @@ struct Voice
     static constexpr int FADE_SAMPLES = 256;  // ~5.8ms at 44.1kHz for anti-click fades
 
     float frequency = 440.0f;       // Frequency in Hz
-    float phase = 0.0f;             // Current phase (0.0 - 1.0)
+    float phase = 0.0f;             // Current phase (0.0 - 1.0) - Oscillator A
+    float phaseB = 0.0f;            // Oscillator B phase (independent)
     int age = 0;                    // Samples since note started
     bool releasing = false;         // In release phase?
     int releaseAge = 0;             // Samples since release started
@@ -131,6 +132,7 @@ struct Voice
     {
         frequency = 440.0f;
         phase = 0.0f;
+        phaseB = 0.0f;
         age = 0;
         releasing = false;
         releaseAge = 0;
@@ -338,8 +340,21 @@ public:
 
     // --- Material & Light ---
 
-    void setMaterial(int materialIndex);
-    int getMaterial() const { return currentMaterialIndex; }
+    // Dual-oscillator material control
+    void setMaterialA(int materialIndex);
+    void setMaterialB(int materialIndex);
+    int getMaterialA() const { return currentMaterialIndexA; }
+    int getMaterialB() const { return currentMaterialIndexB; }
+
+    // Blend mode control
+    void setBlendMode(int mode);
+    void setMixAmount(float amount);
+    void setAMDepth(float depth);
+    void setOscBDetune(float cents);
+
+    // Legacy single-material support (maps to materialA for backward compatibility)
+    void setMaterial(int materialIndex) { setMaterialA(materialIndex); }
+    int getMaterial() const { return currentMaterialIndexA; }
 
     void setGeometry(Geometry geom);
     Geometry getGeometry() const { return currentGeometry; }
@@ -416,7 +431,11 @@ public:
 
     // --- Spectrum Access (for visualization) ---
 
-    const std::array<float, NUM_WAVELENGTHS>& getCurrentSpectrum() const { return spectrum; }
+    const std::array<float, NUM_WAVELENGTHS>& getSpectrumA() const { return spectrumA; }
+    const std::array<float, NUM_WAVELENGTHS>& getSpectrumB() const { return spectrumB; }
+
+    // Legacy support (returns spectrumA for backward compatibility)
+    const std::array<float, NUM_WAVELENGTHS>& getCurrentSpectrum() const { return spectrumA; }
 
     // --- Oscilloscope Access (for visualization) ---
 
@@ -426,6 +445,7 @@ public:
 private:
     // --- Internal Methods ---
 
+    void calculateSpectrumForMaterial(int matIndex, std::array<float, NUM_WAVELENGTHS>& outputSpectrum);
     void updateSpectrum();
     void regenerateWavetables();
     void updatePhysicalEnvelope();
@@ -450,30 +470,44 @@ private:
     float thickness = 1.0f;  // 0.1 = thin/bright, 1.0 = reference, 3.0 = thick/dark
 
     // Material and lighting
-    int currentMaterialIndex = 0;           // Diamond by default
+    int currentMaterialIndexA = 0;          // Diamond by default (Oscillator A)
+    int currentMaterialIndexB = 0;          // Diamond by default (Oscillator B)
     Geometry currentGeometry = Geometry::Sphere;
     std::array<LightConfig, 3> lights;
     RotationMatrix objectRotationMatrix;  // Gimbal-lock-free rotation storage
 
-    // Current spectrum
-    std::array<float, NUM_WAVELENGTHS> spectrum;
+    // Oscillator A: Spectrum and Wavetables
+    std::array<float, NUM_WAVELENGTHS> spectrumA;
+    std::array<float, NUM_WAVELENGTHS> pendingSpectrumA{};
+    WavetableSet currentWavetablesA;
+    CrossfadeState crossfadeA;
+
+    // Oscillator B: Spectrum and Wavetables
+    std::array<float, NUM_WAVELENGTHS> spectrumB;
+    std::array<float, NUM_WAVELENGTHS> pendingSpectrumB{};
+    WavetableSet currentWavetablesB;
+    CrossfadeState crossfadeB;
+
+    // Blend parameters
+    int blendMode = 0;                      // 0=Ring Mod, 1=Spectral Max, 2=AM, 3=XOR, 4=Interleaving
+    float mixAmount = 0.0f;                 // 0.0-1.0 dry/wet mix (0=only A, 1=full blend)
+    float mixAmountSmooth = 0.0f;           // Smoothed version to avoid zipper noise
+    float amDepth = 0.5f;                   // AM modulation depth (0.0-1.0)
+    float oscBDetune = 0.0f;                // Oscillator B detune in cents (±100)
 
     // Spectral amplitude - overall strength of the spectrum (affected by angle)
     // Used to modulate voice amplitude so rotation affects volume
     float spectralAmplitude = 1.0f;
     float spectralAmplitudeTarget = 1.0f;
 
-    // Wavetables
+    // Wavetable generation and crossfade
     WavetableGenerator wavetableGen;
-    WavetableSet currentWavetables;
-    CrossfadeState crossfade;
     float crossfadeDuration = 0.20f;  // 200ms crossfade for smoother transitions
 
     // Throttling for wavetable regeneration (prevents clicks during fast rotation)
     int samplesSinceLastRegen = 0;
     int regenThrottleSamples = 4410;  // ~100ms at 44.1kHz - minimum time between regenerations
     bool regenPending = false;
-    std::array<float, NUM_WAVELENGTHS> pendingSpectrum{};
 
     // Voices
     std::array<Voice, MAX_POLYPHONY> voices;

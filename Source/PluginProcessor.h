@@ -68,9 +68,15 @@ public:
 
     // --- Convenience methods (wrappers around synth) ---
 
-    // Material
+    // Material (legacy single-material support, maps to materialA)
     void setMaterial(int index) { synth.setMaterial(index); }
     int getMaterial() const { return synth.getMaterial(); }
+
+    // Dual-oscillator material control
+    void setMaterialA(int index) { synth.setMaterialA(index); }
+    void setMaterialB(int index) { synth.setMaterialB(index); }
+    int getMaterialA() const { return synth.getMaterialA(); }
+    int getMaterialB() const { return synth.getMaterialB(); }
 
     // Geometry
     void setGeometry(Geometry geom) { synth.setGeometry(geom); }
@@ -157,6 +163,13 @@ private:
     float lastDeformAmount = 0.0f;
     float lastDeformFrequency = 2.0f;
     float lastVolume = 0.95f;
+
+    // Dual-oscillator material mixing cache
+    int lastMaterialA = 0;
+    int lastMaterialB = 0;
+    int lastBlendMode = 0;
+    float lastAmDepth = 0.5f;
+    float lastOscBDetune = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ElementsAudioProcessor)
 };

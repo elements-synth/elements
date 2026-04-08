@@ -210,6 +210,58 @@ ElementsAudioProcessor::createParameterLayout()
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
         0.95f));
 
+    // =====================================================================
+    // 4. DUAL-OSCILLATOR MATERIAL MIXING PARAMETERS
+    // =====================================================================
+
+    // Material A: 0-9 (10 materials), default 0 (Diamond)
+    layout.add(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{"materialA", 1},
+        "Material A",
+        0, 9, 0));
+
+    // Material B: 0-9 (10 materials), default 0 (Diamond)
+    layout.add(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{"materialB", 1},
+        "Material B",
+        0, 9, 0));
+
+    // Blend Mode: 0=Ring Mod, 1=Spectral Max, 2=AM, 3=XOR, 4=Interleaving
+    layout.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"blendMode", 1},
+        "Blend Mode",
+        juce::StringArray{"Ring Mod", "Spectral Max", "AM", "Spectral XOR", "Interleaving"},
+        0));
+
+    // Mix Amount: 0.0-1.0 (dry/wet), default 0.0
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"mixAmount", 1},
+        "Mix Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.0f,
+        "%",
+        juce::AudioProcessorParameter::genericParameter,
+        [](float v, int) { return juce::String(static_cast<int>(v * 100)) + "%"; },
+        nullptr));
+
+    // AM Depth: 0.0-1.0, default 0.5
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"amDepth", 1},
+        "AM Depth",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.5f));
+
+    // Oscillator B Detune: -100 to +100 cents, default 0
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"oscBDetune", 1},
+        "Osc B Detune",
+        juce::NormalisableRange<float>(-100.0f, 100.0f, 0.1f, 1.0f),
+        0.0f,
+        " cents",
+        juce::AudioProcessorParameter::genericParameter,
+        [](float v, int) { return juce::String(v, 1) + " cents"; },
+        nullptr));
+
     return layout;
 }
 
@@ -473,6 +525,52 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }
 
+    // Dual-oscillator material mixing
+    {
+        // Material A
+        int matA = apvts.getRawParameterValue("materialA")->load();
+        if (matA != lastMaterialA)
+        {
+            synth.setMaterialA(matA);
+            lastMaterialA = matA;
+        }
+
+        // Material B
+        int matB = apvts.getRawParameterValue("materialB")->load();
+        if (matB != lastMaterialB)
+        {
+            synth.setMaterialB(matB);
+            lastMaterialB = matB;
+        }
+
+        // Blend Mode
+        int mode = apvts.getRawParameterValue("blendMode")->load();
+        if (mode != lastBlendMode)
+        {
+            synth.setBlendMode(mode);
+            lastBlendMode = mode;
+        }
+
+        // Mix Amount (smooth parameter, no caching - allows smooth automation)
+        synth.setMixAmount(apvts.getRawParameterValue("mixAmount")->load());
+
+        // AM Depth
+        float depth = apvts.getRawParameterValue("amDepth")->load();
+        if (std::abs(depth - lastAmDepth) > 0.01f)
+        {
+            synth.setAMDepth(depth);
+            lastAmDepth = depth;
+        }
+
+        // Osc B Detune
+        float detune = apvts.getRawParameterValue("oscBDetune")->load();
+        if (std::abs(detune - lastOscBDetune) > 0.1f)
+        {
+            synth.setOscBDetune(detune);
+            lastOscBDetune = detune;
+        }
+    }
+
     // =========================================================================
     // GENERAR AUDIO
     // =========================================================================
@@ -565,7 +663,23 @@ void ElementsAudioProcessor::setStateInformation (const void* data, int sizeInBy
 
     if (state != nullptr && state->hasTagName("ElementsState"))
     {
+        // Migration: old single-material projects → dual-oscillator parameters
+        // Old projects stored "material" as XML attribute (not in APVTS)
+        // Migrate to materialA, set materialB = 0 (Diamond), mixAmount = 0 (disabled)
+        if (state->hasAttribute("material"))
+        {
+            int oldMat = state->getIntAttribute("material", 0);
+            auto* pMatA = apvts.getParameter("materialA");
+            auto* pMatB = apvts.getParameter("materialB");
+            auto* pMix = apvts.getParameter("mixAmount");
+
+            pMatA->setValueNotifyingHost(pMatA->convertTo0to1(static_cast<float>(oldMat)));
+            pMatB->setValueNotifyingHost(pMatB->convertTo0to1(0.0f));  // Diamond
+            pMix->setValueNotifyingHost(0.0f);  // Dual-osc disabled
+        }
+
         // Restaurar parámetros manuales
+        // Note: setMaterial() maps to setMaterialA() for backward compatibility
         synth.setMaterial(state->getIntAttribute("material", 0));
         synth.setGeometry(static_cast<Geometry>(state->getIntAttribute("geometry", 0)));
 
