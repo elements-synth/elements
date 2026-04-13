@@ -488,6 +488,10 @@ private:
     WavetableSet currentWavetablesB;
     CrossfadeState crossfadeB;
 
+    // Blended wavetable for spectral modes (0=Ring, 1=Max, 3=XOR, 4=Interleave)
+    WavetableSet currentWavetablesBlended;
+    CrossfadeState crossfadeBlended;
+
     // Blend parameters
     int blendMode = 0;                      // 0=Ring Mod, 1=Spectral Max, 2=AM, 3=XOR, 4=Interleaving
     float mixAmount = 0.0f;                 // 0.0-1.0 dry/wet mix (0=only A, 1=full blend)
