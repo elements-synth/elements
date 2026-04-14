@@ -403,6 +403,9 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     // Count active voices for mixing
     int activeVoiceCount = 0;
 
+    // Only capture Osc B samples from the first active non-stealing voice
+    bool oscBVoiceCaptured = false;
+
     // Process each voice
     for (auto& voice : voices)
     {
@@ -495,6 +498,13 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                     sampleB = lerp(oldSampleB, sampleB, t);
                 }
 
+                // Capture raw Osc B waveform for oscilloscope (first active voice only)
+                if (!oscBVoiceCaptured)
+                {
+                    oscilloscopeBufferB[static_cast<size_t>(oscilloscopeWritePosB)] = sampleB;
+                    oscilloscopeWritePosB = (oscilloscopeWritePosB + 1) % 512;
+                }
+
                 float mixT = lerp(mixAmountSmoothStart, mixAmountSmoothEnd, static_cast<float>(i) / numSamples);
 
                 if (blendMode == 2)
@@ -553,6 +563,10 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
 
             voice.age++;
         }
+
+        // Mark Osc B oscilloscope as captured after the first active non-stealing voice
+        if (dualOscActive && wavetableBPtr != nullptr && !voice.stealing)
+            oscBVoiceCaptured = true;
     }
 
     // Update crossfade progress
@@ -627,10 +641,15 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
         oscilloscopeWritePos = (oscilloscopeWritePos + 1) % 512;
     }
 
-    // Clear oscilloscope buffer if no active voices (for clean display)
+    // Clear oscilloscope buffers if no active voices (for clean display)
     if (activeVoiceCount == 0)
     {
         std::fill(oscilloscopeBuffer.begin(), oscilloscopeBuffer.end(), 0.0f);
+        std::fill(oscilloscopeBufferB.begin(), oscilloscopeBufferB.end(), 0.0f);
+    }
+    else if (!dualOscActive)
+    {
+        std::fill(oscilloscopeBufferB.begin(), oscilloscopeBufferB.end(), 0.0f);
     }
 }
 

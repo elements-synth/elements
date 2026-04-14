@@ -1802,7 +1802,7 @@ juce::Colour SpectrumDisplay::wavelengthToColour(float wavelength)
 // OSCILLOSCOPE DISPLAY
 // ==============================================================================
 
-OscilloscopeDisplay::OscilloscopeDisplay(ElementsAudioProcessor& p) : processor(p)
+OscilloscopeDisplay::OscilloscopeDisplay(ElementsAudioProcessor& p, bool isOscB) : processor(p), useOscB(isOscB)
 {
     startTimerHz(30);  // Reduced from 60Hz
 }
@@ -1831,10 +1831,10 @@ void OscilloscopeDisplay::paint(juce::Graphics& g)
     g.drawHorizontalLine(static_cast<int>(centerY), bounds.getX() + 4, bounds.getRight() - 4);
 
     // Get waveform buffer (circular — writePos is the oldest sample)
-    const auto& buffer = processor.getOscilloscopeBuffer();
+    const auto& buffer = useOscB ? processor.getOscilloscopeBufferB() : processor.getOscilloscopeBuffer();
     int bufferSize = static_cast<int>(buffer.size());
     if (bufferSize == 0) return;
-    int writePos = processor.getOscilloscopeWritePos();
+    int writePos = useOscB ? processor.getOscilloscopeWritePosB() : processor.getOscilloscopeWritePos();
 
     // Draw waveform with auto-scaling
     juce::Path waveformPath;
@@ -2533,6 +2533,7 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
       pianoRoll(p),
       spectrumDisplay(p),
       oscilloscopeDisplay(p),
+      oscilloscopeDisplayB(p, true),
       adsrDisplay(p),
       filterAdsrDisplay(p, true)
 {
@@ -2574,9 +2575,9 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     geoCombo.addListener(this);
     viewport3D.addAndMakeVisible(geoCombo);
 
-    matLabel.setText("MAT", juce::dontSendNotification);
+    matLabel.setText("MAT A", juce::dontSendNotification);
     matLabel.setFont(juce::Font(10.0f, juce::Font::bold));
-    matLabel.setJustificationType(juce::Justification::centred);
+    matLabel.setJustificationType(juce::Justification::centredRight);
     matLabel.setColour(juce::Label::textColourId, ElementsColors::text);
     viewport3D.addAndMakeVisible(matLabel);
 
@@ -2587,6 +2588,48 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     matCombo.setColour(juce::ComboBox::textColourId,
                        MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
     viewport3D.addAndMakeVisible(matCombo);
+
+    // Material B combo
+    matBLabel.setText("MAT B", juce::dontSendNotification);
+    matBLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    matBLabel.setJustificationType(juce::Justification::centredRight);
+    matBLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(matBLabel);
+
+    for (int i = 0; i < NUM_MATERIALS; ++i)
+        matBCombo.addItem(materialNames[i], i + 1);
+    matBCombo.setSelectedId(audioProcessor.getMaterialB() + 1, juce::dontSendNotification);
+    matBCombo.addListener(this);
+    matBCombo.setColour(juce::ComboBox::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(matBCombo);
+
+    // Blend mode combo
+    blendModeLabel.setText("BLEND", juce::dontSendNotification);
+    blendModeLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    blendModeLabel.setJustificationType(juce::Justification::centredRight);
+    blendModeLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(blendModeLabel);
+
+    blendModeCombo.addItem("Ring Mod",   1);
+    blendModeCombo.addItem("Spectral Max", 2);
+    blendModeCombo.addItem("AM",         3);
+    blendModeCombo.addItem("XOR",        4);
+    blendModeCombo.addItem("Interleave", 5);
+    blendModeCombo.setSelectedId(audioProcessor.getBlendMode() + 1, juce::dontSendNotification);
+    blendModeCombo.addListener(this);
+    viewport3D.addAndMakeVisible(blendModeCombo);
+
+    // Mix slider (horizontal, linear)
+    mixLabel.setText("MIX", juce::dontSendNotification);
+    mixLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    mixLabel.setJustificationType(juce::Justification::centredRight);
+    mixLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(mixLabel);
+
+    mixSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    mixSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    viewport3D.addAndMakeVisible(mixSlider);
+    mixAmountAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "mixAmount", mixSlider);
 
     // Set initial visualizer colors to match material
     oscilloscopeDisplay.setWaveformColour(
@@ -2688,10 +2731,13 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     // === RIGHT COLUMN: Spectrum + Oscilloscope + Controls ===
     setupLabel(spectrumLabel, "SPECTRUM", 13.0f, true);
     spectrumLabel.setColour(juce::Label::textColourId, ElementsColors::dim);
-    setupLabel(oscilloscopeLabel, "OSCILLOSCOPE", 13.0f, true);
+    setupLabel(oscilloscopeLabel, "OSC A", 13.0f, true);
     oscilloscopeLabel.setColour(juce::Label::textColourId, ElementsColors::dim);
+    setupLabel(oscilloscopeBLabel, "OSC B", 13.0f, true);
+    oscilloscopeBLabel.setColour(juce::Label::textColourId, ElementsColors::dim);
     addAndMakeVisible(spectrumDisplay);
     addAndMakeVisible(oscilloscopeDisplay);
+    addAndMakeVisible(oscilloscopeDisplayB);
     addAndMakeVisible(adsrDisplay);
     addAndMakeVisible(filterAdsrDisplay);
 
@@ -2761,7 +2807,7 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     volumeAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "volume", volumeSlider);
 
     startTimerHz(30);
-    setSize(1100, 770);
+    setSize(1100, 832);
 
     // Show splash overlay only once per plugin instance (processor survives editor destroy/recreate)
     if (!audioProcessor.splashShown)
@@ -2876,9 +2922,14 @@ void ElementsAudioProcessorEditor::resized()
     spectrumDisplay.setBounds(rightCol.removeFromTop(48));
     rightCol.removeFromTop(6);
 
-    // --- OSCILLOSCOPE ---
+    // --- OSCILLOSCOPE A ---
     oscilloscopeLabel.setBounds(rightCol.removeFromTop(14));
     oscilloscopeDisplay.setBounds(rightCol.removeFromTop(48));
+    rightCol.removeFromTop(4);
+
+    // --- OSCILLOSCOPE B ---
+    oscilloscopeBLabel.setBounds(rightCol.removeFromTop(14));
+    oscilloscopeDisplayB.setBounds(rightCol.removeFromTop(48));
     rightCol.removeFromTop(8);
 
     // --- FILTER section (framed) ---
@@ -2998,10 +3049,28 @@ void ElementsAudioProcessorEditor::resized()
     geoLabel.setBounds(8, comboY, 30, comboH);
     geoCombo.setBounds(40, comboY, 110, comboH);
 
-    // Material — center
-    int matX = vpW / 2 - 75;
-    matLabel.setBounds(matX, comboY, 30, comboH);
-    matCombo.setBounds(matX + 32, comboY, 120, comboH);
+    // Material A — center-left, Material B — center-right
+    int matTotalW = 320;  // total width for A + B labels + combos
+    int matStartX = vpW / 2 - matTotalW / 2;
+    int labelW = 38;
+    int comboW = 116;
+    int matGap = 8;
+    matLabel.setBounds(matStartX, comboY, labelW, comboH);
+    matCombo.setBounds(matStartX + labelW + 2, comboY, comboW, comboH);
+    matBLabel.setBounds(matStartX + labelW + 2 + comboW + matGap, comboY, labelW, comboH);
+    matBCombo.setBounds(matStartX + labelW + 2 + comboW + matGap + labelW + 2, comboY, comboW, comboH);
+
+    // Blend mode + Mix slider — second row (below materials)
+    int row2Y = comboY + comboH + 4;
+    int blendLabelW = 42;
+    int blendComboW = 110;
+    int mixLabelW = 30;
+    int mixSliderW = 120;
+    int row2StartX = matStartX;
+    blendModeLabel.setBounds(row2StartX, row2Y, blendLabelW, comboH);
+    blendModeCombo.setBounds(row2StartX + blendLabelW + 2, row2Y, blendComboW, comboH);
+    mixLabel.setBounds(row2StartX + blendLabelW + 2 + blendComboW + matGap, row2Y, mixLabelW, comboH);
+    mixSlider.setBounds(row2StartX + blendLabelW + 2 + blendComboW + matGap + mixLabelW + 2, row2Y, mixSliderW, comboH);
 
     // Thickness — right
     int thkSliderW = 100;
@@ -3099,7 +3168,20 @@ void ElementsAudioProcessorEditor::comboBoxChanged(juce::ComboBox* combo)
         pianoRoll.setHighlightColour(accent);
         repaint();
     }
-    // Filter type is handled by APVTS attachment (DAW-automatable)
+    else if (combo == &matBCombo)
+    {
+        int matIndex = matBCombo.getSelectedId() - 1;
+        audioProcessor.setMaterialB(matIndex);
+        auto accentB = MaterialAccents::getAccentForMaterial(matIndex);
+        matBCombo.setColour(juce::ComboBox::textColourId, accentB);
+        oscilloscopeDisplayB.setWaveformColour(accentB);
+    }
+    else if (combo == &blendModeCombo)
+    {
+        int mode = blendModeCombo.getSelectedId() - 1;
+        audioProcessor.setBlendModeUI(mode);
+    }
+    // Filter type and mix amount are handled by APVTS attachments
 }
 
 void ElementsAudioProcessorEditor::labelTextChanged(juce::Label* label)

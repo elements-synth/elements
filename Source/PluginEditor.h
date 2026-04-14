@@ -212,7 +212,7 @@ class OscilloscopeDisplay : public juce::Component,
                             public juce::Timer
 {
 public:
-    OscilloscopeDisplay(ElementsAudioProcessor& p);
+    OscilloscopeDisplay(ElementsAudioProcessor& p, bool isOscB = false);
     ~OscilloscopeDisplay() override;
 
     void paint(juce::Graphics& g) override;
@@ -223,6 +223,7 @@ public:
 
 private:
     ElementsAudioProcessor& processor;
+    bool useOscB = false;
     std::array<float, 512> waveformBuffer{};
     int writePosition = 0;
     juce::Colour waveformColour { 0xFF4A90E2 };
@@ -978,8 +979,8 @@ private:
     juce::TextButton helpButton{"?"};
     HelpOverlay helpOverlay;
     SplashOverlay splashOverlay;
-    juce::ComboBox geoCombo, matCombo;
-    juce::Label geoLabel, matLabel;
+    juce::ComboBox geoCombo, matCombo, matBCombo, blendModeCombo;
+    juce::Label geoLabel, matLabel, matBLabel, blendModeLabel;
 
     // === LEFT COLUMN: Viewport + Lights ===
     Viewport3D viewport3D;
@@ -1007,9 +1008,14 @@ private:
     PianoRoll pianoRoll;
 
     // === RIGHT COLUMN: Visualizers + Controls ===
-    juce::Label spectrumLabel, oscilloscopeLabel;
+    juce::Label spectrumLabel, oscilloscopeLabel, oscilloscopeBLabel;
     SpectrumDisplay spectrumDisplay;
     OscilloscopeDisplay oscilloscopeDisplay;
+    OscilloscopeDisplay oscilloscopeDisplayB;
+
+    // Mix/blend slider (in viewport overlay, second row)
+    juce::Label mixLabel;
+    juce::Slider mixSlider;
     ADSRDisplay adsrDisplay;
     ADSRDisplay filterAdsrDisplay;
 
@@ -1062,6 +1068,7 @@ private:
     std::unique_ptr<SliderAttachment> rimIntensityAttachment;
     std::unique_ptr<ComboBoxAttachment> envModeAttachment;
     std::unique_ptr<SliderAttachment> volumeAttachment;
+    std::unique_ptr<SliderAttachment> mixAmountAttachment;
 
     // === Helpers ===
     void setupRotarySlider(juce::Slider& slider, double min, double max, double def);

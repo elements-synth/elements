@@ -139,6 +139,12 @@ public:
     // Oscilloscope (for visualization)
     const std::array<float, 512>& getOscilloscopeBuffer() const { return synth.getOscilloscopeBuffer(); }
     int getOscilloscopeWritePos() const { return synth.getOscilloscopeWritePos(); }
+    const std::array<float, 512>& getOscilloscopeBufferB() const { return synth.getOscilloscopeBufferB(); }
+    int getOscilloscopeWritePosB() const { return synth.getOscilloscopeWritePosB(); }
+
+    void setBlendModeUI(int mode) { synth.setBlendMode(mode); }
+    int getBlendMode() const { return synth.getBlendMode(); }
+    float getMixAmount() const { return synth.getMixAmount(); }
 
     // ==============================================================================
     // AUTOMATABLE PARAMETERS (exposed to DAW / Bitwig modulators)

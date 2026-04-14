@@ -441,6 +441,10 @@ public:
 
     const std::array<float, 512>& getOscilloscopeBuffer() const { return oscilloscopeBuffer; }
     int getOscilloscopeWritePos() const { return oscilloscopeWritePos; }
+    const std::array<float, 512>& getOscilloscopeBufferB() const { return oscilloscopeBufferB; }
+    int getOscilloscopeWritePosB() const { return oscilloscopeWritePosB; }
+    int getBlendMode() const { return blendMode; }
+    float getMixAmount() const { return mixAmount; }
 
 private:
     // --- Internal Methods ---
@@ -561,9 +565,11 @@ private:
     float volume = 0.95f;
     bool hasActiveLights = true;  // False when all lights are OFF → silence
 
-    // Oscilloscope buffer
+    // Oscilloscope buffers (A = main output, B = raw Osc B signal from first active voice)
     std::array<float, 512> oscilloscopeBuffer{};
     int oscilloscopeWritePos = 0;
+    std::array<float, 512> oscilloscopeBufferB{};
+    int oscilloscopeWritePosB = 0;
 
     // Track previous active voice count (for filter reset on silence→sound)
     int prevActiveVoiceCount = 0;
