@@ -3071,22 +3071,26 @@ void ElementsAudioProcessorEditor::resized()
     matBLabel.setBounds(matStartX + labelW + 2 + comboW + matGap, comboY, labelW, comboH);
     matBCombo.setBounds(matStartX + labelW + 2 + comboW + matGap + labelW + 2, comboY, comboW, comboH);
 
-    // Blend mode + Mix + Detune sliders — second row (below materials)
+    // Row 2: BLEND combo + MIX slider (below materials)
     int row2Y = comboY + comboH + 4;
     int blendLabelW = 42;
     int blendComboW = 110;
     int mixLabelW = 30;
     int mixSliderW = 110;
-    int detuneLabelW = 48;
-    int detuneSliderW = 110;
     int row2StartX = matStartX;
     int x2 = row2StartX;
     blendModeLabel.setBounds(x2, row2Y, blendLabelW, comboH);  x2 += blendLabelW + 2;
-    blendModeCombo.setBounds(x2, row2Y, blendComboW, comboH);  x2 += blendComboW + matGap;
+    blendModeCombo.setBounds(x2, row2Y, blendComboW, comboH);  x2 += blendComboW + 8;
     mixLabel.setBounds(x2, row2Y, mixLabelW, comboH);          x2 += mixLabelW + 2;
-    mixSlider.setBounds(x2, row2Y, mixSliderW, comboH);        x2 += mixSliderW + matGap;
-    detuneLabel.setBounds(x2, row2Y, detuneLabelW, comboH);    x2 += detuneLabelW + 2;
-    detuneSlider.setBounds(x2, row2Y, detuneSliderW, comboH);
+    mixSlider.setBounds(x2, row2Y, mixSliderW, comboH);
+
+    // Row 3: DETUNE slider — below the blend combo, same left edge
+    int row3Y = row2Y + comboH + 4;
+    int detuneLabelW = 48;
+    int detuneSliderW = 110;
+    int x3 = row2StartX;
+    detuneLabel.setBounds(x3, row3Y, detuneLabelW, comboH);    x3 += detuneLabelW + 2;
+    detuneSlider.setBounds(x3, row3Y, detuneSliderW, comboH);
 
     // Thickness — right
     int thkSliderW = 100;
