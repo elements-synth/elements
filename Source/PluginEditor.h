@@ -1016,6 +1016,8 @@ private:
     // Mix/blend slider (in viewport overlay, second row)
     juce::Label mixLabel;
     juce::Slider mixSlider;
+    juce::Label detuneLabel;
+    juce::Slider detuneSlider;
     ADSRDisplay adsrDisplay;
     ADSRDisplay filterAdsrDisplay;
 
@@ -1069,6 +1071,7 @@ private:
     std::unique_ptr<ComboBoxAttachment> envModeAttachment;
     std::unique_ptr<SliderAttachment> volumeAttachment;
     std::unique_ptr<SliderAttachment> mixAmountAttachment;
+    std::unique_ptr<SliderAttachment> oscBDetuneAttachment;
 
     // === Helpers ===
     void setupRotarySlider(juce::Slider& slider, double min, double max, double def);

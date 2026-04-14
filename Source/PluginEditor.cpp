@@ -2631,6 +2631,17 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     viewport3D.addAndMakeVisible(mixSlider);
     mixAmountAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "mixAmount", mixSlider);
 
+    detuneLabel.setText("DETUNE", juce::dontSendNotification);
+    detuneLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    detuneLabel.setJustificationType(juce::Justification::centredRight);
+    detuneLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(detuneLabel);
+
+    detuneSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    detuneSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    viewport3D.addAndMakeVisible(detuneSlider);
+    oscBDetuneAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "oscBDetune", detuneSlider);
+
     // Set initial visualizer colors to match material
     oscilloscopeDisplay.setWaveformColour(
         MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
@@ -3060,17 +3071,22 @@ void ElementsAudioProcessorEditor::resized()
     matBLabel.setBounds(matStartX + labelW + 2 + comboW + matGap, comboY, labelW, comboH);
     matBCombo.setBounds(matStartX + labelW + 2 + comboW + matGap + labelW + 2, comboY, comboW, comboH);
 
-    // Blend mode + Mix slider — second row (below materials)
+    // Blend mode + Mix + Detune sliders — second row (below materials)
     int row2Y = comboY + comboH + 4;
     int blendLabelW = 42;
     int blendComboW = 110;
     int mixLabelW = 30;
-    int mixSliderW = 120;
+    int mixSliderW = 110;
+    int detuneLabelW = 48;
+    int detuneSliderW = 110;
     int row2StartX = matStartX;
-    blendModeLabel.setBounds(row2StartX, row2Y, blendLabelW, comboH);
-    blendModeCombo.setBounds(row2StartX + blendLabelW + 2, row2Y, blendComboW, comboH);
-    mixLabel.setBounds(row2StartX + blendLabelW + 2 + blendComboW + matGap, row2Y, mixLabelW, comboH);
-    mixSlider.setBounds(row2StartX + blendLabelW + 2 + blendComboW + matGap + mixLabelW + 2, row2Y, mixSliderW, comboH);
+    int x2 = row2StartX;
+    blendModeLabel.setBounds(x2, row2Y, blendLabelW, comboH);  x2 += blendLabelW + 2;
+    blendModeCombo.setBounds(x2, row2Y, blendComboW, comboH);  x2 += blendComboW + matGap;
+    mixLabel.setBounds(x2, row2Y, mixLabelW, comboH);          x2 += mixLabelW + 2;
+    mixSlider.setBounds(x2, row2Y, mixSliderW, comboH);        x2 += mixSliderW + matGap;
+    detuneLabel.setBounds(x2, row2Y, detuneLabelW, comboH);    x2 += detuneLabelW + 2;
+    detuneSlider.setBounds(x2, row2Y, detuneSliderW, comboH);
 
     // Thickness — right
     int thkSliderW = 100;
