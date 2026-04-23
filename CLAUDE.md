@@ -15,21 +15,28 @@ Audio plugin (VST3/AU/Standalone) — a spectral synthesizer where materials (di
 - **Target**: macOS 11.0+, Universal Binary (arm64 + x86_64), formats: Standalone, AU, VST3
 
 ## Build Commands
+
+> **DEFAULT**: Always build VST3. Only build Standalone when explicitly requested.
+
 ```bash
-# Build VST3 Release — Universal Binary (ALWAYS use this for distribution)
+# DEFAULT — Build VST3 Debug (active arch, fast iteration)
+xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - VST3" -configuration Debug build 2>&1 | tail -20
+
+# Build VST3 Release — Universal Binary (for distribution)
 xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - VST3" -configuration Release ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO build 2>&1 | tail -20
 
-# Build Standalone Release — Universal Binary
-xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - Standalone Plugin" -configuration Release ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO build 2>&1 | tail -20
-
-# Build Debug (active arch only, faster iteration)
+# Build Standalone Debug — only when explicitly requested
 xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - Standalone Plugin" -configuration Debug build 2>&1 | tail -20
 
-# Run standalone
+# Build Standalone Release — only when explicitly requested
+xcodebuild -project Builds/MacOSX/Elements.xcodeproj -scheme "Elements - Standalone Plugin" -configuration Release ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO build 2>&1 | tail -20
+
+# Run standalone (only when explicitly requested)
 open Builds/MacOSX/build/Debug/Elements.app
 ```
 
 > **IMPORTANT**: Release builds MUST always include `ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO` flags to produce Universal Binaries. Projucer defaults to active arch only; these flags override that. Debug builds can use single arch for faster iteration.
+> **BITWIG**: After building VST3, recreate the instrument track in Bitwig (don't just rescan) to pick up parameter layout changes.
 
 ## Source Files
 
@@ -45,7 +52,7 @@ open Builds/MacOSX/build/Debug/Elements.app
 
 ### GUI Layout (PluginEditor)
 Three-column layout:
-- **Left**: Material buttons (8), Geometry selector (Cube/Sphere/Torus), Rotation fields (editable X/Y/Z), 3 light panels (Key/Fill/Rim)
+- **Left**: Material buttons (10), Geometry selector (Cube/Sphere/Torus/Dodeca), Rotation fields (editable X/Y/Z), 3 light panels (Key/Fill/Rim)
 - **Center**: OpenGL 3D Viewport (top), Piano Roll (bottom)
 - **Right**: Spectrum display, Oscilloscope, Filter (LP/HP/BP + cutoff + resonance), ADSR envelope, Volume
 
@@ -57,7 +64,7 @@ Three-column layout:
 - Dirty-flag optimization: only repaints when state changes
 
 ### Materials (10 total)
-Diamond, Ruby, Gold, Emerald, Sapphire, Amber, Amethyst, Topaz, Opal, Quartz — each has:
+Diamond, Water, Amber, Ruby, Gold, Emerald, Amethyst, Sapphire, Copper, Obsidian — each has:
 - `wavelengths[]` — nm values (50 samples from ~380-780nm)
 - `transmission[]` — 0.0 to 1.0 per wavelength
 - `refractiveIndex` — for Fresnel calculations
@@ -71,20 +78,35 @@ Diamond, Ruby, Gold, Emerald, Sapphire, Amber, Amethyst, Topaz, Opal, Quartz —
 - Each has spectral power distribution (50 wavelength samples)
 - Light positions defined in world space
 
-### Physics
-- **Multi-face spectral calculation** (`calculateSpectrumMultiFace`)
-  - Samples normals from all faces of geometry (Cube: 6 faces, Sphere: 32 samples, etc.)
-  - Per-face Fresnel reflectance (angle-dependent via rotation)
-  - Weighted contribution summation from all visible faces
-- **Spectrum calculation pipeline**:
-  1. Material transmission interpolation (50 wavelength samples)
-  2. Light spectral power distribution (SPD) multiplication
-  3. Fresnel factor per face
-  4. Beer-Lambert thickness absorption
-  5. Normalization by total light intensity
-  6. Per-material gain compensation
-- **Deformation** (Sphere only): Sinusoidal wavefolding adds harmonic complexity
-- Output spectrum drives harmonic amplitudes in the synth via `WavetableGenerator`
+### Materials
+Each `Material` struct now carries:
+- `wavelengths[]` / `transmission[]` — 8-point spectral curve (transmission for dielectrics, reflectance for metals)
+- `refractiveIndex` (n) — real part of complex IOR
+- `extinctionCoeff` (k) — imaginary part; 0 for dielectrics, ~2.83 for Gold/Copper
+- `metallicFactor` — 0 = pure dielectric path, 1 = pure metallic path
+
+### Physics — Two-Path Pipeline
+`calculateSpectrum()` blends two physically distinct paths based on `metallicFactor`:
+
+**Dielectric path** (metallicFactor = 0):
+- Real-valued Fresnel using material's actual n (bug fix: was hardcoded to 1.5 for all materials)
+- Strong angle-spectral shaping: blue wavelengths drop much faster with angle than red
+- Beer-Lambert thickness: `T^effectiveThickness` where `effectiveThickness = 1 + (thickness-1) * (1 - metallicFactor)`
+
+**Metallic path** (metallicFactor = 1):
+- Complex Fresnel: `F0 = ((n-1)²+k²) / ((n+1)²+k²)` → Schlick angle-dependent reflectance
+- transmission[] repurposed as spectral reflectance weights
+- Very weak angle-spectral shaping (metals barely change colour with angle)
+- Beer-Lambert does not apply (effectiveThickness → 1.0 for pure metals)
+
+**Blended** (0 < metallicFactor < 1): lerp between both path outputs. Thickness slider effect fades as metallicFactor increases.
+
+**Multi-face calculation** (`calculateSpectrumMultiFace`):
+- Samples normals from all faces of geometry (Cube: 6, Sphere: 32, Torus: ~128, Dodecahedron: 12)
+- Per-face Fresnel reflectance (angle-dependent via rotation matrix)
+- Weighted contribution summation from all visible faces
+- **Deformation** (Sphere only): noise bumps perturb normals, making Fresnel angle vary with rotation
+- Output spectrum → `WavetableGenerator` → harmonic amplitudes
 
 ### Synth Engine
 - **Single-oscillator architecture**: one wavetable oscillator per voice
@@ -104,16 +126,19 @@ Diamond, Ruby, Gold, Emerald, Sapphire, Amber, Amethyst, Topaz, Opal, Quartz —
 - Soft clipper (tanh) on master output
 - Audio buffer exposed for oscilloscope display
 
-## Current State (as of Apr 8, 2026)
+## Current State (as of Apr 18, 2026)
 - Full working prototype with **PBR shader rendering** (Cook-Torrance BRDF)
 - All features functional: materials, geometries, 3-point lighting, Fresnel physics, synth, MIDI
 - Hybrid rendering pipeline: GLSL shaders for geometry, fixed-function for grid/axes/gizmo/light indicators
 - **Audio clicks fixed** — comprehensive anti-click system implemented
 - **Rotation X/Y/Z exposed as DAW-automatable VST parameters** (0-360°)
-- **Volume is now APVTS parameter** (Apr 5, 2026) — DAW-automatable
+- **Volume is now APVTS parameter** — DAW-automatable
 - **Soft clipper implemented** — tanh output limiting reduces clipping
-- **Single-oscillator architecture** — one wavetable oscillator per voice with physics-driven spectral morphing
-- **Dual-oscillator infrastructure in progress** — branch `mix_materials`, points 1-3/6 done (APVTS params, dual WavetableSets, dual spectrum generation)
+- **Dual-oscillator feature points 1-5/6 done** — branch `mix_materials`; true dual-osc, 6 blend modes, preset system
+- **Accurate two-path optical physics** — dielectric vs metallic Fresnel pipeline; Beer-Lambert gated by metallicFactor
+- **Preset bug fixed** — materialB and blendMode combos bypass APVTS; now saved/loaded as manual XML attributes (same pattern as materialA)
+- **Deform volume normalized** — wavefolding now uses `sin(drive*x)/drive`; small-signal gain stays at 1 regardless of deformAmount
+- **Dielectric colors vivid at low thickness** — shader Beer-Lambert adds +0.7 visual offset so materials show rich color even at minimum thickness (audio unaffected)
 
 ### PBR Shader Pipeline (implemented)
 - `Source/Shaders.h` — vertex + fragment GLSL shaders as `constexpr const char*`
@@ -179,15 +204,15 @@ All parameters exposed to DAW automation:
 - `envMode` (0=Classic, 1=Physical)
 
 **Physics**:
-- `thickness` (0.1mm - 50mm, Beer-Lambert absorption)
+- `thickness` (0.1 – 2.0, Beer-Lambert absorption)
 - `rotationX`, `rotationY`, `rotationZ` (0-360°)
 
 **Lighting**:
-- `lightIntensityKey`, `lightIntensityFill`, `lightIntensityRim` (0.0 - 2.0)
+- `lightIntensityKey`, `lightIntensityFill`, `lightIntensityRim` (0.0 – 1.0)
 
 **Deformation** (Sphere only):
-- `deformAmount` (0.0 - 1.0)
-- `deformFrequency` (0.1 - 10.0)
+- `deformAmount` (0.0 – 1.0)
+- `deformFrequency` (0.5 – 10.0)
 
 **Master**:
 - `volume` (0.0 - 1.0) — **Added Apr 5, 2026**
@@ -204,89 +229,98 @@ All parameters exposed to DAW automation:
 
 ### Dual-Oscillator Material Mixing (IN PROGRESS — branch `mix_materials`)
 
-**Status**: Points 1-3 of 6 complete (commit `becb016`, Apr 8, 2026)
+**Status**: Points 1–5 complete (Apr 17, 2026). Point 6 pending.
 
-**Goal**: Add a second independent oscillator to enable richer timbres and advanced sound design through spectral interaction, not just linear mixing.
-
-#### Why Not Simple Mixing?
-Testing with two separate Elements instances in Bitwig (each with different material) showed that **mere addition of curves doesn't generate interesting timbres**. We need **interaction between spectra** to create complex, evolving sounds.
+**Goal**: Two fully independent oscillators, each with its own material/spectrum, interacting through sample-level blend modes.
 
 #### Implementation Plan — 6 Points
 
 **[DONE] Point 1 — APVTS Parameters**
-- `materialA` (0-9) — Material for Oscillator A (maps to legacy `material`)
-- `materialB` (0-9) — Material for Oscillator B
-- `blendMode` (0-4) — 0=Ring Mod, 1=Spectral Max, 2=AM, 3=XOR, 4=Interleave
-- `mixAmount` (0.0-1.0) — Dry/wet (0=only Osc A, 1=full blend)
-- `amDepth` (0.0-1.0) — AM modulation depth (mode 2 only)
-- `oscBDetune` (±100 cents) — Detune Oscillator B relative to A
-- Migration: legacy `material` state → `materialA`, `materialB=0`, `mixAmount=0`
+- `materialA` (0-9), `materialB` (0-9), `blendMode` (0-5), `mixAmount` (0.0-1.0)
+- `amDepth` (0.0-1.0) — modulation depth for AM and FM modes
+- `oscBDetune` (±100 cents) — detune Oscillator B relative to A
 
 **[DONE] Point 2 — SynthEngine Dual-Osc Infrastructure**
-- `spectrumA[50]`, `spectrumB[50]`, `pendingSpectrumA/B` fields
-- `currentWavetablesA`, `currentWavetablesB` (`WavetableSet`)
+- `currentWavetablesA`, `currentWavetablesB` (independent `WavetableSet`s)
 - `crossfadeA`, `crossfadeB` (`CrossfadeState`)
-- Fields: `blendMode`, `mixAmount`, `mixAmountSmooth`, `amDepth`, `oscBDetune`
 - Per-voice `phaseB` for independent Oscillator B phase
-- Methods: `setMaterialA/B()`, `setBlendMode()`, `setMixAmount()`, `setAMDepth()`, `setOscBDetune()`
-- Legacy: `setMaterial()` maps to `setMaterialA()`
+- `oscAMuted` flag for monitoring B in isolation
 
-**[DONE] Point 3 — Physics: Independent Spectrum Calculation + Dual Wavetable Generation**
+**[DONE] Point 3 — Physics: Independent Spectrum Calculation**
 - `calculateSpectrumForMaterial(int matIdx, spectrum[])` — full physics pipeline per material
 - `updateSpectrum()`: calculates `spectrumA` always, `spectrumB` only when `mixAmount > 0`
-- `regenerateWavetables()`: crossfadeA setup + generate `currentWavetablesA`; crossfadeB + `currentWavetablesB` when active
-- Both spectra share same rotation/lights/thickness (same physical context, independent optical properties)
+- `regenerateWavetables()`: generates `currentWavetablesA` always, `currentWavetablesB` when active
+- Both spectra share same rotation/lights/thickness
 
-**[TODO] Point 4 — SynthEngine processBlock: Oscillator B Playback + Blend Modes**
-- Replace stale refs: `currentWavetables` → `currentWavetablesA`, `crossfade` → `crossfadeA`
-- In `regenerateWavetables()`: compute blended spectrum for spectral modes (0, 1, 3, 4) → `currentWavetablesBlended`
-- Per-voice inner loop additions:
-  - Oscillator B reads `currentWavetablesBlended` (spectral modes) or `currentWavetablesB` (AM) at detuned frequency (`voice.phaseB`)
-  - Advance `phaseB` with `phaseIncrement * detuneRatio`
-  - Blend modes at sample level:
-    - Modes 0/1/3/4 (spectral): `output = lerp(sampleA, sampleBlended, mixAmountSmooth)`
-    - Mode 2 (AM): `output = sampleA * (1.0 + amDepth * sampleB)`
-- `mixAmountSmooth`: per-block smoothing to avoid zipper noise on mix changes
-- Guard: when `mixAmount < 0.001`, skip all Osc B work (backward compatible, zero CPU overhead)
-- Update `crossfadeA/B` progress at end of block (replace old `crossfade` block)
+**[DONE] Point 4 — True Dual-Oscillator processBlock + Sample-Level Blend Modes**
+- Both oscillators always read their own pure wavetable (`currentWavetablesA` / `currentWavetablesB`)
+- All blend modes operate at sample level: `lerp(sampleA, blended, mixT)`
+- `mixAmountSmooth` smooths the mix parameter per block to avoid zipper noise
+- `setBlendMode()` calls `updateSpectrum()` to keep wavetables current
+- `setMixAmount()` triggers `updateSpectrum()` when first activating dual-osc (crossing 0.001)
+- Oscilloscope B always captures from `currentWavetablesB` (pure B), independent of blend mode
 
-**[TODO] Point 5 — Viewport3D: Visual Material Blending in PBR Shader**
-- Pass `materialA`, `materialB`, `mixAmount` as uniforms to fragment shader
-- Interpolate PBR visual properties: `color = mix(colorA, colorB, mixAmount)`; same for `metallic`, `roughness`
-- Blend mode visual variants (optional): Ring Mod → `colorA * colorB`; Max → `max(colorA, colorB)`
-- Physics/audio still uses **separate, pure material properties** — visual blend is cosmetic only
+**[DONE] Point 5 — Viewport3D: Visual Material Blending in PBR Shader**
+- All PBR properties (metallic, roughness, IOR, transparency, SSS) lerped CPU-side before shader
+- Albedo uses alloy model: `alloy = sqrt(colorA * colorB)`, `result = lerp(colorA, alloy, mix)`
+  - mix=0 → pure A, mix=1 → alloy colour (neither A nor B)
+  - Physically motivated for dielectrics (optical filter product); consistent approximation for metals
 
-**[TODO] Point 6 — UI: Dual Material Controls**
-- Material selector becomes **dual row**: Material A (top) | Material B (bottom), 10 buttons each
-- Blend mode selector: 5 buttons (RING / MAX / AM / XOR / INT) with icons
-- Mix Amount slider (0-100%) — always visible
-- Detune slider ±100 cents — always visible
-- AM Depth slider — visible only when blend mode = AM
-- Spectrum display: show spectrumA (dim) + spectrumB (dim) + blended result (bright) as overlaid curves
+**[TODO] Point 6 — UI: Full Dual Material Controls**
+- Dual material selector (proper button grid, not combos)
+- Blend mode buttons with icons
+- Spectrum display showing A + B + interaction curves
+- **This is now part of the larger UI reorganization effort below — implement Point 6 within the new tab-based layout, not as a further overlay on the viewport**
+
+#### Current UI (Minimal, in viewport overlay) — CLUTTERED, pending redesign
+Row 1: GEO | MAT A [combo] | MAT B [combo] | THICKNESS [slider]
+Row 2: BLEND [combo] | MIX [slider]
+Row 3: DETUNE [slider] | DEPTH [slider] | MUTE A [button]
+Below thickness: DEFORM [slider]
+Left side (vertical): X/Y/Z rotation fields + RESET
+Bottom: 3 light panels (Key / Fill / Rim) spanning full width
+
+#### Six Blend Modes (all sample-level, true dual-oscillator)
+
+| # | Name | Formula | Character |
+|---|------|---------|-----------|
+| 0 | Ring Mod | `A * B` | Sidebands, metallic, inharmonic |
+| 1 | Max | `abs(A)>abs(B) ? A : B` | Waveshaping, picks dominant signal |
+| 2 | AM | `A * (1 + depth * B)` | Classic AM, depth controls modulation |
+| 3 | Difference | `\|A-B\|` with sign | Spectral subtraction, hollow timbres |
+| 4 | Crossfade | `lerp(A, B, 0.5)` | Simple timbre blend, mix controls ratio |
+| 5 | FM | phase of A modulated by B | Rich inharmonics, depth = FM index |
 
 #### Architecture Notes
 
-**Spectral vs Sample-Level Blend Modes**:
-- Modes 0 (Ring Mod), 1 (Spectral Max), 3 (XOR), 4 (Interleave): blend happens at **spectrum level** in `regenerateWavetables` → generates `currentWavetablesBlended`; processBlock plays one oscillator per voice from blended wavetable plus optionally a detuned second oscillator for thickness
-- Mode 2 (AM): blend happens at **sample level** in processBlock; true two-oscillator playback (A as carrier, B as modulator)
+**True dual-oscillator**: both oscillators always run independently. `currentWavetablesBlended` was removed — there is no pre-baked blend. All interaction happens in the per-sample inner loop.
 
-**Why Separate Spectra, Not Mixed Material Properties?**
-- IOR mixing is not physically valid (Emerald IOR + Gold IOR averaged ≠ realistic alloy)
-- Each material maintains true optical properties through full physics pipeline
-- Blend modes create interaction at spectral/audio level — musically flexible
-- Enables future: independent rotation per material, per-material lighting
+**Backward Compatibility**: `mixAmount = 0.0` → `dualOscActive = false`, zero CPU overhead, identical to single-osc.
 
-**Backward Compatibility**: `mixAmount = 0.0` → behaves exactly as single-osc version, no CPU overhead
+**State save/load pattern**: materialB and blendMode combos call synth setters directly (bypassing APVTS). They are therefore saved/loaded as manual XML attributes in `getStateInformation`/`setStateInformation`, same as materialA and geometry. Do NOT rely on APVTS for these values.
 
-#### Five Blend Modes Reference
+**blendMode APVTS**: Fixed — `AudioParameterChoice` now has all 6 items (0=Ring Mod, 1=Max, 2=AM, 3=Difference, 4=Crossfade, 5=FM). FM is fully automatable.
 
-| # | Name | Formula | Effect |
-|---|------|---------|--------|
-| 0 | Ring Mod | `C[h] = A[h] * B[h]` | Metallic, suppresses weak harmonics |
-| 1 | Spectral Max | `C[h] = max(A[h], B[h])` | Hybrid envelope, no saturation |
-| 2 | AM | `out = A * (1 + depth * B)` | Sidebands, preserves fundamental |
-| 3 | XOR | `C[h] = |A[h] - B[h]|` | Spectral holes, difference timbres |
-| 4 | Interleave | even→A, odd→B | Hollow/nasal entangled spectrum |
+### UI Reorganization — DONE (Apr 22, 2026)
+
+**Implemented**: `ViewportAccordion` — semi-transparent collapsible overlay at the top of the viewport. Two groups, both closed by default. Multiple groups can be open simultaneously.
+
+**New viewport overlay layout:**
+- Top: accordion header bar (28px, always visible) with `[▶ GEO]` and `[▶ MAT]` toggle sections
+  - GEO panel (left half, ~108px tall when open): GEO combo, Thickness slider, Deform slider
+  - MAT panel (right half, ~224px tall when open): MAT A combo, MAT B combo, BLEND combo, MIX slider, DETUNE slider, DEPTH slider, MUTE A button
+- Bottom-left (above lights bar): X/Y/Z rotation fields + RESET in a horizontal row
+- Bottom-right (same height, from paint): "RMB Orbit  Scroll Zoom" hint — right-aligned
+- Bottom bar (unchanged): LIGHTS label + Key / Fill / Rim panels (full width, 64px)
+
+**Architecture notes:**
+- `AccordionPanel` and `ViewportAccordion` classes defined in `PluginEditor.h`
+- `hitTest()` override on accordion ensures clicks in transparent gaps pass through to viewport (gizmo/camera)
+- GEO/MAT controls reparented from viewport3D → accordion panels (APVTS attachments unaffected)
+- Rotation fields remain direct viewport3D children, repositioned to horizontal row
+- `onLayoutChanged` callback triggers `resized()` when a group opens/closes
+
+**Key constraint respected**: OpenGL context not disturbed; accordion sits as a JUCE component child of viewport3D, above the GL surface.
 
 ### Task: ADSR Envelope Graph
 - [ ] ADSRDisplay component (visual curve of current ADSR)

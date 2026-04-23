@@ -723,6 +723,118 @@ private:
 };
 
 // ==============================================================================
+// VIEWPORT ACCORDION - Collapsible overlay panels (GEO / MAT)
+// ==============================================================================
+
+class AccordionPanel : public juce::Component
+{
+public:
+    AccordionPanel() { setInterceptsMouseClicks(true, true); }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.setColour(juce::Colour(0xA20D1117));
+        g.fillRect(getLocalBounds());
+        g.setColour(juce::Colour(0x20FFFFFF));
+        g.drawRect(getLocalBounds().toFloat(), 1.0f);
+    }
+};
+
+class ViewportAccordion : public juce::Component
+{
+public:
+    static constexpr int kHeaderH = 28;
+    static constexpr int kGeoPanH = 108;
+    static constexpr int kMatPanH = 224;
+
+    std::function<void()> onLayoutChanged;
+    AccordionPanel geoPanel, matPanel;
+
+    ViewportAccordion()
+    {
+        setInterceptsMouseClicks(true, true);
+        addAndMakeVisible(geoPanel);  geoPanel.setVisible(false);
+        addAndMakeVisible(matPanel);  matPanel.setVisible(false);
+    }
+
+    bool isGeoOpen() const { return open[0]; }
+    bool isMatOpen() const { return open[1]; }
+
+    int getNeededHeight() const
+    {
+        int maxPH = 0;
+        if (open[0]) maxPH = juce::jmax(maxPH, kGeoPanH);
+        if (open[1]) maxPH = juce::jmax(maxPH, kMatPanH);
+        return kHeaderH + maxPH;
+    }
+
+    bool hitTest(int x, int y) override
+    {
+        if (y < kHeaderH) return true;
+        int half = getWidth() / 2;
+        if (x < half  && open[0] && y < kHeaderH + kGeoPanH) return true;
+        if (x >= half && open[1] && y < kHeaderH + kMatPanH) return true;
+        return false;
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        int w = getWidth();
+        int half = w / 2;
+
+        g.setColour(juce::Colour(0xA20D1117));
+        g.fillRect(0, 0, w, kHeaderH);
+
+        const char* labels[] = { "GEOMETRIES", "MATERIALS" };
+        for (int i = 0; i < 2; ++i)
+        {
+            int x = i * half;
+            if (open[i])
+            {
+                g.setColour(juce::Colour(0x18a8d8f0));
+                g.fillRect(x + 1, 1, half - 2, kHeaderH - 2);
+            }
+            if (i > 0)
+            {
+                g.setColour(juce::Colour(0x28FFFFFF));
+                g.drawVerticalLine(x, 2.0f, (float)(kHeaderH - 2));
+            }
+            juce::String arrow = open[i]
+                ? juce::String::charToString(0x25BC)   // ▼ open
+                : juce::String::charToString(0x25B6);  // ▶ closed
+            g.setColour(open[i] ? juce::Colour(0xFFa8d8f0) : juce::Colour(0xFF5A6A78));
+            g.setFont(juce::Font(11.5f, juce::Font::bold));
+            g.drawText(arrow + "  " + labels[i], x + 14, 0, half - 28, kHeaderH,
+                       juce::Justification::centredLeft);
+        }
+        g.setColour(juce::Colour(0x30FFFFFF));
+        g.drawHorizontalLine(kHeaderH, 0.0f, (float)w);
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        if (e.y >= kHeaderH) return;
+        int idx = e.x / (getWidth() / 2);
+        if (idx < 0 || idx > 1) return;
+        open[idx] = !open[idx];
+        (idx == 0 ? geoPanel : matPanel).setVisible(open[idx]);
+        resized();
+        repaint();
+        if (onLayoutChanged) onLayoutChanged();
+    }
+
+    void resized() override
+    {
+        int half = getWidth() / 2;
+        geoPanel.setBounds(0,    kHeaderH, half, open[0] ? kGeoPanH : 0);
+        matPanel.setBounds(half, kHeaderH, half, open[1] ? kMatPanH : 0);
+    }
+
+private:
+    bool open[2] = { false, false };
+};
+
+// ==============================================================================
 // SPLASH OVERLAY - Startup branding screen
 // ==============================================================================
 
@@ -979,11 +1091,24 @@ private:
     juce::TextButton helpButton{"?"};
     HelpOverlay helpOverlay;
     SplashOverlay splashOverlay;
+
+    // Preset system
+    juce::Label presetLabel;
+    juce::ComboBox presetCombo;
+    juce::TextButton savePresetButton{"SAVE"};
+    juce::TextButton deletePresetButton{"DEL"};
+    void savePreset();
+    void deletePreset();
+    void loadPreset(const juce::File& file);
+    void refreshPresetList();
+    juce::File getPresetsDir() const;
+    juce::File currentPresetFile;
     juce::ComboBox geoCombo, matCombo, matBCombo, blendModeCombo;
     juce::Label geoLabel, matLabel, matBLabel, blendModeLabel;
 
-    // === LEFT COLUMN: Viewport + Lights ===
+    // === LEFT COLUMN: Viewport + Accordion overlay + Lights ===
     Viewport3D viewport3D;
+    ViewportAccordion accordion;
 
     // Lights (kept as LightPanel for now, will become LightsBar in Phase 3)
     juce::Label lightsLabel;
@@ -1018,6 +1143,9 @@ private:
     juce::Slider mixSlider;
     juce::Label detuneLabel;
     juce::Slider detuneSlider;
+    juce::Label modDepthLabel;
+    juce::Slider modDepthSlider;
+    juce::TextButton oscAMuteButton{"MUTE A"};
     ADSRDisplay adsrDisplay;
     ADSRDisplay filterAdsrDisplay;
 
@@ -1072,6 +1200,7 @@ private:
     std::unique_ptr<SliderAttachment> volumeAttachment;
     std::unique_ptr<SliderAttachment> mixAmountAttachment;
     std::unique_ptr<SliderAttachment> oscBDetuneAttachment;
+    std::unique_ptr<SliderAttachment> modDepthAttachment;
 
     // === Helpers ===
     void setupRotarySlider(juce::Slider& slider, double min, double max, double def);

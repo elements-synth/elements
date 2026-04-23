@@ -306,13 +306,12 @@ void Viewport3D::paint(juce::Graphics& g)
         g.drawText("OpenGL not available", getLocalBounds(), juce::Justification::centred);
     }
 
-    // Viewport hints (Houdini-style)
-    auto bounds = getLocalBounds();
+    // Viewport hints (Houdini-style) — right-aligned above rotation row
     g.setColour(ElementsColors::text.withAlpha(0.35f));
     g.setFont(juce::Font(10.5f));
-    int hintY = bounds.getBottom() - 82;
-    g.drawText("RMB  Orbit    Scroll  Zoom", 12, hintY, 250, 14,
-               juce::Justification::centredLeft);
+    int hintY = getHeight() - 90;
+    g.drawText("RMB  Orbit    Scroll  Zoom", getWidth() - 214, hintY, 206, 14,
+               juce::Justification::centredRight);
 }
 
 void Viewport3D::resized()
@@ -1175,14 +1174,48 @@ void Viewport3D::renderGeometryPBR()
         { rimLightPosition.x,  rimLightPosition.y,  rimLightPosition.z }
     };
 
-    // Get PBR material properties
-    int matIdx = processor.getMaterial();
-    if (matIdx < 0 || matIdx >= NUM_MATERIALS) matIdx = 0;
-    const auto& mat = pbrMaterials[matIdx];
+    // Get PBR material properties — blend A and B by mixAmount
+    int matIdxA = processor.getMaterialA();
+    int matIdxB = processor.getMaterialB();
+    float mix = juce::jlimit(0.0f, 1.0f, processor.getMixAmount());
+    if (matIdxA < 0 || matIdxA >= NUM_MATERIALS) matIdxA = 0;
+    if (matIdxB < 0 || matIdxB >= NUM_MATERIALS) matIdxB = 0;
+
+    const auto& matA = pbrMaterials[matIdxA];
+    const auto& matB = pbrMaterials[matIdxB];
+
+    // Interpolate all PBR properties on the CPU — no shader changes needed
+    auto lerpf = [](float a, float b, float t) { return a + (b - a) * t; };
+    PBRMaterialProps mat;
+    mat.metallic         = lerpf(matA.metallic,      matB.metallic,      mix);
+    mat.roughness        = lerpf(matA.roughness,     matB.roughness,     mix);
+    mat.ior              = lerpf(matA.ior,            matB.ior,           mix);
+    mat.transparency     = lerpf(matA.transparency,  matB.transparency,  mix);
+    mat.sssStrength      = lerpf(matA.sssStrength,   matB.sssStrength,   mix);
+    mat.sssRadius        = lerpf(matA.sssRadius,     matB.sssRadius,     mix);
+    for (int c = 0; c < 3; ++c)
+        mat.absorptionColor[c] = lerpf(matA.absorptionColor[c], matB.absorptionColor[c], mix);
+
+    // Blend albedo colours — alloy model.
+    //
+    // Naive lerp: mix=0→A, mix=1→B (wrong: mix=1 should be the alloy, not pure B)
+    // Alloy model: alloy = sqrt(A*B) — fixed geometric mean in linear RGB space.
+    //              mix=0 → pure A,  mix=1 → alloy (neither A nor B)
+    //
+    // Physically: sqrt(A*B) is the optical filter product for dielectrics
+    // (transmission of A filtered through B). For metals it is an approximation.
+    // Works consistently across all material-type combinations.
+    juce::Colour colA = materialColour;  // set externally for mat A
+    juce::Colour colB = MaterialAccents::getAccentForMaterial(matIdxB);
+
+    float alloyR = std::sqrt(colA.getFloatRed()   * colB.getFloatRed());
+    float alloyG = std::sqrt(colA.getFloatGreen() * colB.getFloatGreen());
+    float alloyBch = std::sqrt(colA.getFloatBlue() * colB.getFloatBlue());
+
     float albedo[3] = {
-        materialColour.getFloatRed(),
-        materialColour.getFloatGreen(),
-        materialColour.getFloatBlue()
+        lerpf(colA.getFloatRed(),   alloyR,   mix),
+        lerpf(colA.getFloatGreen(), alloyG,   mix),
+        lerpf(colA.getFloatBlue(),  alloyBch, mix)
     };
 
     // Enable alpha blending for transparent materials
@@ -2554,18 +2587,58 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     helpButton.addListener(this);
     addAndMakeVisible(helpButton);
 
+    // Preset label
+    presetLabel.setText("PRESETS:", juce::dontSendNotification);
+    presetLabel.setFont(juce::Font(11.0f, juce::Font::bold));
+    presetLabel.setColour(juce::Label::textColourId, ElementsColors::mid);
+    presetLabel.setJustificationType(juce::Justification::centredRight);
+    addAndMakeVisible(presetLabel);
+
+    // Preset combo — editable so typing a name + clicking SAVE is all that's needed
+    presetCombo.setEditableText(true);
+    presetCombo.setTextWhenNothingSelected("type name or choose...");
+    presetCombo.setTextWhenNoChoicesAvailable("type a name and click SAVE");
+    presetCombo.setColour(juce::ComboBox::backgroundColourId, ElementsColors::bg2);
+    presetCombo.setColour(juce::ComboBox::textColourId, ElementsColors::mid);
+    presetCombo.setColour(juce::ComboBox::outlineColourId, ElementsColors::bg3);
+    presetCombo.onChange = [this]() {
+        int id = presetCombo.getSelectedId();
+        if (id >= 2) {
+            juce::Array<juce::File> files;
+            getPresetsDir().findChildFiles(files, juce::File::findFiles, false, "*.preset");
+            files.sort();
+            int idx = id - 2;
+            if (idx < files.size())
+                loadPreset(files[idx]);
+        }
+    };
+    addAndMakeVisible(presetCombo);
+    refreshPresetList();
+
+    // Save button
+    savePresetButton.setColour(juce::TextButton::buttonColourId, ElementsColors::bg3);
+    savePresetButton.setColour(juce::TextButton::textColourOffId, ElementsColors::mid);
+    savePresetButton.onClick = [this]() { savePreset(); };
+    addAndMakeVisible(savePresetButton);
+
+    // Delete button
+    deletePresetButton.setColour(juce::TextButton::buttonColourId, ElementsColors::bg3);
+    deletePresetButton.setColour(juce::TextButton::textColourOffId, ElementsColors::mid);
+    deletePresetButton.onClick = [this]() { deletePreset(); };
+    addAndMakeVisible(deletePresetButton);
+
     helpOverlay.setVisible(false);
     helpOverlay.onClose = [this]() { viewport3D.setVisible(true); };
     addChildComponent(helpOverlay);
 
     addChildComponent(splashOverlay);
 
-    // Geometry + Material dropdowns (floating inside viewport)
+    // === GEO accordion panel controls ===
     geoLabel.setText("GEO", juce::dontSendNotification);
     geoLabel.setFont(juce::Font(10.0f, juce::Font::bold));
     geoLabel.setJustificationType(juce::Justification::centred);
     geoLabel.setColour(juce::Label::textColourId, ElementsColors::text);
-    viewport3D.addAndMakeVisible(geoLabel);
+    accordion.geoPanel.addAndMakeVisible(geoLabel);
 
     geoCombo.addItem("Cube", 1);
     geoCombo.addItem("Sphere", 2);
@@ -2573,13 +2646,42 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     geoCombo.addItem("Dodeca", 4);
     geoCombo.setSelectedId(static_cast<int>(audioProcessor.getGeometry()) + 1, juce::dontSendNotification);
     geoCombo.addListener(this);
-    viewport3D.addAndMakeVisible(geoCombo);
+    accordion.geoPanel.addAndMakeVisible(geoCombo);
 
+    thicknessLabel.setText("Thickness", juce::dontSendNotification);
+    thicknessLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    thicknessLabel.setJustificationType(juce::Justification::centredLeft);
+    thicknessLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    accordion.geoPanel.addAndMakeVisible(thicknessLabel);
+
+    thicknessSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    thicknessSlider.setRange(0.1, 2.0, 0.01);
+    thicknessSlider.setValue(0.5);
+    thicknessSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
+    thicknessSlider.addListener(this);
+    accordion.geoPanel.addAndMakeVisible(thicknessSlider);
+    thicknessAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "thickness", thicknessSlider);
+
+    deformLabel.setText("Deform", juce::dontSendNotification);
+    deformLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    deformLabel.setJustificationType(juce::Justification::centredLeft);
+    deformLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    accordion.geoPanel.addAndMakeVisible(deformLabel);
+
+    deformSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    deformSlider.setRange(0.0, 1.0, 0.01);
+    deformSlider.setValue(0.0);
+    deformSlider.setDoubleClickReturnValue(true, 0.0);
+    deformSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
+    accordion.geoPanel.addAndMakeVisible(deformSlider);
+    deformAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "deformAmount", deformSlider);
+
+    // === MAT accordion panel controls ===
     matLabel.setText("MAT A", juce::dontSendNotification);
     matLabel.setFont(juce::Font(10.0f, juce::Font::bold));
     matLabel.setJustificationType(juce::Justification::centredRight);
     matLabel.setColour(juce::Label::textColourId, ElementsColors::text);
-    viewport3D.addAndMakeVisible(matLabel);
+    accordion.matPanel.addAndMakeVisible(matLabel);
 
     for (int i = 0; i < NUM_MATERIALS; ++i)
         matCombo.addItem(materialNames[i], i + 1);
@@ -2587,60 +2689,75 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     matCombo.addListener(this);
     matCombo.setColour(juce::ComboBox::textColourId,
                        MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial()));
-    viewport3D.addAndMakeVisible(matCombo);
+    accordion.matPanel.addAndMakeVisible(matCombo);
 
-    // Material B combo
     matBLabel.setText("MAT B", juce::dontSendNotification);
     matBLabel.setFont(juce::Font(10.0f, juce::Font::bold));
     matBLabel.setJustificationType(juce::Justification::centredRight);
     matBLabel.setColour(juce::Label::textColourId, ElementsColors::text);
-    viewport3D.addAndMakeVisible(matBLabel);
+    accordion.matPanel.addAndMakeVisible(matBLabel);
 
     for (int i = 0; i < NUM_MATERIALS; ++i)
         matBCombo.addItem(materialNames[i], i + 1);
     matBCombo.setSelectedId(audioProcessor.getMaterialB() + 1, juce::dontSendNotification);
     matBCombo.addListener(this);
     matBCombo.setColour(juce::ComboBox::textColourId, ElementsColors::text);
-    viewport3D.addAndMakeVisible(matBCombo);
+    accordion.matPanel.addAndMakeVisible(matBCombo);
 
-    // Blend mode combo
     blendModeLabel.setText("BLEND", juce::dontSendNotification);
     blendModeLabel.setFont(juce::Font(10.0f, juce::Font::bold));
     blendModeLabel.setJustificationType(juce::Justification::centredRight);
     blendModeLabel.setColour(juce::Label::textColourId, ElementsColors::text);
-    viewport3D.addAndMakeVisible(blendModeLabel);
+    accordion.matPanel.addAndMakeVisible(blendModeLabel);
 
-    blendModeCombo.addItem("Ring Mod",   1);
+    blendModeCombo.addItem("Ring Mod",    1);
     blendModeCombo.addItem("Spectral Max", 2);
-    blendModeCombo.addItem("AM",         3);
-    blendModeCombo.addItem("XOR",        4);
-    blendModeCombo.addItem("Interleave", 5);
+    blendModeCombo.addItem("AM",          3);
+    blendModeCombo.addItem("XOR",         4);
+    blendModeCombo.addItem("Interleave",  5);
+    blendModeCombo.addItem("FM",          6);
     blendModeCombo.setSelectedId(audioProcessor.getBlendMode() + 1, juce::dontSendNotification);
     blendModeCombo.addListener(this);
-    viewport3D.addAndMakeVisible(blendModeCombo);
+    accordion.matPanel.addAndMakeVisible(blendModeCombo);
 
-    // Mix slider (horizontal, linear)
     mixLabel.setText("MIX", juce::dontSendNotification);
     mixLabel.setFont(juce::Font(10.0f, juce::Font::bold));
     mixLabel.setJustificationType(juce::Justification::centredRight);
     mixLabel.setColour(juce::Label::textColourId, ElementsColors::text);
-    viewport3D.addAndMakeVisible(mixLabel);
+    accordion.matPanel.addAndMakeVisible(mixLabel);
 
     mixSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    mixSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    viewport3D.addAndMakeVisible(mixSlider);
+    mixSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
+    accordion.matPanel.addAndMakeVisible(mixSlider);
     mixAmountAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "mixAmount", mixSlider);
 
     detuneLabel.setText("DETUNE", juce::dontSendNotification);
     detuneLabel.setFont(juce::Font(10.0f, juce::Font::bold));
     detuneLabel.setJustificationType(juce::Justification::centredRight);
     detuneLabel.setColour(juce::Label::textColourId, ElementsColors::text);
-    viewport3D.addAndMakeVisible(detuneLabel);
+    accordion.matPanel.addAndMakeVisible(detuneLabel);
 
     detuneSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    detuneSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    viewport3D.addAndMakeVisible(detuneSlider);
+    detuneSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 18);
+    accordion.matPanel.addAndMakeVisible(detuneSlider);
     oscBDetuneAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "oscBDetune", detuneSlider);
+
+    setupLabel(modDepthLabel, "DEPTH", 10.0f, false);
+    accordion.matPanel.addAndMakeVisible(modDepthLabel);
+
+    modDepthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    modDepthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
+    accordion.matPanel.addAndMakeVisible(modDepthSlider);
+    modDepthAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "amDepth", modDepthSlider);
+
+    oscAMuteButton.setClickingTogglesState(true);
+    oscAMuteButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::orangered.darker(0.3f));
+    oscAMuteButton.onClick = [this]()
+    {
+        bool muted = oscAMuteButton.getToggleState();
+        audioProcessor.setOscAMuted(muted);
+    };
+    accordion.matPanel.addAndMakeVisible(oscAMuteButton);
 
     // Set initial visualizer colors to match material
     oscilloscopeDisplay.setWaveformColour(
@@ -2682,37 +2799,7 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     resetRotationButton.addListener(this);
     viewport3D.addAndMakeVisible(resetRotationButton);
 
-    // === Lights + Thickness (floating inside viewport bottom) ===
-
-    // Thickness — horizontal slider in viewport top bar
-    thicknessLabel.setText("Thickness", juce::dontSendNotification);
-    thicknessLabel.setFont(juce::Font(13.0f, juce::Font::bold));
-    thicknessLabel.setJustificationType(juce::Justification::centredLeft);
-    thicknessLabel.setColour(juce::Label::textColourId, ElementsColors::text);
-    viewport3D.addAndMakeVisible(thicknessLabel);
-
-    thicknessSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    thicknessSlider.setRange(0.1, 2.0, 0.01);
-    thicknessSlider.setValue(0.5);
-    thicknessSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    thicknessSlider.addListener(this);
-    viewport3D.addAndMakeVisible(thicknessSlider);
-    thicknessAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "thickness", thicknessSlider);
-
-    // Deform / Wavefolding — horizontal slider in viewport, below thickness
-    deformLabel.setText("Deform", juce::dontSendNotification);
-    deformLabel.setFont(juce::Font(13.0f, juce::Font::bold));
-    deformLabel.setJustificationType(juce::Justification::centredLeft);
-    deformLabel.setColour(juce::Label::textColourId, ElementsColors::text);
-    viewport3D.addAndMakeVisible(deformLabel);
-
-    deformSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    deformSlider.setRange(0.0, 1.0, 0.01);
-    deformSlider.setValue(0.0);
-    deformSlider.setDoubleClickReturnValue(true, 0.0);
-    deformSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    viewport3D.addAndMakeVisible(deformSlider);
-    deformAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "deformAmount", deformSlider);
+    // === Lights (floating inside viewport bottom) ===
 
     lightsLabel.setText("LIGHTS", juce::dontSendNotification);
     lightsLabel.setFont(juce::Font(10.0f, juce::Font::bold));
@@ -2734,6 +2821,10 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
         audioProcessor.apvts, "lightIntensityFill", fillLightPanel->getIntensitySlider());
     rimIntensityAttachment = std::make_unique<SliderAttachment>(
         audioProcessor.apvts, "lightIntensityRim", rimLightPanel->getIntensitySlider());
+
+    // === ACCORDION: added last so it renders on top of rotation/lights ===
+    accordion.onLayoutChanged = [this]() { resized(); };
+    viewport3D.addAndMakeVisible(accordion);
 
     // === CENTER COLUMN: Viewport + Piano ===
     addAndMakeVisible(viewport3D);
@@ -2918,6 +3009,10 @@ void ElementsAudioProcessorEditor::resized()
     // === Header: Logo + subtitle + Help button ===
     elementsLogo.setBounds(14, 8, 220, 38);
     helpButton.setBounds(bounds.getWidth() - 14 - 28, 14, 28, 28);
+    deletePresetButton.setBounds(helpButton.getX() - 6 - 38, 14, 38, 28);
+    savePresetButton.setBounds(deletePresetButton.getX() - 6 - 48, 14, 48, 28);
+    presetCombo.setBounds(savePresetButton.getX() - 8 - 200, 14, 200, 28);
+    presetLabel.setBounds(presetCombo.getX() - 6 - 62, 14, 62, 28);
     helpOverlay.setBounds(getLocalBounds());
     splashOverlay.setBounds(getLocalBounds());
     bounds.removeFromTop(56);
@@ -3048,93 +3143,86 @@ void ElementsAudioProcessorEditor::resized()
     auto leftCol = bounds.reduced(pad);
     viewport3D.setBounds(leftCol);
 
-    // Position floating UI inside viewport (local coordinates)
     int vpW = viewport3D.getWidth();
     int vpH = viewport3D.getHeight();
 
-    // --- Top bar: Geo (left) + Mat (center) + Thickness (right) ---
-    int comboY = 8;
-    int comboH = 24;
+    // === ACCORDION: full width, variable height at top of viewport ===
+    accordion.setBounds(0, 0, vpW, accordion.getNeededHeight());
 
-    // Geometry — left
-    geoLabel.setBounds(8, comboY, 30, comboH);
-    geoCombo.setBounds(40, comboY, 110, comboH);
+    // GEO panel controls (local coordinates of geoPanel)
+    if (accordion.isGeoOpen())
+    {
+        auto& pan = accordion.geoPanel;
+        int px = 10, py = 8, pw = pan.getWidth() - 20, rH = 24, gap = 7;
 
-    // Material A — center-left, Material B — center-right
-    int matTotalW = 320;  // total width for A + B labels + combos
-    int matStartX = vpW / 2 - matTotalW / 2;
-    int labelW = 38;
-    int comboW = 116;
-    int matGap = 8;
-    matLabel.setBounds(matStartX, comboY, labelW, comboH);
-    matCombo.setBounds(matStartX + labelW + 2, comboY, comboW, comboH);
-    matBLabel.setBounds(matStartX + labelW + 2 + comboW + matGap, comboY, labelW, comboH);
-    matBCombo.setBounds(matStartX + labelW + 2 + comboW + matGap + labelW + 2, comboY, comboW, comboH);
+        geoLabel.setBounds(px, py, 32, rH);
+        geoCombo.setBounds(px + 34, py, pw - 34, rH);
+        py += rH + gap;
 
-    // Row 2: BLEND combo + MIX slider (below materials)
-    int row2Y = comboY + comboH + 4;
-    int blendLabelW = 42;
-    int blendComboW = 110;
-    int mixLabelW = 30;
-    int mixSliderW = 110;
-    int row2StartX = matStartX;
-    int x2 = row2StartX;
-    blendModeLabel.setBounds(x2, row2Y, blendLabelW, comboH);  x2 += blendLabelW + 2;
-    blendModeCombo.setBounds(x2, row2Y, blendComboW, comboH);  x2 += blendComboW + 8;
-    mixLabel.setBounds(x2, row2Y, mixLabelW, comboH);          x2 += mixLabelW + 2;
-    mixSlider.setBounds(x2, row2Y, mixSliderW, comboH);
+        thicknessLabel.setBounds(px, py, 60, rH);
+        thicknessSlider.setBounds(px + 62, py + 2, pw - 62, rH - 4);
+        py += rH + gap;
 
-    // Row 3: DETUNE slider — below the blend combo, same left edge
-    int row3Y = row2Y + comboH + 4;
-    int detuneLabelW = 48;
-    int detuneSliderW = 110;
-    int x3 = row2StartX;
-    detuneLabel.setBounds(x3, row3Y, detuneLabelW, comboH);    x3 += detuneLabelW + 2;
-    detuneSlider.setBounds(x3, row3Y, detuneSliderW, comboH);
+        deformLabel.setBounds(px, py, 60, rH);
+        deformSlider.setBounds(px + 62, py + 2, pw - 62, rH - 4);
+    }
 
-    // Thickness — right
-    int thkSliderW = 100;
-    int thkLabelW = 58;
-    thicknessLabel.setBounds(vpW - 8 - thkSliderW - thkLabelW, comboY, thkLabelW, comboH);
-    thicknessSlider.setBounds(vpW - 8 - thkSliderW, comboY + 2, thkSliderW, comboH - 4);
+    // MAT panel controls (local coordinates of matPanel)
+    if (accordion.isMatOpen())
+    {
+        auto& pan = accordion.matPanel;
+        int px = 10, py = 8, pw = pan.getWidth() - 20, rH = 24, gap = 6;
 
-    // Deform — right, below thickness
-    int deformY = comboY + comboH + 4;
-    deformLabel.setBounds(vpW - 8 - thkSliderW - thkLabelW, deformY, thkLabelW, comboH);
-    deformSlider.setBounds(vpW - 8 - thkSliderW, deformY + 2, thkSliderW, comboH - 4);
+        matLabel.setBounds(px, py, 44, rH);
+        matCombo.setBounds(px + 46, py, pw - 46, rH);
+        py += rH + gap;
 
-    // --- Left side: Rotation X Y Z (vertical stack) + Reset ---
-    int rotFieldW = 44;
-    int rotLabelW = 28;
-    int rotH = 20;
-    int rotLx = 8;
-    int ry = 44;
+        matBLabel.setBounds(px, py, 44, rH);
+        matBCombo.setBounds(px + 46, py, pw - 46, rH);
+        py += rH + gap;
 
-    rotXLabel.setBounds(rotLx, ry, rotLabelW, rotH);
-    rotXValue.setBounds(rotLx + rotLabelW + 2, ry, rotFieldW, rotH);
-    ry += rotH + 3;
-    rotYLabel.setBounds(rotLx, ry, rotLabelW, rotH);
-    rotYValue.setBounds(rotLx + rotLabelW + 2, ry, rotFieldW, rotH);
-    ry += rotH + 3;
-    rotZLabel.setBounds(rotLx, ry, rotLabelW, rotH);
-    rotZValue.setBounds(rotLx + rotLabelW + 2, ry, rotFieldW, rotH);
-    ry += rotH + 4;
-    resetRotationButton.setBounds(rotLx, ry, rotLabelW + 2 + rotFieldW, rotH);
+        blendModeLabel.setBounds(px, py, 44, rH);
+        blendModeCombo.setBounds(px + 46, py, pw - 46, rH);
+        py += rH + gap;
 
-    // --- Bottom: Lights bar (two-row panels: toggle+combo / intensity slider) ---
+        mixLabel.setBounds(px, py, 30, rH);
+        mixSlider.setBounds(px + 32, py, pw - 32, rH);
+        py += rH + gap;
+
+        detuneLabel.setBounds(px, py, 44, rH);
+        detuneSlider.setBounds(px + 46, py, pw - 46, rH);
+        py += rH + gap;
+
+        modDepthLabel.setBounds(px, py, 44, rH);
+        modDepthSlider.setBounds(px + 46, py, pw - 46, rH);
+        py += rH + gap;
+
+        oscAMuteButton.setBounds(px, py, 74, rH);
+    }
+
+    // === ROTATION: vertical stack, bottom-left above lights bar ===
     int barH = 64;
     int barY = vpH - barH - 6;
-    int lx = 8;
+    int rotLW = 28, rotFW = 44, rotH = 20, rotGap = 3;
+    int rotLx = 8;
+    int ry = barY - 4 * (rotH + rotGap);
 
-    lightsLabel.setBounds(lx, barY, 46, barH);
-    lx += 48;
+    rotXLabel.setBounds(rotLx, ry, rotLW, rotH);
+    rotXValue.setBounds(rotLx + rotLW + 2, ry, rotFW, rotH);  ry += rotH + rotGap;
+    rotYLabel.setBounds(rotLx, ry, rotLW, rotH);
+    rotYValue.setBounds(rotLx + rotLW + 2, ry, rotFW, rotH);  ry += rotH + rotGap;
+    rotZLabel.setBounds(rotLx, ry, rotLW, rotH);
+    rotZValue.setBounds(rotLx + rotLW + 2, ry, rotFW, rotH);  ry += rotH + rotGap;
+    resetRotationButton.setBounds(rotLx, ry, rotLW + 2 + rotFW, rotH);
 
-    int lightW = (vpW - lx - 8) / 3;
-    keyLightPanel->setBounds(lx, barY + 4, lightW - 4, barH - 8);
-    lx += lightW;
-    fillLightPanel->setBounds(lx, barY + 4, lightW - 4, barH - 8);
-    lx += lightW;
-    rimLightPanel->setBounds(lx, barY + 4, lightW - 4, barH - 8);
+    // === LIGHTS: bottom bar — Key left, Fill center, Rim right ===
+    lightsLabel.setBounds(8, barY, 46, barH);
+    {
+        int lightW = (vpW - 16) / 3;
+        keyLightPanel->setBounds(8,              barY + 4, lightW - 4, barH - 8);
+        fillLightPanel->setBounds(8 + lightW,    barY + 4, lightW - 4, barH - 8);
+        rimLightPanel->setBounds(8 + lightW * 2, barY + 4, lightW - 4, barH - 8);
+    }
 }
 
 void ElementsAudioProcessorEditor::sliderValueChanged(juce::Slider* slider)
@@ -3202,6 +3290,7 @@ void ElementsAudioProcessorEditor::comboBoxChanged(juce::ComboBox* combo)
         audioProcessor.setBlendModeUI(mode);
     }
     // Filter type and mix amount are handled by APVTS attachments
+    // Preset loading is handled via presetCombo.onChange lambda
 }
 
 void ElementsAudioProcessorEditor::labelTextChanged(juce::Label* label)
@@ -3230,3 +3319,101 @@ void ElementsAudioProcessorEditor::labelTextChanged(juce::Label* label)
                                      audioProcessor.getRotationZ());
 }
 
+// ==============================================================================
+// PRESET SYSTEM
+// ==============================================================================
+
+juce::File ElementsAudioProcessorEditor::getPresetsDir() const
+{
+    juce::File dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                         .getChildFile("Application Support/Elements/Presets");
+    dir.createDirectory();
+    return dir;
+}
+
+void ElementsAudioProcessorEditor::refreshPresetList()
+{
+    // clear() resets selectedId to 0 and clears the label.
+    presetCombo.clear(juce::dontSendNotification);
+
+    // Set display text BEFORE adding items so setText() finds no match,
+    // leaving selectedId=0. This is the key: id=0 means any subsequent click
+    // on any item (even the same one) fires onChange.
+    if (currentPresetFile.existsAsFile())
+        presetCombo.setText(currentPresetFile.getFileNameWithoutExtension(),
+                            juce::dontSendNotification);
+
+    juce::Array<juce::File> files;
+    getPresetsDir().findChildFiles(files, juce::File::findFiles, false, "*.preset");
+    files.sort();
+
+    for (int i = 0; i < files.size(); ++i)
+        presetCombo.addItem(files[i].getFileNameWithoutExtension(), i + 2);
+}
+
+void ElementsAudioProcessorEditor::savePreset()
+{
+    juce::String name = presetCombo.getText().trim();
+    if (name.isEmpty()) return;
+
+    name = name.replaceCharacters("\\/:|*?\"<>", "_________");
+    juce::File file = getPresetsDir().getChildFile(name + ".preset");
+
+    juce::MemoryBlock data;
+    audioProcessor.getStateInformation(data);
+    auto xml = audioProcessor.getXmlFromBinary(data.getData(), (int)data.getSize());
+
+    if (xml != nullptr && xml->writeToFile(file, {}))
+    {
+        currentPresetFile = file;
+        refreshPresetList(); // shows name with id=0 so it stays re-selectable
+    }
+}
+
+void ElementsAudioProcessorEditor::deletePreset()
+{
+    // Only delete if a saved preset is currently selected
+    if (!currentPresetFile.existsAsFile()) return;
+
+    currentPresetFile.deleteFile();
+    currentPresetFile = juce::File{};
+    refreshPresetList();
+    presetCombo.setText("", juce::dontSendNotification);
+}
+
+void ElementsAudioProcessorEditor::loadPreset(const juce::File& file)
+{
+    if (!file.existsAsFile()) return;
+
+    auto xml = juce::XmlDocument::parse(file);
+    if (xml == nullptr) return;
+
+    juce::MemoryBlock data;
+    audioProcessor.copyXmlToBinary(*xml, data);
+    audioProcessor.setStateInformation(data.getData(), (int)data.getSize());
+
+    currentPresetFile = file;
+    refreshPresetList(); // sets display text + id=0 so the same preset is re-selectable
+
+    // Refresh UI combos to reflect loaded state
+    int matA = audioProcessor.getMaterialA();
+    int matB = audioProcessor.getMaterialB();
+    matCombo.setSelectedId(matA + 1, juce::dontSendNotification);
+    matBCombo.setSelectedId(matB + 1, juce::dontSendNotification);
+    geoCombo.setSelectedId(static_cast<int>(audioProcessor.getGeometry()) + 1, juce::dontSendNotification);
+    blendModeCombo.setSelectedId(audioProcessor.getBlendMode() + 1, juce::dontSendNotification);
+
+    auto accent = MaterialAccents::getAccentForMaterial(matA);
+    lookAndFeel.setAccent(accent);
+    matCombo.setColour(juce::ComboBox::textColourId, accent);
+    oscilloscopeDisplay.setWaveformColour(accent);
+    adsrDisplay.setEnvelopeColour(accent);
+    filterAdsrDisplay.setEnvelopeColour(accent);
+    pianoRoll.setHighlightColour(accent);
+
+    auto accentB = MaterialAccents::getAccentForMaterial(matB);
+    matBCombo.setColour(juce::ComboBox::textColourId, accentB);
+    oscilloscopeDisplayB.setWaveformColour(accentB);
+
+    repaint();
+}
