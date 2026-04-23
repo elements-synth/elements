@@ -42,9 +42,11 @@ struct Material
 {
     std::string name;
     std::array<float, 8> wavelengths;      // 8 puntos de muestreo (nm)
-    std::array<float, 8> transmission;     // Transmisión 0-1 en cada punto
+    std::array<float, 8> transmission;     // Transmisión/reflectancia 0-1 en cada punto
     std::string color;                      // Hex color para UI
-    float refractiveIndex = 1.5f;           // Index of refraction (IOR)
+    float refractiveIndex = 1.5f;           // Real part of complex IOR (n)
+    float extinctionCoeff = 0.0f;           // Imaginary part of complex IOR (k): 0 = dielectric, >0 = metal
+    float metallicFactor  = 0.0f;           // 0 = pure dielectric, 1 = pure metal — blends physics paths
 
     // Constructor por defecto (necesario para arrays)
     Material() = default;
@@ -54,8 +56,11 @@ struct Material
              const std::array<float, 8>& wl,
              const std::array<float, 8>& tr,
              const std::string& col,
-             float ior = 1.5f)
-        : name(n), wavelengths(wl), transmission(tr), color(col), refractiveIndex(ior) {}
+             float ior = 1.5f,
+             float k    = 0.0f,
+             float metal = 0.0f)
+        : name(n), wavelengths(wl), transmission(tr), color(col),
+          refractiveIndex(ior), extinctionCoeff(k), metallicFactor(metal) {}
 };
 
 /**

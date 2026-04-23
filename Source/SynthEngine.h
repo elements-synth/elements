@@ -351,6 +351,8 @@ public:
     void setMixAmount(float amount);
     void setAMDepth(float depth);
     void setOscBDetune(float cents);
+    void setOscAMuted(bool muted) { oscAMuted = muted; }
+    bool isOscAMuted() const { return oscAMuted; }
 
     // Legacy single-material support (maps to materialA for backward compatibility)
     void setMaterial(int materialIndex) { setMaterialA(materialIndex); }
@@ -493,8 +495,6 @@ private:
     CrossfadeState crossfadeB;
 
     // Blended wavetable for spectral modes (0=Ring, 1=Max, 3=XOR, 4=Interleave)
-    WavetableSet currentWavetablesBlended;
-    CrossfadeState crossfadeBlended;
 
     // Blend parameters
     int blendMode = 0;                      // 0=Ring Mod, 1=Spectral Max, 2=AM, 3=XOR, 4=Interleaving
@@ -502,6 +502,7 @@ private:
     float mixAmountSmooth = 0.0f;           // Smoothed version to avoid zipper noise
     float amDepth = 0.5f;                   // AM modulation depth (0.0-1.0)
     float oscBDetune = 0.0f;                // Oscillator B detune in cents (±100)
+    bool oscAMuted = false;                 // Mute Oscillator A for monitoring Osc B in isolation
 
     // Spectral amplitude - overall strength of the spectrum (affected by angle)
     // Used to modulate voice amplitude so rotation affects volume

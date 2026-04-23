@@ -206,8 +206,9 @@ static constexpr const char* pbrFragmentShader = R"(
 
             vec3 refractSample = sampleEnvMap(refractDir);
 
-            // Beer's law absorption using dynamic thickness parameter
-            vec3 absorption = exp(-u_thickness * (vec3(1.0) - u_absorptionColor) * 2.0);
+            // Beer's law absorption using dynamic thickness parameter.
+            // +0.7 offset ensures vivid material colors even at minimum thickness setting.
+            vec3 absorption = exp(-(u_thickness + 0.7) * (vec3(1.0) - u_absorptionColor) * 2.0);
             refractionColor = refractSample * absorption;
         }
 

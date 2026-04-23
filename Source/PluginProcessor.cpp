@@ -214,23 +214,15 @@ ElementsAudioProcessor::createParameterLayout()
     // 4. DUAL-OSCILLATOR MATERIAL MIXING PARAMETERS
     // =====================================================================
 
-    // Material A: 0-9 (10 materials), default 0 (Diamond)
-    layout.add(std::make_unique<juce::AudioParameterInt>(
-        juce::ParameterID{"materialA", 1},
-        "Material A",
-        0, 9, 0));
+    // materialA and materialB are NOT APVTS parameters — managed as manual XML
+    // attributes (same as geometry and blendMode) because DAW automation is not
+    // needed and APVTS would cause stale-value conflicts on preset load.
 
-    // Material B: 0-9 (10 materials), default 0 (Diamond)
-    layout.add(std::make_unique<juce::AudioParameterInt>(
-        juce::ParameterID{"materialB", 1},
-        "Material B",
-        0, 9, 0));
-
-    // Blend Mode: 0=Ring Mod, 1=Spectral Max, 2=AM, 3=XOR, 4=Interleaving
+    // Blend Mode: 0=Ring Mod, 1=Max, 2=AM, 3=Difference, 4=Crossfade, 5=FM
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"blendMode", 1},
         "Blend Mode",
-        juce::StringArray{"Ring Mod", "Spectral Max", "AM", "Spectral XOR", "Interleaving"},
+        juce::StringArray{"Ring Mod", "Max", "AM", "Difference", "Crossfade", "FM"},
         0));
 
     // Mix Amount: 0.0-1.0 (dry/wet), default 0.0
@@ -527,21 +519,8 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // Dual-oscillator material mixing
     {
-        // Material A
-        int matA = apvts.getRawParameterValue("materialA")->load();
-        if (matA != lastMaterialA)
-        {
-            synth.setMaterialA(matA);
-            lastMaterialA = matA;
-        }
-
-        // Material B
-        int matB = apvts.getRawParameterValue("materialB")->load();
-        if (matB != lastMaterialB)
-        {
-            synth.setMaterialB(matB);
-            lastMaterialB = matB;
-        }
+        // materialA and materialB are set directly via setMaterial/setMaterialB
+        // (not read from APVTS) — see getStateInformation/setStateInformation.
 
         // Blend Mode
         int mode = apvts.getRawParameterValue("blendMode")->load();
@@ -629,9 +608,12 @@ void ElementsAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // Crear un objeto XML para guardar el estado
     auto state = std::make_unique<juce::XmlElement>("ElementsState");
 
-    // Guardar parámetros manuales
-    state->setAttribute("material", synth.getMaterial());
-    state->setAttribute("geometry", static_cast<int>(synth.getGeometry()));
+    // Guardar parámetros manuales (stored directly from synth, not via APVTS,
+    // because their combos call synth setters directly rather than through APVTS)
+    state->setAttribute("material",   synth.getMaterial());
+    state->setAttribute("materialB",  synth.getMaterialB());
+    state->setAttribute("blendMode",  synth.getBlendMode());
+    state->setAttribute("geometry",   static_cast<int>(synth.getGeometry()));
 
     // Guardar estado de luces (enabled + source)
     for (int i = 0; i < 3; ++i)
@@ -663,30 +645,17 @@ void ElementsAudioProcessor::setStateInformation (const void* data, int sizeInBy
 
     if (state != nullptr && state->hasTagName("ElementsState"))
     {
-        // Migration: old single-material projects → dual-oscillator parameters
-        // Old projects stored "material" as XML attribute (not in APVTS)
-        // Migrate to materialA, set materialB = 0 (Diamond), mixAmount = 0 (disabled)
-        if (state->hasAttribute("material"))
-        {
-            int oldMat = state->getIntAttribute("material", 0);
-            auto* pMatA = apvts.getParameter("materialA");
-            auto* pMatB = apvts.getParameter("materialB");
-            auto* pMix = apvts.getParameter("mixAmount");
-
-            pMatA->setValueNotifyingHost(pMatA->convertTo0to1(static_cast<float>(oldMat)));
-            pMatB->setValueNotifyingHost(pMatB->convertTo0to1(0.0f));  // Diamond
-            pMix->setValueNotifyingHost(0.0f);  // Dual-osc disabled
-        }
-
-        // Restaurar parámetros manuales
-        // Note: setMaterial() maps to setMaterialA() for backward compatibility
+        // Restaurar parámetros manuales (material, geometry, blendMode — not in APVTS)
         synth.setMaterial(state->getIntAttribute("material", 0));
+        synth.setMaterialB(state->getIntAttribute("materialB", 0));
+        synth.setBlendMode(state->getIntAttribute("blendMode", 0));
+        lastBlendMode = synth.getBlendMode();
         synth.setGeometry(static_cast<Geometry>(state->getIntAttribute("geometry", 0)));
 
         // Restaurar estado de luces (enabled + source)
         for (int i = 0; i < 3; ++i)
         {
-            bool defaultEnabled = (i == 0);  // Key light on by default for old projects
+            bool defaultEnabled = (i == 0);
             synth.setLightEnabled(i, state->getBoolAttribute("lightEnabled" + juce::String(i), defaultEnabled));
             synth.setLightSource(i, state->getIntAttribute("lightSource" + juce::String(i), i));
         }

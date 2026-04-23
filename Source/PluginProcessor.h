@@ -145,6 +145,8 @@ public:
     void setBlendModeUI(int mode) { synth.setBlendMode(mode); }
     int getBlendMode() const { return synth.getBlendMode(); }
     float getMixAmount() const { return synth.getMixAmount(); }
+    void setOscAMuted(bool muted) { synth.setOscAMuted(muted); }
+    bool isOscAMuted() const { return synth.isOscAMuted(); }
 
     // ==============================================================================
     // AUTOMATABLE PARAMETERS (exposed to DAW / Bitwig modulators)
@@ -170,9 +172,7 @@ private:
     float lastDeformFrequency = 2.0f;
     float lastVolume = 0.95f;
 
-    // Dual-oscillator material mixing cache
-    int lastMaterialA = 0;
-    int lastMaterialB = 0;
+    // Dual-oscillator blend/mod cache (materialA/B managed directly via synth)
     int lastBlendMode = 0;
     float lastAmDepth = 0.5f;
     float lastOscBDetune = 0.0f;

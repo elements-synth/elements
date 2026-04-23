@@ -358,8 +358,9 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     // Dual-osc: prepare Osc B state for this block
     bool dualOscActive = (mixAmount > 0.001f);
     float detuneRatio = dualOscActive ? std::pow(2.0f, oscBDetune / 1200.0f) : 1.0f;
-    const WavetableSet* wavetablesBPtr = (blendMode == 2) ? &currentWavetablesB : &currentWavetablesBlended;
-    CrossfadeState* crossfadeBPtr = (blendMode == 2) ? &crossfadeB : &crossfadeBlended;
+    // Always use pure Osc B — all blend formulas operate at sample level
+    const WavetableSet* wavetablesBPtr = &currentWavetablesB;
+    CrossfadeState*     crossfadeBPtr  = &crossfadeB;
 
     float xfadeBStart = 0.0f, xfadeBEnd = 0.0f;
     if (dualOscActive && crossfadeBPtr->active)
@@ -485,6 +486,7 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                 float t = lerp(xfadeAStart, xfadeAEnd, static_cast<float>(i) / numSamples);
                 sampleA = lerp(oldSample, sampleA, t);
             }
+            if (oscAMuted) sampleA = 0.0f;
 
             // Oscillator B: read, crossfade, blend with A
             float sample = sampleA;
@@ -498,19 +500,64 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                     sampleB = lerp(oldSampleB, sampleB, t);
                 }
 
-                // Capture raw Osc B waveform for oscilloscope (first active voice only)
+                // Capture pure Osc B waveform for oscilloscope (always from currentWavetablesB,
+                // independent of blend mode so the display always shows the raw B oscillator)
                 if (!oscBVoiceCaptured)
                 {
-                    oscilloscopeBufferB[static_cast<size_t>(oscilloscopeWritePosB)] = sampleB;
+                    const auto& pureWavetableB = currentWavetablesB.getForFrequency(voice.frequency * detuneRatio);
+                    float pureSampleB = readWavetable(voice.phaseB, pureWavetableB);
+                    oscilloscopeBufferB[static_cast<size_t>(oscilloscopeWritePosB)] = pureSampleB;
                     oscilloscopeWritePosB = (oscilloscopeWritePosB + 1) % 512;
                 }
 
                 float mixT = lerp(mixAmountSmoothStart, mixAmountSmoothEnd, static_cast<float>(i) / numSamples);
 
-                if (blendMode == 2)
-                    sample = sampleA * (1.0f + amDepth * sampleB);  // AM: A is carrier, B modulates amplitude
+                if (oscAMuted)
+                {
+                    sample = sampleB;                                  // A muted: output B directly
+                }
                 else
-                    sample = lerp(sampleA, sampleB, mixT);           // Spectral modes: crossfade A → blended
+                {
+                    float blended;
+                    switch (blendMode)
+                    {
+                        case 0:  // Ring Mod: multiply — creates sidebands
+                            blended = sampleA * sampleB;
+                            break;
+                        case 1:  // Max: picks dominant sample — waveshaping effect
+                            blended = (std::abs(sampleA) > std::abs(sampleB)) ? sampleA : sampleB;
+                            break;
+                        case 2:  // AM: B modulates amplitude of A
+                            blended = sampleA * (1.0f + amDepth * sampleB);
+                            break;
+                        case 3:  // Difference: |A-B| — spectral subtraction effect
+                            blended = std::abs(sampleA - sampleB) * (sampleA >= sampleB ? 1.0f : -1.0f);
+                            break;
+                        case 4:  // Crossfade: simple linear mix of both timbres
+                            blended = lerp(sampleA, sampleB, 0.5f);
+                            break;
+                        case 5:  // FM: B modulates phase of A
+                        {
+                            float fmIndex = amDepth * 0.25f;
+                            float modPhase = voice.phase + fmIndex * sampleB;
+                            modPhase -= std::floor(modPhase);
+                            blended = readWavetable(modPhase, wavetableA);
+                            if (oldWavetableA != nullptr)
+                            {
+                                float t = lerp(xfadeAStart, xfadeAEnd, static_cast<float>(i) / numSamples);
+                                blended = lerp(readWavetable(modPhase, *oldWavetableA), blended, t);
+                            }
+                            break;
+                        }
+                        default:
+                            blended = sampleA;
+                            break;
+                    }
+                    // Mix scales continuously from pure A (0) to full blend result (1)
+                    // Exception: AM and FM are already scaled internally via amDepth/fmIndex,
+                    // but mix still gates dual-osc activation and provides coarse wet level.
+                    sample = lerp(sampleA, blended, mixT);
+                }
             }
 
             // Calculate envelope level with velocity
@@ -532,10 +579,11 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
 
             // Wavefolding: sinusoidal fold driven by deform amount (Sphere only)
             // drive=1 → sin(x)≈x (transparent), drive=15 → heavy folding + harmonics
+            // Divide by drive to normalize small-signal gain: sin(d*x)/d ≈ x for small x
             if (currentGeometry == Geometry::Sphere && deformAmount > 0.001f)
             {
                 float drive = 1.0f + deformAmount * 14.0f;  // 1 to 15
-                sample = std::sin(drive * sample);
+                sample = std::sin(drive * sample) / drive;
             }
 
             // Anti-click fade-in for NEW voices
@@ -901,15 +949,20 @@ void ElementsSynth::setMaterialB(int materialIndex)
 // Blend control setters
 void ElementsSynth::setBlendMode(int mode)
 {
-    if (mode >= 0 && mode <= 4)
+    if (mode >= 0 && mode <= 5)
     {
         blendMode = mode;
+        updateSpectrum();  // regenerate blended wavetable with new blend formula
     }
 }
 
 void ElementsSynth::setMixAmount(float amount)
 {
+    float prev = mixAmount;
     mixAmount = clamp(amount, 0.0f, 1.0f);
+    // Trigger regen when dual-osc first activates so B/blended wavetables get built
+    if (prev <= 0.001f && mixAmount > 0.001f)
+        updateSpectrum();
 }
 
 void ElementsSynth::setAMDepth(float depth)
@@ -1200,12 +1253,19 @@ void ElementsSynth::calculateSpectrumForMaterial(int matIndex, std::array<float,
     }
 
     // Beer-Lambert thickness: T_effective = T^thickness
-    // thickness < 1.0 = thinner walls = more transmission = brighter sound
-    // thickness > 1.0 = thicker walls = more absorption = darker/bassier sound
-    if (std::abs(thickness - 1.0f) > 0.001f)
+    // Only applies to the dielectric component — metals have no bulk transmission.
+    // For mixed materials, the effective exponent is scaled by (1 - metallicFactor):
+    //   pure dielectric → full thickness effect
+    //   pure metal      → effectiveThickness = 1.0 (no-op)
+    //   blended         → proportional attenuation
     {
-        for (int w = 0; w < NUM_WAVELENGTHS; ++w)
-            combinedSpectrum[w] = std::pow(std::max(combinedSpectrum[w], 0.001f), thickness);
+        float dielectricFraction = 1.0f - material.metallicFactor;
+        float effectiveThickness = 1.0f + (thickness - 1.0f) * dielectricFraction;
+        if (std::abs(effectiveThickness - 1.0f) > 0.001f)
+        {
+            for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+                combinedSpectrum[w] = std::pow(std::max(combinedSpectrum[w], 0.001f), effectiveThickness);
+        }
     }
 
     // Per-material gain compensation.
@@ -1352,33 +1412,6 @@ void ElementsSynth::regenerateWavetables()
         wavetableGen.generateBandLimitedSet(pendingSpectrumB, static_cast<float>(sampleRate), currentWavetablesB);
         spectrumB = pendingSpectrumB;
 
-        // Spectral blend modes (not AM): blend spectra → blended wavetable
-        if (blendMode != 2)
-        {
-            if (hasActiveVoices && !crossfadeBlended.active)
-            {
-                crossfadeBlended.oldTables = currentWavetablesBlended;
-                crossfadeBlended.progress = 0.0f;
-                crossfadeBlended.increment = 1.0f / (crossfadeDuration * static_cast<float>(sampleRate));
-                crossfadeBlended.active = true;
-            }
-
-            std::array<float, NUM_WAVELENGTHS> spectrumBlended;
-            for (int h = 0; h < NUM_WAVELENGTHS; ++h)
-            {
-                float a = spectrumA[h];
-                float b = spectrumB[h];
-                switch (blendMode)
-                {
-                    case 0: spectrumBlended[h] = a * b;             break;  // Ring Mod
-                    case 1: spectrumBlended[h] = std::max(a, b);    break;  // Spectral Max
-                    case 3: spectrumBlended[h] = std::abs(a - b);   break;  // XOR
-                    case 4: spectrumBlended[h] = (h % 2 == 0) ? a : b; break;  // Interleave
-                    default: spectrumBlended[h] = a; break;
-                }
-            }
-            wavetableGen.generateBandLimitedSet(spectrumBlended, static_cast<float>(sampleRate), currentWavetablesBlended);
-        }
     }
 
     regenPending = false;
