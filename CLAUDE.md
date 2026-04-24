@@ -53,8 +53,17 @@ open Builds/MacOSX/build/Debug/Elements.app
 ### GUI Layout (PluginEditor)
 Three-column layout:
 - **Left**: Material buttons (10), Geometry selector (Cube/Sphere/Torus/Dodeca), Rotation fields (editable X/Y/Z), 3 light panels (Key/Fill/Rim)
-- **Center**: OpenGL 3D Viewport (top), Piano Roll (bottom)
+- **Center**: OpenGL 3D Viewport with accordion overlay (top), Piano Roll (bottom)
 - **Right**: Spectrum display, Oscilloscope, Filter (LP/HP/BP + cutoff + resonance), ADSR envelope, Volume
+
+### 3D Viewport Overlay (accordion)
+Semi-transparent collapsible header at top of viewport (both groups closed by default):
+- `[▶ GEOMETRIES]` (left half): GEO combo, Thickness slider, Deform slider
+- `[▶ MATERIALS]` (right half): MAT A combo, MAT B combo, BLEND combo, MIX slider, DETUNE slider, DEPTH slider, MUTE A button
+- `hitTest()` override: transparent gaps pass clicks through to OpenGL gizmo/camera
+- Bottom-left of viewport: X/Y/Z rotation fields + RESET (vertical stack, above lights bar)
+- Bottom-right: "RMB Orbit  Scroll Zoom" hint text
+- Bottom bar (full width): Key / Fill / Rim light panels
 
 ### 3D Viewport (Viewport3D class)
 - Uses `juce::OpenGLRenderer` with legacy fixed-function OpenGL pipeline
@@ -126,7 +135,7 @@ Each `Material` struct now carries:
 - Soft clipper (tanh) on master output
 - Audio buffer exposed for oscilloscope display
 
-## Current State (as of Apr 18, 2026)
+## Current State (as of Apr 24, 2026)
 - Full working prototype with **PBR shader rendering** (Cook-Torrance BRDF)
 - All features functional: materials, geometries, 3-point lighting, Fresnel physics, synth, MIDI
 - Hybrid rendering pipeline: GLSL shaders for geometry, fixed-function for grid/axes/gizmo/light indicators
@@ -134,11 +143,13 @@ Each `Material` struct now carries:
 - **Rotation X/Y/Z exposed as DAW-automatable VST parameters** (0-360°)
 - **Volume is now APVTS parameter** — DAW-automatable
 - **Soft clipper implemented** — tanh output limiting reduces clipping
-- **Dual-oscillator feature points 1-5/6 done** — branch `mix_materials`; true dual-osc, 6 blend modes, preset system
+- **Dual-oscillator feature complete** — branch `mix_materials`; true dual-osc, 6 blend modes, preset system, accordion UI
 - **Accurate two-path optical physics** — dielectric vs metallic Fresnel pipeline; Beer-Lambert gated by metallicFactor
-- **Preset bug fixed** — materialB and blendMode combos bypass APVTS; now saved/loaded as manual XML attributes (same pattern as materialA)
+- **materialA/B removed from APVTS** — saved/loaded as manual XML attributes; processBlock no longer reads/overwrites them
 - **Deform volume normalized** — wavefolding now uses `sin(drive*x)/drive`; small-signal gain stays at 1 regardless of deformAmount
 - **Dielectric colors vivid at low thickness** — shader Beer-Lambert adds +0.7 visual offset so materials show rich color even at minimum thickness (audio unaffected)
+- **Viewport accordion UI** — GEO and MAT controls in collapsible overlay; viewport breathes again
+- **Preset combo re-selection fixed** — `setText()` called before `addItem()` so selectedId stays 0; any click on any preset always fires `onChange`
 
 ### PBR Shader Pipeline (implemented)
 - `Source/Shaders.h` — vertex + fragment GLSL shaders as `constexpr const char*`
@@ -266,18 +277,16 @@ All parameters exposed to DAW automation:
   - mix=0 → pure A, mix=1 → alloy colour (neither A nor B)
   - Physically motivated for dielectrics (optical filter product); consistent approximation for metals
 
-**[TODO] Point 6 — UI: Full Dual Material Controls**
-- Dual material selector (proper button grid, not combos)
-- Blend mode buttons with icons
-- Spectrum display showing A + B + interaction curves
-- **This is now part of the larger UI reorganization effort below — implement Point 6 within the new tab-based layout, not as a further overlay on the viewport**
+**[DONE] Point 6 — UI: Dual Material Controls in Accordion Overlay**
+- MATERIALS accordion panel: MAT A combo, MAT B combo, BLEND combo, MIX slider, DETUNE slider, DEPTH slider, MUTE A button
+- GEOMETRIES accordion panel: GEO combo, Thickness slider, Deform slider
+- Both panels collapsed by default; viewport breathes
 
-#### Current UI (Minimal, in viewport overlay) — CLUTTERED, pending redesign
-Row 1: GEO | MAT A [combo] | MAT B [combo] | THICKNESS [slider]
-Row 2: BLEND [combo] | MIX [slider]
-Row 3: DETUNE [slider] | DEPTH [slider] | MUTE A [button]
-Below thickness: DEFORM [slider]
-Left side (vertical): X/Y/Z rotation fields + RESET
+#### Current UI (Accordion Overlay — DONE Apr 24, 2026)
+Top accordion header bar (always visible):
+- `[▶ GEOMETRIES]` left half: GEO combo | Thickness slider | Deform slider
+- `[▶ MATERIALS]` right half: MAT A | MAT B | BLEND | MIX | DETUNE | DEPTH | MUTE A
+Bottom-left: X/Y/Z + RESET (vertical stack above lights bar)
 Bottom: 3 light panels (Key / Fill / Rim) spanning full width
 
 #### Six Blend Modes (all sample-level, true dual-oscillator)
@@ -301,26 +310,11 @@ Bottom: 3 light panels (Key / Fill / Rim) spanning full width
 
 **blendMode APVTS**: Fixed — `AudioParameterChoice` now has all 6 items (0=Ring Mod, 1=Max, 2=AM, 3=Difference, 4=Crossfade, 5=FM). FM is fully automatable.
 
-### UI Reorganization — DONE (Apr 22, 2026)
+### Preset Combo — Key Pattern
+`setText(name)` in JUCE ComboBox matches items by name and calls `setSelectedId(itemId)`, leaving the combo unable to re-fire for that item. Fix: call `setText(name)` BEFORE `addItem()` in `refreshPresetList()` so no match exists → `selectedId` stays 0 → any subsequent click fires `onChange`.
 
-**Implemented**: `ViewportAccordion` — semi-transparent collapsible overlay at the top of the viewport. Two groups, both closed by default. Multiple groups can be open simultaneously.
-
-**New viewport overlay layout:**
-- Top: accordion header bar (28px, always visible) with `[▶ GEO]` and `[▶ MAT]` toggle sections
-  - GEO panel (left half, ~108px tall when open): GEO combo, Thickness slider, Deform slider
-  - MAT panel (right half, ~224px tall when open): MAT A combo, MAT B combo, BLEND combo, MIX slider, DETUNE slider, DEPTH slider, MUTE A button
-- Bottom-left (above lights bar): X/Y/Z rotation fields + RESET in a horizontal row
-- Bottom-right (same height, from paint): "RMB Orbit  Scroll Zoom" hint — right-aligned
-- Bottom bar (unchanged): LIGHTS label + Key / Fill / Rim panels (full width, 64px)
-
-**Architecture notes:**
-- `AccordionPanel` and `ViewportAccordion` classes defined in `PluginEditor.h`
-- `hitTest()` override on accordion ensures clicks in transparent gaps pass through to viewport (gizmo/camera)
-- GEO/MAT controls reparented from viewport3D → accordion panels (APVTS attachments unaffected)
-- Rotation fields remain direct viewport3D children, repositioned to horizontal row
-- `onLayoutChanged` callback triggers `resized()` when a group opens/closes
-
-**Key constraint respected**: OpenGL context not disturbed; accordion sits as a JUCE component child of viewport3D, above the GL surface.
+### State Save/Load — materialA/B/blendMode
+These are NOT APVTS parameters. They are saved as manual XML attributes and read back in `setStateInformation`. Do NOT try to expose them via APVTS — it causes stale-value overwrites in `processBlock`.
 
 ### Task: ADSR Envelope Graph
 - [ ] ADSRDisplay component (visual curve of current ADSR)
