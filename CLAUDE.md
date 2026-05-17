@@ -14,6 +14,11 @@ Audio plugin (VST3/AU/Standalone) — a spectral synthesizer where materials (di
 - **OpenGL**: juce_opengl module for 3D viewport
 - **Target**: macOS 11.0+, Universal Binary (arm64 + x86_64), formats: Standalone, AU, VST3
 
+## Version
+
+> **RULE**: Never assume or infer the plugin version. Always read it from `Elements.jucer` (the `version="..."` attribute on the `<JUCERPROJECT>` line) before referencing or modifying it anywhere in the code or documentation.
+> Current version: **0.9.4**
+
 ## Build Commands
 
 > **DEFAULT**: Always build VST3. Only build Standalone when explicitly requested.
@@ -135,7 +140,8 @@ Each `Material` struct now carries:
 - Soft clipper (tanh) on master output
 - Audio buffer exposed for oscilloscope display
 
-## Current State (as of Apr 24, 2026)
+## Current State (as of May 17, 2026) — v0.9.4 Beta
+
 - Full working prototype with **PBR shader rendering** (Cook-Torrance BRDF)
 - All features functional: materials, geometries, 3-point lighting, Fresnel physics, synth, MIDI
 - Hybrid rendering pipeline: GLSL shaders for geometry, fixed-function for grid/axes/gizmo/light indicators
@@ -143,13 +149,20 @@ Each `Material` struct now carries:
 - **Rotation X/Y/Z exposed as DAW-automatable VST parameters** (0-360°)
 - **Volume is now APVTS parameter** — DAW-automatable
 - **Soft clipper implemented** — tanh output limiting reduces clipping
-- **Dual-oscillator feature complete** — branch `mix_materials`; true dual-osc, 6 blend modes, preset system, accordion UI
+- **Dual-oscillator feature complete** — 4 blend modes (Ring Mod, AM, XOR, FM); Spectral Max and Crossfade removed
+- **Material swap button** — swaps MAT A/B with full UI color refresh (accent, oscilloscopes, filter ADSR, piano roll, subtitle)
+- **Blended spectrum display** — spectrum widget shows dim A + bright blend result when MIX > 0; blend normalized to prevent visual clipping
+- **All 13 materials upgraded to 32 sample points** — simple materials upsampled from 16-pt source data; confirmed audible improvement
+- **PBR materials complete** — Alexandrite (chromism), Malachite (banding), Neodymium (Nd³⁺ glass, violet↔red chromism) fully implemented
+- **PBR alloy blend model** — all scalar PBR properties (roughness, metallic, IOR, transparency, SSS) use alloy model; mix=1 gives a fused hybrid, not pure B
 - **Accurate two-path optical physics** — dielectric vs metallic Fresnel pipeline; Beer-Lambert gated by metallicFactor
 - **materialA/B removed from APVTS** — saved/loaded as manual XML attributes; processBlock no longer reads/overwrites them
 - **Deform volume normalized** — wavefolding now uses `sin(drive*x)/drive`; small-signal gain stays at 1 regardless of deformAmount
 - **Dielectric colors vivid at low thickness** — shader Beer-Lambert adds +0.7 visual offset so materials show rich color even at minimum thickness (audio unaffected)
 - **Viewport accordion UI** — GEO and MAT controls in collapsible overlay; viewport breathes again
 - **Preset combo re-selection fixed** — `setText()` called before `addItem()` so selectedId stays 0; any click on any preset always fires `onChange`
+- **Science tab** — spectral chart PNG embedded in Help overlay with per-material scientific sources; measurement conditions section
+- **Materials grouped in dropdowns** — GEMS / MINERALS / METALS / SPECIAL with section headers and separators
 
 ### PBR Shader Pipeline (implemented)
 - `Source/Shaders.h` — vertex + fragment GLSL shaders as `constexpr const char*`
@@ -289,16 +302,14 @@ Top accordion header bar (always visible):
 Bottom-left: X/Y/Z + RESET (vertical stack above lights bar)
 Bottom: 3 light panels (Key / Fill / Rim) spanning full width
 
-#### Six Blend Modes (all sample-level, true dual-oscillator)
+#### Four Blend Modes (all sample-level, true dual-oscillator)
 
 | # | Name | Formula | Character |
 |---|------|---------|-----------|
 | 0 | Ring Mod | `A * B` | Sidebands, metallic, inharmonic |
-| 1 | Max | `abs(A)>abs(B) ? A : B` | Waveshaping, picks dominant signal |
-| 2 | AM | `A * (1 + depth * B)` | Classic AM, depth controls modulation |
-| 3 | Difference | `\|A-B\|` with sign | Spectral subtraction, hollow timbres |
-| 4 | Crossfade | `lerp(A, B, 0.5)` | Simple timbre blend, mix controls ratio |
-| 5 | FM | phase of A modulated by B | Rich inharmonics, depth = FM index |
+| 1 | AM | `A * (1 + depth * B)` | Classic AM, depth controls modulation |
+| 2 | XOR | `\|A-B\|` with sign | Spectral subtraction, hollow timbres |
+| 3 | FM | phase of A modulated by B | Rich inharmonics, depth = FM index |
 
 #### Architecture Notes
 
@@ -316,29 +327,91 @@ Bottom: 3 light panels (Key / Fill / Rim) spanning full width
 ### State Save/Load — materialA/B/blendMode
 These are NOT APVTS parameters. They are saved as manual XML attributes and read back in `setStateInformation`. Do NOT try to expose them via APVTS — it causes stale-value overwrites in `processBlock`.
 
-### Task: ADSR Envelope Graph
-- [ ] ADSRDisplay component (visual curve of current ADSR)
-- [ ] Integrate in right column layout
-- [ ] Real-time update from synth envelope parameters
+### Future Features
 
-### Task: Enhance Timbre Movement from Rotation
-- [ ] Wider spectral variation per rotation degree
-- [ ] Make different geometries produce more distinct timbral signatures
-- [ ] Non-linear harmonic mapping for more dramatic timbre shifts
+**Deform Noise Controls**
+Expose noise parameters to the user for the Sphere deform effect. Currently `noiseTimeOffset += 0.02f` is hardcoded. Planned:
+- `deformSpeed` — rate of noise animation (easy, ~1hr: add APVTS param, read in timerCallback)
+- `noiseType` — selector for noise algorithm (moderate, ~1-2 days: requires multiple noise implementations)
+- `deformFrequency` — already exposed as APVTS parameter
 
-### Task: UI Feedback
-- [ ] Filter value labels (show "2.5kHz", "Q:1.5" under knobs)
+**Filter B Bypass**
+Allow Material B to bypass the global filter (currently both A and B pass through the same filter). In FM mode the modulator (B) gets filtered alongside the carrier. Architectural split of the filter path required (~1 day).
 
-### Completed Tasks
+**ADSR Envelope Graph**
+Visual curve display of the current ADSR shape, updating in real time. ADSRDisplay component exists but shows fill only — a proper curve overlay would improve legibility.
 
-**Task 3: Rotation as VST Parameters** — DONE (Feb 2026)
-- [x] Add rotationX/Y/Z to APVTS (`createParameterLayout()`) — 0-360°, step 0.1
-- [x] Sync viewport 3D from APVTS in timerCallback (when not dragging)
-- [x] Gizmo drag writes to APVTS with beginChangeGesture/endChangeGesture
-- [x] processBlock reads APVTS rotation with change detection → synth.setObjectRotation()
-- [x] Text fields and resetRotation write to APVTS
-- [x] State save/load: rotation now via APVTS, migration for old projects
-- [x] Removed manual rotationX/Y/Z fields, setRotationMatrix, setDisplayRotation from Processor
+**Enhance Timbre Movement from Rotation**
+Wider spectral variation per rotation degree; more distinct timbral signatures per geometry; non-linear harmonic mapping for more dramatic timbre shifts.
+
+**UI Feedback**
+Filter value labels showing readable values (e.g. "2.5kHz", "Q:1.5") under the knobs.
+
+**PBR Spectral Accuracy — Alexandrite, Malachite, Neodymium**
+Current spectral curves are qualitatively correct but estimated. Sourcing USGS/literature data for these three would improve audio accuracy.
+
+**Fog / Environment Feature** (stashed)
+`stash@{0}` contains volumetric fog with ray-marched simplex noise, `envType`/`fogDensity` parameters, fullscreen fog shader. Ready to resume.
+
+## Materials: Scientific Data Policy
+
+### Ground Rules
+- **Authoritative source**: USGS Spectral Library (free, downloadable) — covers visible range (0.2-200μm), measured from real mineral samples
+- **Never estimate spectral values without asking first** — if data is unavailable, say so and ask the user how to proceed
+- **IOR values are reliable** — tabulated in mineralogy literature (e.g. mindat.org, Handbook of Optical Constants)
+- **Transmission shapes need USGS or equivalent measurement** — do not invent
+
+### Reflectance → Transmission Conversion (USGS Data)
+USGS measures reflectance R of powdered samples, not crystal transmission. To convert:
+1. **Kubelka-Munk**: `F(R) = (1-R)² / (2R)` — converts reflectance to absorption coefficient K (relative units)
+2. **Beer-Lambert**: `T = exp(-K × thickness)` — converts absorption to transmission for a given crystal thickness
+- Works best for opaque/scattering minerals (malachite, obsidian)
+- Less precise for highly transparent gems (diamond, water) — those are better measured directly
+- When using K-M data, normalize so max(T) ≈ 1.0 before storing in Material struct
+
+### Sample Point Architecture
+- **All 13 materials use 32 sample points** (380–780 nm, Δλ ≈ 12.9 nm)
+- Simple materials (Diamond, Water, Amber, Gold, Amethyst, Copper, Obsidian) upsampled from 16-pt source data via linear interp; values stored directly in `Physics.cpp`
+- **`MATERIAL_MAX_SAMPLES = 32`** — max array size in Material struct
+- **`numSamples` field** in Material struct — actual count for this material
+- **`interpolateMaterial()`** uses `numSamples` — no hardcoded count
+
+> **Status**: Fully implemented as of May 7, 2026. See `science.md` for all 32-pt tables.
+
+### Material Accuracy Summary (as of May 7, 2026)
+
+| Material | IOR | Spectral Curve | Notes |
+|----------|-----|----------------|-------|
+| Diamond  | ✅ 2.417 | ✅ flat (near-uniform) | Well-established |
+| Water    | ✅ 1.333 | ✅ flat visible, UV absorption | Well-established |
+| Gold     | ✅ n+ik measured | ✅ measured data | Complex IOR from Palik |
+| Copper   | ✅ n+ik measured | ✅ measured data | Complex IOR from Palik |
+| Ruby     | ✅ 1.762 | ⚠️ directionally correct | Cr³⁺ absorption shape qualitative |
+| Emerald  | ✅ 1.565 | ⚠️ directionally correct | Cr³⁺ absorption shape qualitative |
+| Sapphire | ✅ 1.762 | ⚠️ directionally correct | Fe²⁺/Ti⁴⁺ absorption qualitative |
+| Amber    | ✅ 1.539 | ⚠️ directionally correct | Organic polymer, shape approximate |
+| Alexandrite | ✅ 1.745 | ⚠️ estimated | Cr³⁺ dual-peak correct in principle |
+| Amethyst | ✅ 1.544 | ⚠️ physically weak | Fe³⁺ charge transfer barely visible |
+| Obsidian | ✅ 1.49 | ⚠️ physically weak | Volcanic glass, nearly flat |
+| Malachite | ✅ 1.85 | ⚠️ estimated | Cu²⁺ absorption qualitative |
+| Neodymium | ✅ 1.636 | ⚠️ band positions approximate | Nd³⁺ f-f transitions undersampled at 8pts |
+
+### New Material Workflow
+1. **Audio first**: implement spectral data + materialGain entry → test sound before any PBR work
+2. **Placeholder shader**: flat diffuse with material color, no reflections (roughness=1.0, metallic=0.0)
+3. **Audio approved** → then work on PBR shader properties
+4. **materialGain[] array** in SynthEngine.cpp MUST always have exactly `NUM_MATERIALS` entries — out-of-bounds → silence
+
+### Current Materials (13 total, NUM_MATERIALS = 13)
+Diamond, Water, Amber, Ruby, Gold, Emerald, Amethyst, Sapphire, Copper, Obsidian, Alexandrite, Malachite, Neodymium
+
+### Neodymium Notes
+- Nd³⁺ f-f transitions create 5-8 narrow absorption bands (~10-20nm wide)
+- At 8-point sampling (50-80nm spacing) the comb-filter character is completely lost
+- Needs 32 sample points to resolve properly
+- Band positions approximate until USGS/literature data applied
+
+---
 
 ## Key Implementation Details
 

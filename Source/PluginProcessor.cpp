@@ -218,11 +218,11 @@ ElementsAudioProcessor::createParameterLayout()
     // attributes (same as geometry and blendMode) because DAW automation is not
     // needed and APVTS would cause stale-value conflicts on preset load.
 
-    // Blend Mode: 0=Ring Mod, 1=Max, 2=AM, 3=Difference, 4=Crossfade, 5=FM
+    // Blend Mode: 0=Ring Mod, 1=AM, 2=XOR, 3=FM
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"blendMode", 1},
         "Blend Mode",
-        juce::StringArray{"Ring Mod", "Max", "AM", "Difference", "Crossfade", "FM"},
+        juce::StringArray{"Ring Mod", "AM", "XOR", "FM"},
         0));
 
     // Mix Amount: 0.0-1.0 (dry/wet), default 0.0

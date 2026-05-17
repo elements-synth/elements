@@ -25,8 +25,12 @@ constexpr float WAVELENGTH_MIN = 380.0f;
 constexpr float WAVELENGTH_MAX = 780.0f;
 
 // Number of materials and light sources
-constexpr int NUM_MATERIALS = 10;
+constexpr int NUM_MATERIALS = 13;
 constexpr int NUM_LIGHT_SOURCES = 3;
+
+// Maximum sample points per material spectral curve
+// 16 for smooth/simple materials, 32 for complex multi-band (e.g. rare-earth)
+constexpr int MATERIAL_MAX_SAMPLES = 32;
 
 // ==============================================================================
 // STRUCTS
@@ -41,26 +45,33 @@ constexpr int NUM_LIGHT_SOURCES = 3;
 struct Material
 {
     std::string name;
-    std::array<float, 8> wavelengths;      // 8 puntos de muestreo (nm)
-    std::array<float, 8> transmission;     // Transmisión/reflectancia 0-1 en cada punto
+    std::array<float, MATERIAL_MAX_SAMPLES> wavelengths;   // up to MATERIAL_MAX_SAMPLES points (nm)
+    std::array<float, MATERIAL_MAX_SAMPLES> transmission;  // transmittance/reflectance 0-1 per point
+    int numSamples = 8;                    // actual number of valid points in this material
     std::string color;                      // Hex color para UI
     float refractiveIndex = 1.5f;           // Real part of complex IOR (n)
     float extinctionCoeff = 0.0f;           // Imaginary part of complex IOR (k): 0 = dielectric, >0 = metal
     float metallicFactor  = 0.0f;           // 0 = pure dielectric, 1 = pure metal — blends physics paths
 
-    // Constructor por defecto (necesario para arrays)
     Material() = default;
 
-    // Constructor con parámetros
     Material(const std::string& n,
-             const std::array<float, 8>& wl,
-             const std::array<float, 8>& tr,
+             std::initializer_list<float> wl,
+             std::initializer_list<float> tr,
              const std::string& col,
              float ior = 1.5f,
              float k    = 0.0f,
              float metal = 0.0f)
-        : name(n), wavelengths(wl), transmission(tr), color(col),
-          refractiveIndex(ior), extinctionCoeff(k), metallicFactor(metal) {}
+        : name(n), numSamples(static_cast<int>(wl.size())), color(col),
+          refractiveIndex(ior), extinctionCoeff(k), metallicFactor(metal)
+    {
+        wavelengths.fill(0.0f);
+        transmission.fill(0.0f);
+        int i = 0;
+        for (float v : wl)  wavelengths[static_cast<size_t>(i++)]  = v;
+        i = 0;
+        for (float v : tr)  transmission[static_cast<size_t>(i++)] = v;
+    }
 };
 
 /**
@@ -352,7 +363,7 @@ inline float degToRad(float degrees)
 
 /**
  * Interpolate material transmission to match light wavelengths.
- * Material has 8 sample points, output has NUM_WAVELENGTHS points.
+ * Uses material.numSamples (up to MATERIAL_MAX_SAMPLES); output has NUM_WAVELENGTHS points.
  */
 void interpolateMaterial(const Material& material,
                          const std::array<float, NUM_WAVELENGTHS>& targetWavelengths,

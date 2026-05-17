@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="elements01" name="Elements" projectType="audioplug" version="0.9.3" useAppConfig="0"
+<JUCERPROJECT id="elements01" name="Elements" projectType="audioplug" version="0.9.4" useAppConfig="0"
               addUsingNamespaceToJuceHeader="1" jucerFormatVersion="1" companyName="ElementsSynth"
               companyCopyright="2025" companyWebsite="https://github.com/elements-synth"
               pluginFormats="buildAU,buildStandalone,buildVST3" pluginCharacteristicsValue="pluginIsSynth,pluginWantsMidiIn,pluginEditorRequiresKeys"
@@ -39,6 +39,10 @@
             resource="1" file="Source/JetBrainsMono-Bold.ttf"/>
       <FILE id="elements_logo" name="elements-logo.png" compile="0"
             resource="1" file="Source/elements-logo.png"/>
+      <FILE id="spectra_panel" name="elements_spectra_panel.png" compile="0"
+            resource="1" file="Source/elements_spectra_panel.png"/>
+      <FILE id="swap_arrows" name="swap_arrows.png" compile="0"
+            resource="1" file="Source/swap_arrows.png"/>
       <FILE id="env_hdr" name="studio_kontrast_03_2k.hdr" compile="0"
             resource="1" file="studio_kontrast_03_2k.hdr"/>
       <GROUP id="knobsgroup" name="Knobs">

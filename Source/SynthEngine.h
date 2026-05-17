@@ -333,7 +333,7 @@ public:
         notes.fill(false);
         for (const auto& voice : voices)
         {
-            if (voice.active && voice.noteId >= 0 && voice.noteId < 128)
+            if (voice.active && !voice.releasing && voice.noteId >= 0 && voice.noteId < 128)
                 notes[static_cast<size_t>(voice.noteId)] = true;
         }
     }

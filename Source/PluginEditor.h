@@ -123,26 +123,32 @@ private:
     struct PBRMaterialProps {
         float metallic;
         float roughness;
-        float ior;               // Index of refraction
-        float transparency;      // 0=opaque, 1=fully transparent
-        float sssStrength;       // Subsurface scattering intensity
-        float sssRadius;         // SSS spread
-        float absorptionColor[3]; // RGB tint (from transmission spectrum)
+        float ior;
+        float transparency;
+        float sssStrength;
+        float sssRadius;
+        float absorptionColor[3];
+        bool  hasChromism;
+        float albedoSecondary[3];
+        float bandingStrength;
+        float bandingFrequency;
     };
 
-    // PBR material properties indexed by material enum (same order as materialNames)
-    //                          metal  rough  ior    transp  sssStr sssRad  absorption R,G,B
+    // PBR material properties — metal, rough, ior, transp, sssStr, sssRad, absRGB, chromism, secRGB, bandStr, bandFreq
     static constexpr PBRMaterialProps pbrMaterials[NUM_MATERIALS] = {
-        { 0.00f, 0.05f, 2.42f, 0.95f, 0.15f, 0.3f, {0.97f, 0.98f, 1.00f} },  // Diamond
-        { 0.00f, 0.10f, 1.33f, 0.90f, 0.05f, 0.5f, {0.70f, 0.85f, 0.95f} },  // Water
-        { 0.00f, 0.30f, 1.55f, 0.70f, 0.40f, 0.4f, {1.00f, 0.75f, 0.20f} },  // Amber
-        { 0.05f, 0.15f, 1.77f, 0.60f, 0.50f, 0.3f, {0.90f, 0.10f, 0.25f} },  // Ruby
-        { 1.00f, 0.20f, 0.47f, 0.00f, 0.00f, 0.0f, {1.00f, 0.84f, 0.00f} },  // Gold
-        { 0.05f, 0.20f, 1.57f, 0.55f, 0.35f, 0.3f, {0.20f, 0.80f, 0.40f} },  // Emerald
-        { 0.05f, 0.25f, 1.54f, 0.65f, 0.35f, 0.3f, {0.60f, 0.30f, 0.80f} },  // Amethyst
-        { 0.05f, 0.10f, 1.77f, 0.60f, 0.40f, 0.3f, {0.10f, 0.30f, 0.85f} },  // Sapphire
-        { 1.00f, 0.20f, 0.46f, 0.00f, 0.00f, 0.0f, {0.97f, 0.57f, 0.32f} },  // Copper  — metallic, orange-tinted like gold
-        { 0.00f, 0.03f, 1.50f, 0.00f, 0.00f, 0.0f, {0.02f, 0.02f, 0.02f} },  // Obsidian — black glass, glossy specular
+        { 0.00f, 0.05f, 2.42f,  0.95f, 0.15f, 0.3f, {0.97f, 0.98f, 1.00f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Diamond
+        { 0.00f, 0.10f, 1.33f,  0.90f, 0.05f, 0.5f, {0.70f, 0.85f, 0.95f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Water
+        { 0.00f, 0.30f, 1.55f,  0.70f, 0.40f, 0.4f, {1.00f, 0.75f, 0.20f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Amber
+        { 0.05f, 0.15f, 1.77f,  0.60f, 0.50f, 0.3f, {0.90f, 0.10f, 0.25f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Ruby
+        { 1.00f, 0.20f, 0.47f,  0.00f, 0.00f, 0.0f, {1.00f, 0.84f, 0.00f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Gold
+        { 0.05f, 0.20f, 1.57f,  0.55f, 0.35f, 0.3f, {0.20f, 0.80f, 0.40f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Emerald
+        { 0.05f, 0.25f, 1.54f,  0.65f, 0.35f, 0.3f, {0.60f, 0.30f, 0.80f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Amethyst
+        { 0.05f, 0.10f, 1.77f,  0.60f, 0.40f, 0.3f, {0.10f, 0.30f, 0.85f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Sapphire
+        { 1.00f, 0.20f, 0.46f,  0.00f, 0.00f, 0.0f, {0.97f, 0.57f, 0.32f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Copper
+        { 0.00f, 0.03f, 1.50f,  0.00f, 0.00f, 0.0f, {0.02f, 0.02f, 0.02f}, false, {0.0f, 0.0f, 0.0f}, 0.0f, 10.0f },  // Obsidian
+        { 0.00f, 0.10f, 1.745f, 0.68f, 0.30f, 0.3f, {0.28f, 0.60f, 0.35f}, true,  {0.80f, 0.26f, 0.22f}, 0.0f, 10.0f }, // Alexandrite
+        { 0.00f, 0.28f, 1.85f,  0.00f, 0.00f, 0.0f, {0.15f, 0.55f, 0.22f}, false, {0.0f, 0.0f, 0.0f}, 0.55f, 14.0f },  // Malachite
+        { 0.00f, 0.05f, 1.636f, 0.75f, 0.00f, 0.0f, {0.50f, 0.40f, 0.80f}, true,  {0.65f, 0.28f, 0.65f}, 0.0f, 10.0f }, // Neodymium — Nd³⁺ glass, violet↔red chromism
     };
 
     // Shader program
@@ -298,7 +304,7 @@ namespace HelpContent
             "  - Light absorption curves shape the frequency spectrum\n"
             "  - Material thickness controls spectral filtering\n"
             "\n"
-            "Version 1.0 (Beta)";
+            "Version 0.9.4 (Beta)";
     }
 
     inline juce::String materials()
@@ -307,49 +313,189 @@ namespace HelpContent
             "MATERIALS\n"
             "\n"
             "Each material produces different timbres based on its\n"
-            "optical properties:\n"
+            "optical transmission curve (see Science tab).\n"
+            "\n"
+            "--- MATERIAL MIXING ---\n"
+            "\n"
+            "Elements runs two independent oscillators (A and B),\n"
+            "each shaped by its own material spectrum. The BLEND\n"
+            "mode defines how they interact at the sample level.\n"
+            "\n"
+            "MIX: dry/wet between pure A (0) and the blend result.\n"
+            "DETUNE: pitch offset for oscillator B (±100 cents).\n"
+            "DEPTH: modulation depth — used by AM and FM only.\n"
+            "MUTE A: audition oscillator B in isolation.\n"
+            "\n"
+            "RING MOD\n"
+            "Multiplies A and B sample-by-sample. Produces sum and\n"
+            "difference frequencies — sidebands that are not part\n"
+            "of either source spectrum. Inharmonic, metallic, and\n"
+            "highly dependent on both material choices. Strongest\n"
+            "at MIX=1 with contrasting materials.\n"
+            "\n"
+            "AM\n"
+            "B modulates the amplitude of A. At DEPTH=0, pure A\n"
+            "passes through unchanged. As DEPTH rises, amplitude\n"
+            "sidebands appear alongside the original carrier — you\n"
+            "hear A enriched with new harmonics. Warmer and more\n"
+            "controlled than Ring Mod; the original timbre stays\n"
+            "recognisable.\n"
+            "\n"
+            "XOR\n"
+            "Takes the absolute difference |A-B|, preserving the\n"
+            "sign of A. Highlights spectral disagreement between\n"
+            "materials — regions where they diverge most become\n"
+            "loudest. Subtractive and hollow; pairing materials\n"
+            "with contrasting curves (e.g. Ruby + Diamond) produces\n"
+            "the most harmonic complexity.\n"
+            "\n"
+            "FM\n"
+            "B modulates the phase of A before wavetable readout.\n"
+            "DEPTH controls the FM index. Low DEPTH: subtle pitch\n"
+            "drift and shimmer. High DEPTH: rich inharmonic spectra\n"
+            "typical of DX-style FM synthesis, now coloured by\n"
+            "both material curves. The most spectrally complex mode.\n"
+            "\n"
+            "--- GEMS ---\n"
             "\n"
             "{#ffa8d8f0}DIAMOND\n"
-            "Highly refractive (n=2.42). Bright, crystalline sound\n"
+            "Highly refractive (n=2.42). Near-flat transmission\n"
+            "across the visible spectrum. Bright, crystalline sound\n"
             "with strong upper harmonics. Sharp, clear transients.\n"
             "\n"
-            "{#ff7ec8e3}WATER\n"
-            "Low refraction (n=1.33). Soft, fluid timbre.\n"
-            "Smooth harmonic roll-off.\n"
-            "\n"
-            "{#fff5b942}AMBER\n"
-            "Warm, organic character. Mid-range emphasis.\n"
-            "Gentle high-frequency absorption.\n"
-            "\n"
             "{#ffe84b6a}RUBY\n"
-            "Rich harmonic content. Warm, saturated tone.\n"
-            "Strong fundamental.\n"
-            "\n"
-            "{#ffd4a843}GOLD\n"
-            "Soft, metallic shimmer. Gentle spectral peaks.\n"
-            "Warm overall character.\n"
+            "Cr\u00b3\u207a absorbs at 413nm + 550nm. Blue-violet window\n"
+            "and red transmission above 620nm. Rich harmonic\n"
+            "content — two spectral clusters, warm saturated tone.\n"
             "\n"
             "{#ff4ecb8d}EMERALD\n"
-            "Balanced spectrum. Clear, focused sound.\n"
-            "Moderate brightness.\n"
+            "Cr\u00b3\u207a in beryl: absorption at 430nm + 610nm opens a\n"
+            "green window (480-560nm). Balanced, focused spectrum.\n"
             "\n"
             "{#ffb57bee}AMETHYST\n"
-            "Complex harmonic structure.\n"
-            "Slight mid-range emphasis.\n"
+            "[FeO\u2084]\u2070 absorbs at 545nm, transmitting violet + red.\n"
+            "Bimodal harmonic structure with mid-range dip.\n"
             "\n"
             "{#ff5b9ef5}SAPPHIRE\n"
-            "Clear, focused tone. Strong upper-mid presence.\n"
-            "Note: Sapphire only transmits blue wavelengths.\n"
-            "It will not produce sound with Sunset light.\n"
-            "Use Daylight or LED Cool for best results.\n"
+            "Fe\u00b2\u207a-Ti\u2074\u207a charge transfer: broad absorption at 570nm.\n"
+            "Transmits blue only. Note: produces no sound under\n"
+            "Sunset light — use Daylight or LED Cool.\n"
             "\n"
-            "{#ffcf7e46}COPPER\n"
-            "Metallic, warm resonance. Orange-tinted harmonics.\n"
-            "Smooth mid-range with soft high-end roll-off.\n"
+            "{#ff5b8a64}ALEXANDRITE\n"
+            "Cr\u00b3\u207a dual-peak: green (490-570nm) + red (640-780nm)\n"
+            "windows. Two harmonic clusters. Colour changes with\n"
+            "light source — the alexandrite effect.\n"
+            "\n"
+            "--- MINERALS ---\n"
+            "\n"
+            "{#fff5b942}AMBER\n"
+            "Organic polymer: UV cutoff at ~440nm, smooth warm\n"
+            "sigmoid. Mid-high emphasis. Gentle, organic character.\n"
+            "\n"
+            "{#ff2e7d52}MALACHITE\n"
+            "Cu\u00b2\u207a LMCT cuts blue, d-d band cuts red, leaving a\n"
+            "green window (490-560nm). Focused, mineral timbre.\n"
             "\n"
             "{#ff6a7a8a}OBSIDIAN\n"
-            "Dark, glassy character. Subdued harmonics with\n"
-            "glossy specular highlights. Deep, minimal tone.";
+            "Volcanic glass: featureless, dark, monotonically rising\n"
+            "toward red/NIR. Deep, subdued, minimal harmonics.\n"
+            "\n"
+            "--- METALS ---\n"
+            "\n"
+            "{#ffd4a843}GOLD\n"
+            "Complex IOR (n=0.47 k=2.83). Interband edge at ~500nm\n"
+            "absorbs blue/UV. Warm metallic shimmer, yellow-red\n"
+            "harmonic weighting.\n"
+            "\n"
+            "{#ffcf7e46}COPPER\n"
+            "Complex IOR (n=0.46 k=2.83). Deeper interband edge\n"
+            "at ~600nm. Absorbs blue-green, emphasises orange-red.\n"
+            "Smooth metallic resonance.\n"
+            "\n"
+            "--- SPECIAL ---\n"
+            "\n"
+            "{#ff7ec8e3}WATER\n"
+            "Direct Beer-Lambert from measured data (1m path).\n"
+            "Flat in visible, steep OH overtone drop above 700nm.\n"
+            "Soft, fluid timbre with strong high-harmonic roll-off.\n"
+            "\n"
+            "{#ff9070c8}NEODYMIUM\n"
+            "Nd\u00b3\u207a rare-earth glass: 6 narrow f-f absorption bands\n"
+            "(432/522/583/625/677/741nm). Comb-filter character.\n"
+            "Harmonically rich, otherworldly, complex spectrum.";
+    }
+
+    inline juce::String science()
+    {
+        return
+            "SPECTRAL SCIENCE\n"
+            "\n"
+            "Each material curve shows optical transmission (0-1)\n"
+            "across the visible spectrum (380-780nm, 32 samples).\n"
+            "These curves directly shape the harmonic spectrum.\n"
+            "\n"
+            "--- GEMS ---\n"
+            "\n"
+            "{#ffa8d8f0}DIAMOND  n=2.42  Sellmeier (1923)\n"
+            "Near-flat visible transmission. Slight UV scatter\n"
+            "loss at 380nm (Rayleigh). No absorbing chromophores.\n"
+            "\n"
+            "{#ffe84b6a}RUBY  n=1.77  PMC9330567 (Rossman 2022)\n"
+            "Cr\u00b3\u207a in corundum: absorbs at 413nm + 550nm, transmits\n"
+            "blue-violet window (455-480nm) + red above 620nm.\n"
+            "\n"
+            "{#ff4ecb8d}EMERALD  n=1.57  Wood & Nassau (1968)\n"
+            "Cr\u00b3\u207a in beryl: weaker crystal field than ruby shifts\n"
+            "absorption to 430nm + 610nm, opening the green window.\n"
+            "\n"
+            "{#ffb57bee}AMETHYST  n=1.54  PMC7483767 (Hatipoglu 2020)\n"
+            "[FeO\u2084]\u2070 centre absorbs at 545nm. Transmits violet + red,\n"
+            "producing the characteristic purple colour.\n"
+            "\n"
+            "{#ff5b9ef5}SAPPHIRE  n=1.77  GIA 2020 (Dubinsky et al.)\n"
+            "Fe\u00b2\u207a-Ti\u2074\u207a intervalence charge transfer: broad absorption\n"
+            "centred at 570nm. Fe\u00b3\u207a adds dips at 393nm + 450nm.\n"
+            "\n"
+            "{#ff5b8a64}ALEXANDRITE  n=1.75  PMC7145866 (Taran 2020)\n"
+            "Cr\u00b3\u207a in chrysoberyl: two transmission peaks (green +\n"
+            "red) create the alexandrite colour-change effect.\n"
+            "\n"
+            "--- MINERALS ---\n"
+            "\n"
+            "{#fff5b942}AMBER  n=1.54  PMC12196071 (Wolfe 2025)\n"
+            "Polycyclic aromatics create a UV cutoff at ~440nm.\n"
+            "No sharp visible bands. Smooth warm sigmoid.\n"
+            "\n"
+            "{#ff2e7d52}MALACHITE  n=1.85  USGS splib07 / K-M\n"
+            "Cu\u00b2\u207a LMCT below 450nm + d-d band above 700nm leave\n"
+            "a narrow green window. Converted via Kubelka-Munk.\n"
+            "\n"
+            "{#ff6a7a8a}OBSIDIAN  n=1.50  Icarus 2021 (Cloutis et al.)\n"
+            "Volcanic glass: featureless monotonic rise UV-to-NIR.\n"
+            "Fe\u00b2\u207a + magnetite nanoparticles cause broadband absorption.\n"
+            "\n"
+            "--- METALS ---\n"
+            "\n"
+            "{#ffd4a843}GOLD  n=0.47 k=2.83  Palik (1985)\n"
+            "Interband transition at ~500nm. Absorbs blue/UV,\n"
+            "reflects yellow/red. Complex IOR metallic path.\n"
+            "\n"
+            "{#ffcf7e46}COPPER  n=0.46 k=2.83  Palik (1985)\n"
+            "Deeper interband edge at ~600nm vs gold. Absorbs\n"
+            "blue-green, reflects orange-red. Metallic path.\n"
+            "\n"
+            "--- RARE EARTH ---\n"
+            "\n"
+            "{#ff9070c8}NEODYMIUM  n=1.64  Kaminskii (1981)\n"
+            "Nd\u00b3\u207a f-f transitions from \u2074I\u2089/\u2082 ground state: 6 narrow\n"
+            "absorption bands (432/522/583/625/677/741nm).\n"
+            "32-point grid required to resolve band structure.\n"
+            "\n"
+            "--- WATER ---\n"
+            "\n"
+            "{#ff7ec8e3}WATER  n=1.33  Pope & Fry (1997)\n"
+            "Direct Beer-Lambert from measured absorption data\n"
+            "(1m path). OH overtone causes steep drop above 700nm.";
     }
 
     inline juce::String geometry()
@@ -497,15 +643,20 @@ public:
         setInterceptsMouseClicks(true, true);
         setWantsKeyboardFocus(true);
 
-        tabs = { "About", "Materials", "Geometry", "Lights", "Viewport", "Controls" };
+        tabs = { "About", "Materials", "Science", "Geometry", "Lights", "Viewport", "Controls" };
         content = {
             HelpContent::about(),
             HelpContent::materials(),
+            HelpContent::science(),
             HelpContent::geometry(),
             HelpContent::lights(),
             HelpContent::viewport(),
             HelpContent::controls()
         };
+
+        spectraImage = juce::ImageFileFormat::loadFrom(
+            BinaryData::elements_spectra_panel_png,
+            static_cast<size_t>(BinaryData::elements_spectra_panel_pngSize));
     }
 
     void paint(juce::Graphics& g) override
@@ -556,7 +707,30 @@ public:
                                                  fullPanelBounds.getWidth(),
                                                  fullPanelBounds.getBottom() - tabBarBounds.getBottom())
                                .reduced(32, 24);
-        drawFormattedContent(g, contentArea, content[static_cast<size_t>(activeTab)]);
+
+        // Science tab: image scrolls with content as the first item
+        static const int scienceTabIndex = 2;
+        int scienceImgOffset = 0;
+        if (activeTab == scienceTabIndex && spectraImage.isValid())
+        {
+            float imgAspect = static_cast<float>(spectraImage.getWidth()) / spectraImage.getHeight();
+            int imgW = contentArea.getWidth();
+            int imgH = juce::roundToInt(imgW / imgAspect);
+            scienceImgOffset = imgH + 8;
+
+            int imgY = contentArea.getY() - scrollOffset;
+            if (imgY + imgH > contentArea.getY() && imgY < contentArea.getBottom())
+            {
+                g.saveState();
+                g.reduceClipRegion(contentArea);
+                g.drawImage(spectraImage,
+                            juce::Rectangle<float>((float)contentArea.getX(), (float)imgY, (float)imgW, (float)imgH),
+                            juce::RectanglePlacement::fillDestination);
+                g.restoreState();
+            }
+        }
+
+        drawFormattedContent(g, contentArea, content[static_cast<size_t>(activeTab)], scienceImgOffset);
 
         // Close button (top-right of panel)
         g.setColour(ElementsColors::mid);
@@ -618,11 +792,11 @@ public:
     }
 
 private:
-    void drawFormattedContent(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& text)
+    void drawFormattedContent(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& text, int topOffset = 0)
     {
         auto lines = juce::StringArray::fromLines(text);
         float lineH = 22.0f;
-        float totalH = lines.size() * lineH;
+        float totalH = lines.size() * lineH + static_cast<float>(topOffset);
         float visibleH = static_cast<float>(area.getHeight());
         int maxScroll = juce::jmax(0, static_cast<int>(totalH - visibleH));
         scrollOffset = juce::jmin(scrollOffset, maxScroll);
@@ -631,7 +805,7 @@ private:
         int scrollBarW = (totalH > visibleH) ? 6 : 0;
         auto textArea = area.withTrimmedRight(scrollBarW + 4);
 
-        float y = static_cast<float>(area.getY()) - scrollOffset;
+        float y = static_cast<float>(area.getY()) - scrollOffset + static_cast<float>(topOffset);
         float x = static_cast<float>(textArea.getX());
         float w = static_cast<float>(textArea.getWidth());
 
@@ -715,6 +889,7 @@ private:
 
     std::vector<juce::String> tabs;
     std::vector<juce::String> content;
+    juce::Image spectraImage;
     int activeTab = 0;
     int scrollOffset = 0;
     juce::Rectangle<int> fullPanelBounds;
@@ -1101,6 +1276,7 @@ private:
     void deletePreset();
     void loadPreset(const juce::File& file);
     void refreshPresetList();
+    void updateDepthEnabled(int blendMode);  // gray out DEPTH when not AM/FM
     juce::File getPresetsDir() const;
     juce::File currentPresetFile;
     juce::ComboBox geoCombo, matCombo, matBCombo, blendModeCombo;
@@ -1146,6 +1322,7 @@ private:
     juce::Label modDepthLabel;
     juce::Slider modDepthSlider;
     juce::TextButton oscAMuteButton{"MUTE A"};
+    juce::DrawableButton swapMaterialsButton{"swap", juce::DrawableButton::ImageFitted};
     ADSRDisplay adsrDisplay;
     ADSRDisplay filterAdsrDisplay;
 
@@ -1206,17 +1383,17 @@ private:
     void setupRotarySlider(juce::Slider& slider, double min, double max, double def);
     void setupLabel(juce::Label& label, const juce::String& text, float fontSize, bool bold = false);
 
-    // Material data
-    static constexpr int NUM_MATERIALS = 10;
+    // Material data (NUM_MATERIALS = 13 from Physics.h)
     const juce::String materialNames[NUM_MATERIALS] = {
         "Diamond", "Water", "Amber", "Ruby", "Gold", "Emerald", "Amethyst", "Sapphire",
-        "Copper", "Obsidian"
+        "Copper", "Obsidian", "Alexandrite", "Malachite", "Neodymium"
     };
     const juce::Colour materialColours[NUM_MATERIALS] = {
         juce::Colour(0xFFE8F4FF), juce::Colour(0xFF50C8E8), juce::Colour(0xFFFFBF00),
         juce::Colour(0xFFE0115F), juce::Colour(0xFFFFD700), juce::Colour(0xFF50C878),
         juce::Colour(0xFF9966CC), juce::Colour(0xFF0F52BA),
-        juce::Colour(0xFFB87333), juce::Colour(0xFF1C1C1C)
+        juce::Colour(0xFFB87333), juce::Colour(0xFF1C1C1C),
+        juce::Colour(0xFF5B8A64), juce::Colour(0xFF2E7D52), juce::Colour(0xFF9070C8)
     };
 
     // Section frame rectangles (right column, for paint())

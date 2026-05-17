@@ -524,19 +524,13 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                         case 0:  // Ring Mod: multiply — creates sidebands
                             blended = sampleA * sampleB;
                             break;
-                        case 1:  // Max: picks dominant sample — waveshaping effect
-                            blended = (std::abs(sampleA) > std::abs(sampleB)) ? sampleA : sampleB;
-                            break;
-                        case 2:  // AM: B modulates amplitude of A
+                        case 1:  // AM: B modulates amplitude of A
                             blended = sampleA * (1.0f + amDepth * sampleB);
                             break;
-                        case 3:  // Difference: |A-B| — spectral subtraction effect
+                        case 2:  // XOR: |A-B| — spectral subtraction effect
                             blended = std::abs(sampleA - sampleB) * (sampleA >= sampleB ? 1.0f : -1.0f);
                             break;
-                        case 4:  // Crossfade: simple linear mix of both timbres
-                            blended = lerp(sampleA, sampleB, 0.5f);
-                            break;
-                        case 5:  // FM: B modulates phase of A
+                        case 3:  // FM: B modulates phase of A
                         {
                             float fmIndex = amDepth * 0.25f;
                             float modPhase = voice.phase + fmIndex * sampleB;
@@ -554,8 +548,6 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                             break;
                     }
                     // Mix scales continuously from pure A (0) to full blend result (1)
-                    // Exception: AM and FM are already scaled internally via amDepth/fmIndex,
-                    // but mix still gates dual-osc activation and provides coarse wet level.
                     sample = lerp(sampleA, blended, mixT);
                 }
             }
@@ -949,7 +941,7 @@ void ElementsSynth::setMaterialB(int materialIndex)
 // Blend control setters
 void ElementsSynth::setBlendMode(int mode)
 {
-    if (mode >= 0 && mode <= 5)
+    if (mode >= 0 && mode <= 3)
     {
         blendMode = mode;
         updateSpectrum();  // regenerate blended wavetable with new blend formula
@@ -1272,16 +1264,19 @@ void ElementsSynth::calculateSpectrumForMaterial(int matIndex, std::array<float,
     // Normalizes perceived volume across materials with different total transmission.
     // Gains calculated from avg transmission ratio to Diamond (baseline ~0.96).
     static const float materialGain[NUM_MATERIALS] = {
-        1.0f,   // Diamond  — baseline (flat ~0.96 transmission)
-        1.6f,   // Water    — red absorption, needs slight brightness boost
-        1.7f,   // Amber    — strong blue absorption
-        2.5f,   // Ruby     — near-zero below 600nm, low total energy
-        2.0f,   // Gold     — sharper interband step, less total energy
-        2.8f,   // Emerald  — narrow green peak, most energy concentrated
-        2.2f,   // Amethyst — bimodal, green/yellow absorbed
-        4.0f,   // Sapphire — steep cutoff, only blue/high harmonics pass
-        2.8f,   // Copper   — deep red only, very low total energy
-        4.5f    // Obsidian — near-opaque, minimal transmission
+        1.0f,   // Diamond     — baseline (flat ~0.96 transmission)
+        1.6f,   // Water       — red absorption, needs slight brightness boost
+        1.7f,   // Amber       — strong blue absorption
+        2.5f,   // Ruby        — near-zero below 600nm, low total energy
+        2.0f,   // Gold        — sharper interband step, less total energy
+        2.8f,   // Emerald     — narrow green peak, most energy concentrated
+        2.2f,   // Amethyst    — bimodal, green/yellow absorbed
+        4.0f,   // Sapphire    — steep cutoff, only blue/high harmonics pass
+        2.8f,   // Copper      — deep red only, very low total energy
+        4.5f,   // Obsidian    — near-opaque, minimal transmission
+        2.4f,   // Alexandrite — bimodal (green+red), moderate average energy
+        3.2f,   // Malachite   — narrow green window, high absorption elsewhere
+        1.9f,   // Neodymium   — comb spectrum, moderate average transmission across all windows
     };
     float matGain = materialGain[matIndex];
     if (matGain != 1.0f)

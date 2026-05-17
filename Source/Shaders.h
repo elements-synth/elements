@@ -19,12 +19,14 @@ static constexpr const char* pbrVertexShader = R"(
 
     varying vec3 v_worldPos;
     varying vec3 v_worldNormal;
+    varying vec3 v_objectPos;
 
     void main()
     {
         vec4 worldPos = u_modelMatrix * a_position;
         v_worldPos = worldPos.xyz;
         v_worldNormal = normalize(u_normalMatrix * a_normal);
+        v_objectPos = a_position.xyz;
         gl_Position = u_projMatrix * u_viewMatrix * worldPos;
     }
 )";
@@ -33,9 +35,12 @@ static constexpr const char* pbrVertexShader = R"(
 static constexpr const char* pbrFragmentShader = R"(
     varying vec3 v_worldPos;
     varying vec3 v_worldNormal;
+    varying vec3 v_objectPos;
 
     // Existing PBR uniforms
     uniform vec3 u_albedo;
+    uniform float u_bandingStrength;
+    uniform float u_bandingFrequency;
     uniform float u_metallic;
     uniform float u_roughness;
 
@@ -119,10 +124,19 @@ static constexpr const char* pbrFragmentShader = R"(
         vec3 V = normalize(u_cameraPos - v_worldPos);
         float NdotV = max(dot(N, V), 0.0);
 
+        // Procedural banding (Malachite-style): modulate albedo in object space
+        vec3 albedo = u_albedo;
+        if (u_bandingStrength > 0.0) {
+            float r = length(v_objectPos.xz);
+            float band = 0.5 + 0.5 * sin(r * u_bandingFrequency + v_objectPos.y * u_bandingFrequency * 0.4);
+            band = smoothstep(0.15, 0.85, band);
+            albedo = mix(albedo * 0.38, albedo, band);
+        }
+
         // (a) F0 from IOR: F0 = ((1-n)/(1+n))^2
         float iorRatio = (1.0 - u_ior) / (1.0 + u_ior);
         float F0scalar = iorRatio * iorRatio;
-        vec3 F0 = mix(vec3(F0scalar), u_albedo, u_metallic);
+        vec3 F0 = mix(vec3(F0scalar), albedo, u_metallic);
 
         // =====================================================================
         // Direct lighting (Cook-Torrance with 3 point lights)
@@ -157,7 +171,7 @@ static constexpr const char* pbrFragmentShader = R"(
             vec3 kD = (1.0 - kS) * (1.0 - u_metallic);
 
             float NdotL = max(dot(N, L), 0.0);
-            Lo += (kD * u_albedo / PI + specular) * radiance * NdotL;
+            Lo += (kD * albedo / PI + specular) * radiance * NdotL;
 
             // (d) Subsurface scattering contribution
             if (u_sssStrength > 0.0)
@@ -217,7 +231,7 @@ static constexpr const char* pbrFragmentShader = R"(
         // =====================================================================
 
         // Ambient
-        vec3 ambient = vec3(0.03) * u_albedo;
+        vec3 ambient = vec3(0.03) * albedo;
 
         // Environment reflection strength: reduced for opaque metals, stronger for transparent/glossy
         float envStrength = mix(0.15, 0.4, u_transparency) * mix(1.0, 0.5, u_metallic);

@@ -134,7 +134,8 @@ public:
     float getVolume() const { return apvts.getRawParameterValue("volume")->load(); }
 
     // Spectrum (for visualization)
-    const std::array<float, NUM_WAVELENGTHS>& getSpectrum() const { return synth.getCurrentSpectrum(); }
+    const std::array<float, NUM_WAVELENGTHS>& getSpectrum()  const { return synth.getSpectrumA(); }
+    const std::array<float, NUM_WAVELENGTHS>& getSpectrumB() const { return synth.getSpectrumB(); }
 
     // Oscilloscope (for visualization)
     const std::array<float, 512>& getOscilloscopeBuffer() const { return synth.getOscilloscopeBuffer(); }
