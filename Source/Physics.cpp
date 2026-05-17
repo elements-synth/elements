@@ -11,99 +11,6 @@
 #include <algorithm>
 
 // ==============================================================================
-// STATIC DATA - Materials
-// ==============================================================================
-
-/**
- * Los 8 materiales del prototipo Python.
- *
- * 'static' significa que esta variable solo es visible en este archivo.
- * Se inicializa una sola vez cuando el programa carga.
- */
-static std::array<Material, NUM_MATERIALS> s_materials = {{
-    // Diamond - Near-perfect uniform transmission → ALL harmonics → crystalline
-    // Pure diamond is colorless with >95% transmission across visible spectrum
-    Material(
-        "Diamond",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.95f, 0.96f, 0.97f, 0.97f, 0.96f, 0.96f, 0.95f, 0.94f }},
-        "#E8F4FF", 2.42f
-    ),
-    // Water - Strong IR/red absorption (vibrational overtones of O-H bonds)
-    // Very transparent in blue-green, drops sharply above 600nm
-    Material(
-        "Water",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.98f, 0.98f, 0.97f, 0.95f, 0.82f, 0.55f, 0.25f, 0.08f }},
-        "#50C8E8", 1.33f
-    ),
-    // Amber - Fossilized resin, strong UV/blue absorption from conjugated organics
-    // Gradual warm slope with near-zero blue transmission
-    Material(
-        "Amber",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.03f, 0.08f, 0.22f, 0.55f, 0.80f, 0.92f, 0.95f, 0.97f }},
-        "#FFBF00", 1.55f
-    ),
-    // Ruby - Cr3+ in Al2O3, sharp absorption below 600nm (d-d transitions)
-    // Near-zero transmission in blue/green, abrupt step to high red transmission
-    Material(
-        "Ruby",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.02f, 0.02f, 0.03f, 0.04f, 0.18f, 0.78f, 0.95f, 0.98f }},
-        "#E0115F", 1.77f
-    ),
-    // Gold - Sharp interband transition at ~500nm (5d→6sp electron excitation)
-    // Abrupt step from near-zero blue to high transmission above 520nm
-    Material(
-        "Gold",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.01f, 0.02f, 0.05f, 0.72f, 0.94f, 0.97f, 0.98f, 0.98f }},
-        "#FFD700", 0.47f
-    ),
-    // Emerald - Cr3+ in Be3Al2Si6O18, narrow green transmission window
-    // Sharp absorption in both blue and red, only green passes through
-    Material(
-        "Emerald",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.04f, 0.18f, 0.72f, 0.95f, 0.65f, 0.15f, 0.04f, 0.02f }},
-        "#50C878", 1.57f
-    ),
-    // Amethyst - Fe4+ charge transfer in SiO2, absorbs green/yellow (500-600nm)
-    // BIMODAL: transmits violet AND some red, creating characteristic purple
-    Material(
-        "Amethyst",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.90f, 0.82f, 0.45f, 0.15f, 0.12f, 0.28f, 0.45f, 0.35f }},
-        "#9966CC", 1.54f
-    ),
-    // Sapphire - Fe2+/Ti4+ intervalence charge transfer in Al2O3
-    // Strong blue transmission, steep cutoff above 550nm
-    Material(
-        "Sapphire",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.95f, 0.92f, 0.78f, 0.42f, 0.10f, 0.03f, 0.01f, 0.01f }},
-        "#0F52BA", 1.77f
-    ),
-    // Copper - Interband transition at ~590nm (higher than Gold's ~500nm)
-    // Only deep red/IR passes through; extremely warm/bass-heavy
-    Material(
-        "Copper",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.01f, 0.01f, 0.02f, 0.03f, 0.08f, 0.45f, 0.85f, 0.95f }},
-        "#B87333", 0.46f
-    ),
-    // Obsidian - Volcanic glass (amorphous SiO2 + Fe3O4/Fe2O3 inclusions)
-    // Nearly opaque; only deep red passes in thin sections
-    Material(
-        "Obsidian",
-        {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-        {{ 0.01f, 0.01f, 0.01f, 0.02f, 0.03f, 0.12f, 0.40f, 0.70f }},
-        "#1C1C1C", 1.50f
-    )
-}};
-
-// ==============================================================================
 // STATIC DATA - Light Sources
 // ==============================================================================
 
@@ -136,9 +43,9 @@ std::array<float, NUM_WAVELENGTHS> generateWavelengths()
 float calculateAverageTransmission(const Material& material)
 {
     float sum = 0.0f;
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < material.numSamples; ++i)
         sum += material.transmission[static_cast<size_t>(i)];
-    return sum / 8.0f;
+    return sum / static_cast<float>(material.numSamples);
 }
 
 /**
@@ -214,47 +121,162 @@ static std::array<LightPosition, 3> s_lightPositions = {{
 const std::array<Material, NUM_MATERIALS>& getMaterials()
 {
     // Static local - inicializado en primera llamada (thread-safe en C++11+)
+    // Material(name, wavelengths, transmission/reflectance, color, n, k, metallicFactor)
+    // n   = real part of complex IOR
+    // k   = extinction coefficient (imaginary part): 0 = dielectric, >0 = metal
+    // metallic = 0 → pure dielectric path (Beer-Lambert + real Fresnel)
+    //            1 → pure metallic path (complex Fresnel, no Beer-Lambert)
+    // 32-point wavelength grid shared by all materials (380–780nm, ~12.9nm steps)
+    // Simple materials upsampled from 16-pt source data via linear interpolation.
+    // Complex materials hand-designed at 32 pts (band positions from literature).
+    // See science.md for sources and methodology.
     static std::array<Material, NUM_MATERIALS> materials = {{
+        // Pure dielectrics: k=0, metallic=0
+        // Diamond — Sellmeier (1923), k≈0, near-flat visible
         Material("Diamond",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.95f, 0.96f, 0.97f, 0.97f, 0.96f, 0.96f, 0.95f, 0.94f }},
-                 "#E8F4FF", 2.42f),
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.920f, 0.930f, 0.939f, 0.945f, 0.950f, 0.954f, 0.959f, 0.964f,
+                   0.969f, 0.970f, 0.970f, 0.970f, 0.970f, 0.970f, 0.970f, 0.967f,
+                   0.962f, 0.960f, 0.960f, 0.960f, 0.960f, 0.958f, 0.953f, 0.950f,
+                   0.950f, 0.950f, 0.950f, 0.950f, 0.945f, 0.940f, 0.940f, 0.940f },
+                 "#E8F4FF", 2.42f, 0.0f, 0.0f),
+        // Water — Pope & Fry (1997), 1m Beer-Lambert
         Material("Water",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.98f, 0.98f, 0.97f, 0.95f, 0.82f, 0.55f, 0.25f, 0.08f }},
-                 "#50C8E8", 1.33f),
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.989f, 0.992f, 0.995f, 0.995f, 0.995f, 0.993f, 0.991f, 0.989f,
+                   0.987f, 0.978f, 0.967f, 0.960f, 0.956f, 0.948f, 0.938f, 0.917f,
+                   0.888f, 0.844f, 0.789f, 0.749f, 0.730f, 0.705f, 0.670f, 0.629f,
+                   0.576f, 0.496f, 0.328f, 0.182f, 0.126f, 0.072f, 0.045f, 0.018f },
+                 "#50C8E8", 1.33f, 0.0f, 0.0f),
+        // Amber — PMC12196071, UV cutoff ~440nm
         Material("Amber",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.03f, 0.08f, 0.22f, 0.55f, 0.80f, 0.92f, 0.95f, 0.97f }},
-                 "#FFBF00", 1.55f),
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.010f, 0.020f, 0.029f, 0.053f, 0.078f, 0.142f, 0.204f, 0.316f,
+                   0.441f, 0.549f, 0.649f, 0.713f, 0.761f, 0.804f, 0.842f, 0.871f,
+                   0.891f, 0.908f, 0.922f, 0.934f, 0.943f, 0.952f, 0.957f, 0.960f,
+                   0.960f, 0.961f, 0.966f, 0.970f, 0.970f, 0.970f, 0.970f, 0.970f },
+                 "#FFBF00", 1.55f, 0.0f, 0.0f),
+        // Ruby — PMC9330567, Cr³⁺ absorption bands 413/550nm
         Material("Ruby",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.02f, 0.02f, 0.03f, 0.04f, 0.18f, 0.78f, 0.95f, 0.98f }},
-                 "#E0115F", 1.77f),
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.02f, 0.02f, 0.03f, 0.06f, 0.10f, 0.12f, 0.13f, 0.10f,
+                   0.08f, 0.05f, 0.03f, 0.02f, 0.02f, 0.02f, 0.04f, 0.08f,
+                   0.15f, 0.30f, 0.55f, 0.75f, 0.85f, 0.90f, 0.93f, 0.95f,
+                   0.97f, 0.96f, 0.97f, 0.97f, 0.97f, 0.97f, 0.98f, 0.98f },
+                 "#E0115F", 1.77f, 0.01f, 0.0f),
+        // Metals: k>>0, metallic=1.0 — transmission[] repurposed as spectral reflectance weights
+        // Gold — Palik (1985), complex IOR: absorbs blue/UV, reflects yellow/red
         Material("Gold",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.01f, 0.02f, 0.05f, 0.72f, 0.94f, 0.97f, 0.98f, 0.98f }},
-                 "#FFD700", 0.47f),
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.010f, 0.010f, 0.010f, 0.015f, 0.020f, 0.024f, 0.029f, 0.034f,
+                   0.039f, 0.068f, 0.108f, 0.273f, 0.495f, 0.645f, 0.751f, 0.830f,
+                   0.885f, 0.920f, 0.940f, 0.954f, 0.963f, 0.970f, 0.970f, 0.971f,
+                   0.976f, 0.980f, 0.980f, 0.980f, 0.980f, 0.980f, 0.980f, 0.980f },
+                 "#FFD700", 0.47f, 2.83f, 1.0f),
+        // Emerald — Wood & Nassau (1968), Cr³⁺ absorption 430/610nm
         Material("Emerald",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.04f, 0.18f, 0.72f, 0.95f, 0.65f, 0.15f, 0.04f, 0.02f }},
-                 "#50C878", 1.57f),
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.04f, 0.07f, 0.09f, 0.07f, 0.04f, 0.12f, 0.28f, 0.48f,
+                   0.65f, 0.78f, 0.87f, 0.90f, 0.89f, 0.88f, 0.82f, 0.70f,
+                   0.50f, 0.28f, 0.14f, 0.08f, 0.06f, 0.06f, 0.06f, 0.05f,
+                   0.04f, 0.04f, 0.03f, 0.03f, 0.03f, 0.02f, 0.02f, 0.02f },
+                 "#50C878", 1.57f, 0.0f, 0.0f),
+        // Amethyst — PMC7483767, [FeO₄]⁰ charge transfer ~545nm
         Material("Amethyst",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.90f, 0.82f, 0.45f, 0.15f, 0.12f, 0.28f, 0.45f, 0.35f }},
-                 "#9966CC", 1.54f),
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.880f, 0.861f, 0.841f, 0.812f, 0.782f, 0.736f, 0.691f, 0.595f,
+                   0.484f, 0.363f, 0.238f, 0.163f, 0.110f, 0.105f, 0.129f, 0.162f,
+                   0.202f, 0.246f, 0.294f, 0.342f, 0.387f, 0.432f, 0.472f, 0.507f,
+                   0.531f, 0.547f, 0.532f, 0.519f, 0.509f, 0.499f, 0.490f, 0.480f },
+                 "#9966CC", 1.54f, 0.0f, 0.0f),
+        // Sapphire — GIA 2020, Fe²⁺–Ti⁴⁺ IVCT ~570nm
         Material("Sapphire",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.95f, 0.92f, 0.78f, 0.42f, 0.10f, 0.03f, 0.01f, 0.01f }},
-                 "#0F52BA", 1.77f),
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.88f, 0.82f, 0.85f, 0.86f, 0.83f, 0.78f, 0.75f, 0.68f,
+                   0.58f, 0.46f, 0.34f, 0.24f, 0.16f, 0.11f, 0.08f, 0.07f,
+                   0.07f, 0.06f, 0.05f, 0.04f, 0.03f, 0.03f, 0.02f, 0.02f,
+                   0.02f, 0.01f, 0.01f, 0.01f, 0.01f, 0.01f, 0.01f, 0.01f },
+                 "#0F52BA", 1.77f, 0.0f, 0.0f),
+        // Copper — Palik (1985), complex IOR, deep red character
         Material("Copper",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.01f, 0.01f, 0.02f, 0.03f, 0.08f, 0.45f, 0.85f, 0.95f }},
-                 "#B87333", 0.46f),
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.010f, 0.010f, 0.010f, 0.010f, 0.010f, 0.010f, 0.010f, 0.014f,
+                   0.019f, 0.020f, 0.020f, 0.023f, 0.028f, 0.036f, 0.046f, 0.055f,
+                   0.065f, 0.111f, 0.189f, 0.274f, 0.363f, 0.461f, 0.561f, 0.663f,
+                   0.769f, 0.853f, 0.868f, 0.882f, 0.902f, 0.921f, 0.936f, 0.950f },
+                 "#B87333", 0.46f, 2.83f, 1.0f),
+        // Obsidian — Icarus 2021 / USGS, volcanic glass, featureless rise toward IR
         Material("Obsidian",
-                 {{ 380.0f, 450.0f, 500.0f, 550.0f, 600.0f, 650.0f, 700.0f, 780.0f }},
-                 {{ 0.01f, 0.01f, 0.01f, 0.02f, 0.03f, 0.12f, 0.40f, 0.70f }},
-                 "#1C1C1C", 1.50f)
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.010f, 0.010f, 0.010f, 0.010f, 0.010f, 0.010f, 0.010f, 0.014f,
+                   0.019f, 0.020f, 0.020f, 0.023f, 0.028f, 0.036f, 0.046f, 0.055f,
+                   0.065f, 0.083f, 0.107f, 0.138f, 0.173f, 0.218f, 0.278f, 0.344f,
+                   0.421f, 0.493f, 0.551f, 0.603f, 0.638f, 0.672f, 0.696f, 0.720f },
+                 "#1C1C1C", 1.50f, 0.0f, 0.0f),
+        // Alexandrite — PMC7145866, Cr³⁺ dual-peak: green (440-570nm) + red (640-780nm)
+        Material("Alexandrite",
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.07f, 0.09f, 0.10f, 0.08f, 0.05f, 0.08f, 0.22f, 0.45f,
+                   0.62f, 0.72f, 0.74f, 0.70f, 0.60f, 0.42f, 0.25f, 0.16f,
+                   0.20f, 0.32f, 0.46f, 0.58f, 0.68f, 0.76f, 0.82f, 0.86f,
+                   0.88f, 0.88f, 0.88f, 0.87f, 0.88f, 0.88f, 0.89f, 0.90f },
+                 "#5B8A64", 1.745f, 0.0f, 0.0f),
+        // Malachite — USGS splib07 K-M, Cu²⁺ LMCT+d-d, green window
+        Material("Malachite",
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.08f, 0.12f, 0.18f, 0.25f, 0.34f, 0.45f, 0.56f, 0.66f,
+                   0.74f, 0.81f, 0.86f, 0.89f, 0.90f, 0.88f, 0.84f, 0.78f,
+                   0.70f, 0.62f, 0.53f, 0.45f, 0.38f, 0.32f, 0.27f, 0.22f,
+                   0.19f, 0.16f, 0.14f, 0.13f, 0.12f, 0.12f, 0.11f, 0.11f },
+                 "#2E7D52", 1.85f, 0.0f, 0.0f),
+        // Neodymium — Nd:glass laser lit., f-f transitions from 4I9/2 ground state
+        // Bands: ~432nm (4G11/2), ~522nm (4G9/2), ~583nm (4G5/2), ~625nm (2H9/2), ~677nm (4F7/2), ~741nm (4F5/2)
+        Material("Neodymium",
+                 { 380.0f, 393.0f, 406.0f, 419.0f, 432.0f, 445.0f, 457.0f, 470.0f,
+                   483.0f, 496.0f, 509.0f, 522.0f, 535.0f, 548.0f, 561.0f, 574.0f,
+                   587.0f, 600.0f, 613.0f, 626.0f, 638.0f, 651.0f, 664.0f, 677.0f,
+                   690.0f, 703.0f, 716.0f, 728.0f, 741.0f, 754.0f, 767.0f, 780.0f },
+                 { 0.72f, 0.78f, 0.82f, 0.85f, 0.55f, 0.80f, 0.86f, 0.82f,
+                   0.75f, 0.85f, 0.78f, 0.18f, 0.72f, 0.86f, 0.88f, 0.30f,
+                   0.06f, 0.52f, 0.78f, 0.38f, 0.72f, 0.85f, 0.78f, 0.30f,
+                   0.68f, 0.82f, 0.84f, 0.72f, 0.38f, 0.76f, 0.86f, 0.88f },
+                 "#9070C8", 1.636f, 0.0f, 0.0f)
     }};
     return materials;
 }
@@ -873,6 +895,7 @@ void interpolateMaterial(const Material& material,
 {
     const auto& matWL = material.wavelengths;
     const auto& matTR = material.transmission;
+    const int n = material.numSamples;
 
     for (int i = 0; i < NUM_WAVELENGTHS; ++i)
     {
@@ -880,20 +903,14 @@ void interpolateMaterial(const Material& material,
 
         // Find surrounding points in material data
         int idx = 0;
-        while (idx < 7 && matWL[idx + 1] < wl)
-        {
+        while (idx < n - 2 && matWL[idx + 1] < wl)
             ++idx;
-        }
 
         // Linear interpolation
         if (wl <= matWL[0])
-        {
             output[i] = matTR[0];
-        }
-        else if (wl >= matWL[7])
-        {
-            output[i] = matTR[7];
-        }
+        else if (wl >= matWL[n - 1])
+            output[i] = matTR[n - 1];
         else
         {
             float t = (wl - matWL[idx]) / (matWL[idx + 1] - matWL[idx]);
@@ -913,20 +930,73 @@ void calculateSpectrum(const Material& material,
                        float angleDeg,
                        std::array<float, NUM_WAVELENGTHS>& output)
 {
-    // Interpolate material to light wavelengths
+    // Interpolate material spectral curve (transmission for dielectrics,
+    // reflectance for metals) to the 50-point light wavelength grid
     std::array<float, NUM_WAVELENGTHS> materialCurve;
     interpolateMaterial(material, light.wavelengths, materialCurve);
 
-    // Calculate Fresnel transmission
-    std::array<float, NUM_WAVELENGTHS> fresnelCurve;
-    calculateFresnelSpectral(angleDeg, light.wavelengths, fresnelCurve);
+    float metallic = material.metallicFactor;
 
-    // Combine: light * material * fresnel
-    for (int i = 0; i < NUM_WAVELENGTHS; ++i)
+    // ==========================================================================
+    // DIELECTRIC PATH  (metallicFactor = 0)
+    // Uses real-valued IOR, Beer-Lambert transmission model.
+    // Fresnel output is a transmission factor (1 = all passes, 0 = all reflected).
+    // Strong angle-dependent spectral shaping (blues drop first with angle).
+    // ==========================================================================
+    std::array<float, NUM_WAVELENGTHS> dielectricOut{};
+    if (metallic < 0.999f)
     {
-        output[i] = light.intensity[i] * materialCurve[i] * fresnelCurve[i];
-        output[i] = clamp(output[i], 0.0f, 1.0f);
+        std::array<float, NUM_WAVELENGTHS> fresnelCurve;
+        // Pass the material's actual IOR (previously hard-coded to 1.5f — bug fix)
+        calculateFresnelSpectral(angleDeg, light.wavelengths, fresnelCurve,
+                                 material.refractiveIndex);
+        for (int i = 0; i < NUM_WAVELENGTHS; ++i)
+            dielectricOut[i] = clamp(light.intensity[i] * materialCurve[i] * fresnelCurve[i],
+                                     0.0f, 1.0f);
     }
+
+    // ==========================================================================
+    // METALLIC PATH  (metallicFactor = 1)
+    // Uses complex IOR (n + ik). F0 computed from both n and k.
+    // Schlick approximation from the correct metallic F0.
+    // materialCurve[] is now the spectral reflectance (not transmission).
+    // Angle-spectral shaping is ~10x weaker than dielectric — metals barely
+    // change colour with viewing angle.
+    // ==========================================================================
+    std::array<float, NUM_WAVELENGTHS> metallicOut{};
+    if (metallic > 0.001f)
+    {
+        float n = material.refractiveIndex;
+        float k = material.extinctionCoeff;
+
+        // Complex Fresnel F0: R = ((n-1)² + k²) / ((n+1)² + k²)
+        float F0 = ((n - 1.0f) * (n - 1.0f) + k * k)
+                 / ((n + 1.0f) * (n + 1.0f) + k * k);
+
+        // Schlick angle-dependent reflectance
+        float cosI = std::cos(degToRad(clamp(angleDeg, 0.0f, 89.0f)));
+        float schlick = F0 + (1.0f - F0) * std::pow(1.0f - cosI, 5.0f);
+
+        // Very subtle spectral modulation with angle: metals stay their colour
+        // at all angles (0.5–1.5 decay vs 1–6 for dielectrics)
+        float angleFactor = clamp(angleDeg / 90.0f, 0.0f, 1.0f);
+        for (int i = 0; i < NUM_WAVELENGTHS; ++i)
+        {
+            float wlPos = (light.wavelengths[i] - 380.0f) / 400.0f;
+            float decayRate = 0.5f + 1.0f * (1.0f - wlPos);  // 0.5–1.5, much flatter than dielectric
+            float spectralMod = std::pow(1.0f - angleFactor * 0.3f, decayRate);  // 0.3 caps the angle effect
+            metallicOut[i] = clamp(light.intensity[i] * materialCurve[i] * schlick * spectralMod,
+                                   0.0f, 1.0f);
+        }
+    }
+
+    // ==========================================================================
+    // BLEND: lerp between paths based on metallicFactor
+    // Pure dielectric (0) or pure metal (1) takes the respective path fully.
+    // Mixed materials (e.g. dielectric+metallic blend) get a weighted sum.
+    // ==========================================================================
+    for (int i = 0; i < NUM_WAVELENGTHS; ++i)
+        output[i] = clamp(lerp(dielectricOut[i], metallicOut[i], metallic), 0.0f, 1.0f);
 }
 
 // ==============================================================================

@@ -68,9 +68,15 @@ public:
 
     // --- Convenience methods (wrappers around synth) ---
 
-    // Material
+    // Material (legacy single-material support, maps to materialA)
     void setMaterial(int index) { synth.setMaterial(index); }
     int getMaterial() const { return synth.getMaterial(); }
+
+    // Dual-oscillator material control
+    void setMaterialA(int index) { synth.setMaterialA(index); }
+    void setMaterialB(int index) { synth.setMaterialB(index); }
+    int getMaterialA() const { return synth.getMaterialA(); }
+    int getMaterialB() const { return synth.getMaterialB(); }
 
     // Geometry
     void setGeometry(Geometry geom) { synth.setGeometry(geom); }
@@ -128,11 +134,20 @@ public:
     float getVolume() const { return apvts.getRawParameterValue("volume")->load(); }
 
     // Spectrum (for visualization)
-    const std::array<float, NUM_WAVELENGTHS>& getSpectrum() const { return synth.getCurrentSpectrum(); }
+    const std::array<float, NUM_WAVELENGTHS>& getSpectrum()  const { return synth.getSpectrumA(); }
+    const std::array<float, NUM_WAVELENGTHS>& getSpectrumB() const { return synth.getSpectrumB(); }
 
     // Oscilloscope (for visualization)
     const std::array<float, 512>& getOscilloscopeBuffer() const { return synth.getOscilloscopeBuffer(); }
     int getOscilloscopeWritePos() const { return synth.getOscilloscopeWritePos(); }
+    const std::array<float, 512>& getOscilloscopeBufferB() const { return synth.getOscilloscopeBufferB(); }
+    int getOscilloscopeWritePosB() const { return synth.getOscilloscopeWritePosB(); }
+
+    void setBlendModeUI(int mode) { synth.setBlendMode(mode); }
+    int getBlendMode() const { return synth.getBlendMode(); }
+    float getMixAmount() const { return synth.getMixAmount(); }
+    void setOscAMuted(bool muted) { synth.setOscAMuted(muted); }
+    bool isOscAMuted() const { return synth.isOscAMuted(); }
 
     // ==============================================================================
     // AUTOMATABLE PARAMETERS (exposed to DAW / Bitwig modulators)
@@ -157,6 +172,11 @@ private:
     float lastDeformAmount = 0.0f;
     float lastDeformFrequency = 2.0f;
     float lastVolume = 0.95f;
+
+    // Dual-oscillator blend/mod cache (materialA/B managed directly via synth)
+    int lastBlendMode = 0;
+    float lastAmDepth = 0.5f;
+    float lastOscBDetune = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ElementsAudioProcessor)
 };

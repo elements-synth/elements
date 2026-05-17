@@ -42,16 +42,20 @@ namespace MaterialAccents
     const juce::Colour emerald  {0xff4ecb8d};
     const juce::Colour amethyst {0xffb57bee};
     const juce::Colour sapphire {0xff5b9ef5};
-    const juce::Colour copper   {0xffcf7e46};
-    const juce::Colour obsidian {0xff6a7a8a};
+    const juce::Colour copper       {0xffcf7e46};
+    const juce::Colour obsidian     {0xff6a7a8a};
+    const juce::Colour alexandrite  {0xff5b8a64};
+    const juce::Colour malachite    {0xff2e7d52};
+    const juce::Colour neodymium    {0xff9070c8};
 
     inline juce::Colour getAccentForMaterial(int index)
     {
         static const juce::Colour accents[] = {
             diamond, water, amber, ruby, gold,
-            emerald, amethyst, sapphire, copper, obsidian
+            emerald, amethyst, sapphire, copper, obsidian,
+            alexandrite, malachite, neodymium
         };
-        if (index >= 0 && index < 10)
+        if (index >= 0 && index < 13)
             return accents[index];
         return diamond;
     }

@@ -210,6 +210,50 @@ ElementsAudioProcessor::createParameterLayout()
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
         0.95f));
 
+    // =====================================================================
+    // 4. DUAL-OSCILLATOR MATERIAL MIXING PARAMETERS
+    // =====================================================================
+
+    // materialA and materialB are NOT APVTS parameters — managed as manual XML
+    // attributes (same as geometry and blendMode) because DAW automation is not
+    // needed and APVTS would cause stale-value conflicts on preset load.
+
+    // Blend Mode: 0=Ring Mod, 1=AM, 2=XOR, 3=FM
+    layout.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"blendMode", 1},
+        "Blend Mode",
+        juce::StringArray{"Ring Mod", "AM", "XOR", "FM"},
+        0));
+
+    // Mix Amount: 0.0-1.0 (dry/wet), default 0.0
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"mixAmount", 1},
+        "Mix Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.0f,
+        "%",
+        juce::AudioProcessorParameter::genericParameter,
+        [](float v, int) { return juce::String(static_cast<int>(v * 100)) + "%"; },
+        nullptr));
+
+    // AM Depth: 0.0-1.0, default 0.5
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"amDepth", 1},
+        "AM Depth",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.0f),
+        0.5f));
+
+    // Oscillator B Detune: -100 to +100 cents, default 0
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"oscBDetune", 1},
+        "Osc B Detune",
+        juce::NormalisableRange<float>(-100.0f, 100.0f, 0.1f, 1.0f),
+        0.0f,
+        " cents",
+        juce::AudioProcessorParameter::genericParameter,
+        [](float v, int) { return juce::String(v, 1) + " cents"; },
+        nullptr));
+
     return layout;
 }
 
@@ -473,6 +517,39 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }
 
+    // Dual-oscillator material mixing
+    {
+        // materialA and materialB are set directly via setMaterial/setMaterialB
+        // (not read from APVTS) — see getStateInformation/setStateInformation.
+
+        // Blend Mode
+        int mode = apvts.getRawParameterValue("blendMode")->load();
+        if (mode != lastBlendMode)
+        {
+            synth.setBlendMode(mode);
+            lastBlendMode = mode;
+        }
+
+        // Mix Amount (smooth parameter, no caching - allows smooth automation)
+        synth.setMixAmount(apvts.getRawParameterValue("mixAmount")->load());
+
+        // AM Depth
+        float depth = apvts.getRawParameterValue("amDepth")->load();
+        if (std::abs(depth - lastAmDepth) > 0.01f)
+        {
+            synth.setAMDepth(depth);
+            lastAmDepth = depth;
+        }
+
+        // Osc B Detune
+        float detune = apvts.getRawParameterValue("oscBDetune")->load();
+        if (std::abs(detune - lastOscBDetune) > 0.1f)
+        {
+            synth.setOscBDetune(detune);
+            lastOscBDetune = detune;
+        }
+    }
+
     // =========================================================================
     // GENERAR AUDIO
     // =========================================================================
@@ -531,9 +608,12 @@ void ElementsAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // Crear un objeto XML para guardar el estado
     auto state = std::make_unique<juce::XmlElement>("ElementsState");
 
-    // Guardar parámetros manuales
-    state->setAttribute("material", synth.getMaterial());
-    state->setAttribute("geometry", static_cast<int>(synth.getGeometry()));
+    // Guardar parámetros manuales (stored directly from synth, not via APVTS,
+    // because their combos call synth setters directly rather than through APVTS)
+    state->setAttribute("material",   synth.getMaterial());
+    state->setAttribute("materialB",  synth.getMaterialB());
+    state->setAttribute("blendMode",  synth.getBlendMode());
+    state->setAttribute("geometry",   static_cast<int>(synth.getGeometry()));
 
     // Guardar estado de luces (enabled + source)
     for (int i = 0; i < 3; ++i)
@@ -565,14 +645,17 @@ void ElementsAudioProcessor::setStateInformation (const void* data, int sizeInBy
 
     if (state != nullptr && state->hasTagName("ElementsState"))
     {
-        // Restaurar parámetros manuales
+        // Restaurar parámetros manuales (material, geometry, blendMode — not in APVTS)
         synth.setMaterial(state->getIntAttribute("material", 0));
+        synth.setMaterialB(state->getIntAttribute("materialB", 0));
+        synth.setBlendMode(state->getIntAttribute("blendMode", 0));
+        lastBlendMode = synth.getBlendMode();
         synth.setGeometry(static_cast<Geometry>(state->getIntAttribute("geometry", 0)));
 
         // Restaurar estado de luces (enabled + source)
         for (int i = 0; i < 3; ++i)
         {
-            bool defaultEnabled = (i == 0);  // Key light on by default for old projects
+            bool defaultEnabled = (i == 0);
             synth.setLightEnabled(i, state->getBoolAttribute("lightEnabled" + juce::String(i), defaultEnabled));
             synth.setLightSource(i, state->getIntAttribute("lightSource" + juce::String(i), i));
         }

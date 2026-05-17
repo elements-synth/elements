@@ -224,9 +224,7 @@ ElementsSynth::ElementsSynth()
     // Force immediate wavetable generation on startup (bypass throttling)
     if (regenPending)
     {
-        spectrum = pendingSpectrum;
         regenerateWavetables();
-        regenPending = false;
     }
 }
 
@@ -276,7 +274,6 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     if (regenPending && samplesSinceLastRegen >= regenThrottleSamples)
     {
         // Enough time has passed, regenerate now
-        spectrum = pendingSpectrum;
         regenerateWavetables();
         regenPending = false;
         samplesSinceLastRegen = 0;
@@ -350,13 +347,33 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     }
     prevActiveVoiceCount = currentActiveVoiceCount;
 
-    // Process crossfade
-    float xfadeStart = 0.0f, xfadeEnd = 0.0f;
-    if (crossfade.active)
+    // Process Oscillator A crossfade
+    float xfadeAStart = 0.0f, xfadeAEnd = 0.0f;
+    if (crossfadeA.active)
     {
-        xfadeStart = crossfade.progress;
-        xfadeEnd = std::min(1.0f, xfadeStart + crossfade.increment * numSamples);
+        xfadeAStart = crossfadeA.progress;
+        xfadeAEnd = std::min(1.0f, xfadeAStart + crossfadeA.increment * numSamples);
     }
+
+    // Dual-osc: prepare Osc B state for this block
+    bool dualOscActive = (mixAmount > 0.001f);
+    float detuneRatio = dualOscActive ? std::pow(2.0f, oscBDetune / 1200.0f) : 1.0f;
+    // Always use pure Osc B — all blend formulas operate at sample level
+    const WavetableSet* wavetablesBPtr = &currentWavetablesB;
+    CrossfadeState*     crossfadeBPtr  = &crossfadeB;
+
+    float xfadeBStart = 0.0f, xfadeBEnd = 0.0f;
+    if (dualOscActive && crossfadeBPtr->active)
+    {
+        xfadeBStart = crossfadeBPtr->progress;
+        xfadeBEnd = std::min(1.0f, xfadeBStart + crossfadeBPtr->increment * numSamples);
+    }
+
+    // Smooth mixAmount to avoid zipper noise when mix knob moves
+    float mixAmountSmoothStart = mixAmountSmooth;
+    float mixSmoothCoeff = 1.0f - std::exp(-static_cast<float>(numSamples) / (0.05f * static_cast<float>(sampleRate)));
+    mixAmountSmooth += (mixAmount - mixAmountSmooth) * mixSmoothCoeff;
+    float mixAmountSmoothEnd = mixAmountSmooth;
 
     // Pre-compute filter state
     bool filterEnvActive = std::abs(filterEnvAmount) > 0.001f;
@@ -387,6 +404,9 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     // Count active voices for mixing
     int activeVoiceCount = 0;
 
+    // Only capture Osc B samples from the first active non-stealing voice
+    bool oscBVoiceCaptured = false;
+
     // Process each voice
     for (auto& voice : voices)
     {
@@ -395,11 +415,22 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
 
         activeVoiceCount++;
 
-        // Get appropriate wavetable for this voice's frequency
-        const auto& wavetable = currentWavetables.getForFrequency(voice.frequency);
-        const auto* oldWavetable = crossfade.active
-            ? &crossfade.oldTables.getForFrequency(voice.frequency)
+        // Oscillator A wavetable
+        const auto& wavetableA = currentWavetablesA.getForFrequency(voice.frequency);
+        const auto* oldWavetableA = crossfadeA.active
+            ? &crossfadeA.oldTables.getForFrequency(voice.frequency)
             : nullptr;
+
+        // Oscillator B wavetable (only if dual-osc active)
+        const std::array<float, WAVETABLE_SIZE>* wavetableBPtr = nullptr;
+        const std::array<float, WAVETABLE_SIZE>* oldWavetableBPtr = nullptr;
+        if (dualOscActive)
+        {
+            float freqB = voice.frequency * detuneRatio;
+            wavetableBPtr = &wavetablesBPtr->getForFrequency(freqB);
+            if (crossfadeBPtr->active)
+                oldWavetableBPtr = &crossfadeBPtr->oldTables.getForFrequency(freqB);
+        }
 
         // Apply pitch modulation from light intensity (+-2 semitones)
         float pitchMod = std::pow(2.0f, pitchOffsetSemitones / 12.0f);
@@ -410,7 +441,7 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             // Handle voice stealing fade-out
             if (voice.stealing)
             {
-                float sample = readWavetable(voice.phase, wavetable);
+                float sample = readWavetable(voice.phase, wavetableA);
 
                 float fadeGain = static_cast<float>(voice.stealFadeRemaining) / Voice::FADE_SAMPLES;
                 float interpSpectralAmpSteal = spectralAmpStart + (spectralAmpEnd - spectralAmpStart) * (static_cast<float>(i) / numSamples);
@@ -421,6 +452,13 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                 voice.phase += phaseIncrement;
                 if (voice.phase >= 1.0f)
                     voice.phase -= 1.0f;
+
+                if (dualOscActive)
+                {
+                    voice.phaseB += phaseIncrement * detuneRatio;
+                    if (voice.phaseB >= 1.0f)
+                        voice.phaseB -= 1.0f;
+                }
 
                 voice.stealFadeRemaining--;
                 if (voice.stealFadeRemaining <= 0)
@@ -440,15 +478,78 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                 break;
             }
 
-            // Read wavetable with linear interpolation
-            float sample = readWavetable(voice.phase, wavetable);
-
-            // Apply crossfade if active
-            if (oldWavetable != nullptr)
+            // Read Oscillator A wavetable with linear interpolation
+            float sampleA = readWavetable(voice.phase, wavetableA);
+            if (oldWavetableA != nullptr)
             {
-                float oldSample = readWavetable(voice.phase, *oldWavetable);
-                float t = lerp(xfadeStart, xfadeEnd, static_cast<float>(i) / numSamples);
-                sample = lerp(oldSample, sample, t);
+                float oldSample = readWavetable(voice.phase, *oldWavetableA);
+                float t = lerp(xfadeAStart, xfadeAEnd, static_cast<float>(i) / numSamples);
+                sampleA = lerp(oldSample, sampleA, t);
+            }
+            if (oscAMuted) sampleA = 0.0f;
+
+            // Oscillator B: read, crossfade, blend with A
+            float sample = sampleA;
+            if (dualOscActive && wavetableBPtr != nullptr)
+            {
+                float sampleB = readWavetable(voice.phaseB, *wavetableBPtr);
+                if (oldWavetableBPtr != nullptr)
+                {
+                    float oldSampleB = readWavetable(voice.phaseB, *oldWavetableBPtr);
+                    float t = lerp(xfadeBStart, xfadeBEnd, static_cast<float>(i) / numSamples);
+                    sampleB = lerp(oldSampleB, sampleB, t);
+                }
+
+                // Capture pure Osc B waveform for oscilloscope (always from currentWavetablesB,
+                // independent of blend mode so the display always shows the raw B oscillator)
+                if (!oscBVoiceCaptured)
+                {
+                    const auto& pureWavetableB = currentWavetablesB.getForFrequency(voice.frequency * detuneRatio);
+                    float pureSampleB = readWavetable(voice.phaseB, pureWavetableB);
+                    oscilloscopeBufferB[static_cast<size_t>(oscilloscopeWritePosB)] = pureSampleB;
+                    oscilloscopeWritePosB = (oscilloscopeWritePosB + 1) % 512;
+                }
+
+                float mixT = lerp(mixAmountSmoothStart, mixAmountSmoothEnd, static_cast<float>(i) / numSamples);
+
+                if (oscAMuted)
+                {
+                    sample = sampleB;                                  // A muted: output B directly
+                }
+                else
+                {
+                    float blended;
+                    switch (blendMode)
+                    {
+                        case 0:  // Ring Mod: multiply — creates sidebands
+                            blended = sampleA * sampleB;
+                            break;
+                        case 1:  // AM: B modulates amplitude of A
+                            blended = sampleA * (1.0f + amDepth * sampleB);
+                            break;
+                        case 2:  // XOR: |A-B| — spectral subtraction effect
+                            blended = std::abs(sampleA - sampleB) * (sampleA >= sampleB ? 1.0f : -1.0f);
+                            break;
+                        case 3:  // FM: B modulates phase of A
+                        {
+                            float fmIndex = amDepth * 0.25f;
+                            float modPhase = voice.phase + fmIndex * sampleB;
+                            modPhase -= std::floor(modPhase);
+                            blended = readWavetable(modPhase, wavetableA);
+                            if (oldWavetableA != nullptr)
+                            {
+                                float t = lerp(xfadeAStart, xfadeAEnd, static_cast<float>(i) / numSamples);
+                                blended = lerp(readWavetable(modPhase, *oldWavetableA), blended, t);
+                            }
+                            break;
+                        }
+                        default:
+                            blended = sampleA;
+                            break;
+                    }
+                    // Mix scales continuously from pure A (0) to full blend result (1)
+                    sample = lerp(sampleA, blended, mixT);
+                }
             }
 
             // Calculate envelope level with velocity
@@ -470,10 +571,11 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
 
             // Wavefolding: sinusoidal fold driven by deform amount (Sphere only)
             // drive=1 → sin(x)≈x (transparent), drive=15 → heavy folding + harmonics
+            // Divide by drive to normalize small-signal gain: sin(d*x)/d ≈ x for small x
             if (currentGeometry == Geometry::Sphere && deformAmount > 0.001f)
             {
                 float drive = 1.0f + deformAmount * 14.0f;  // 1 to 15
-                sample = std::sin(drive * sample);
+                sample = std::sin(drive * sample) / drive;
             }
 
             // Anti-click fade-in for NEW voices
@@ -487,21 +589,38 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             // Add to buffer
             buffer[i] += sample;
 
-            // Advance phase
+            // Advance phases
             voice.phase += phaseIncrement;
             if (voice.phase >= 1.0f)
                 voice.phase -= 1.0f;
 
+            if (dualOscActive)
+            {
+                voice.phaseB += phaseIncrement * detuneRatio;
+                if (voice.phaseB >= 1.0f)
+                    voice.phaseB -= 1.0f;
+            }
+
             voice.age++;
         }
+
+        // Mark Osc B oscilloscope as captured after the first active non-stealing voice
+        if (dualOscActive && wavetableBPtr != nullptr && !voice.stealing)
+            oscBVoiceCaptured = true;
     }
 
     // Update crossfade progress
-    if (crossfade.active)
+    if (crossfadeA.active)
     {
-        crossfade.progress = xfadeEnd;
-        if (crossfade.progress >= 1.0f)
-            crossfade.active = false;
+        crossfadeA.progress = xfadeAEnd;
+        if (crossfadeA.progress >= 1.0f)
+            crossfadeA.active = false;
+    }
+    if (dualOscActive && crossfadeBPtr->active)
+    {
+        crossfadeBPtr->progress = xfadeBEnd;
+        if (crossfadeBPtr->progress >= 1.0f)
+            crossfadeBPtr->active = false;
     }
 
     // Update filter enabled mix (for next block)
@@ -562,10 +681,15 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
         oscilloscopeWritePos = (oscilloscopeWritePos + 1) % 512;
     }
 
-    // Clear oscilloscope buffer if no active voices (for clean display)
+    // Clear oscilloscope buffers if no active voices (for clean display)
     if (activeVoiceCount == 0)
     {
         std::fill(oscilloscopeBuffer.begin(), oscilloscopeBuffer.end(), 0.0f);
+        std::fill(oscilloscopeBufferB.begin(), oscilloscopeBufferB.end(), 0.0f);
+    }
+    else if (!dualOscActive)
+    {
+        std::fill(oscilloscopeBufferB.begin(), oscilloscopeBufferB.end(), 0.0f);
     }
 }
 
@@ -790,14 +914,57 @@ void ElementsSynth::setDeformFrequency(float freq)
     }
 }
 
-void ElementsSynth::setMaterial(int materialIndex)
+// Dual-oscillator material setters
+void ElementsSynth::setMaterialA(int materialIndex)
 {
-    if (materialIndex >= 0 && materialIndex < NUM_MATERIALS)
+    if (materialIndex >= 0 && materialIndex < NUM_MATERIALS && materialIndex != currentMaterialIndexA)
     {
-        currentMaterialIndex = materialIndex;
+        currentMaterialIndexA = materialIndex;
         updateSpectrum();
         updatePhysicalEnvelope();
     }
+}
+
+void ElementsSynth::setMaterialB(int materialIndex)
+{
+    if (materialIndex >= 0 && materialIndex < NUM_MATERIALS && materialIndex != currentMaterialIndexB)
+    {
+        currentMaterialIndexB = materialIndex;
+        // Only update spectrum if dual-osc is active
+        if (mixAmount > 0.001f)
+        {
+            updateSpectrum();
+        }
+    }
+}
+
+// Blend control setters
+void ElementsSynth::setBlendMode(int mode)
+{
+    if (mode >= 0 && mode <= 3)
+    {
+        blendMode = mode;
+        updateSpectrum();  // regenerate blended wavetable with new blend formula
+    }
+}
+
+void ElementsSynth::setMixAmount(float amount)
+{
+    float prev = mixAmount;
+    mixAmount = clamp(amount, 0.0f, 1.0f);
+    // Trigger regen when dual-osc first activates so B/blended wavetables get built
+    if (prev <= 0.001f && mixAmount > 0.001f)
+        updateSpectrum();
+}
+
+void ElementsSynth::setAMDepth(float depth)
+{
+    amDepth = clamp(depth, 0.0f, 1.0f);
+}
+
+void ElementsSynth::setOscBDetune(float cents)
+{
+    oscBDetune = clamp(cents, -100.0f, 100.0f);
 }
 
 void ElementsSynth::setGeometry(Geometry geom)
@@ -865,11 +1032,19 @@ void ElementsSynth::updatePhysicalEnvelope()
     // Average intensity (0-1 range) for envelope parameters
     float avgIntensity = (activeCount > 0) ? (totalIntensity / activeCount) : 0.5f;
 
-    // Get current material properties
+    // Get material properties (interpolate between A and B based on mixAmount)
     const auto& materials = getMaterials();
-    const Material& material = materials[currentMaterialIndex];
-    float ior = material.refractiveIndex;
-    float avgTransmission = calculateAverageTransmission(material);
+    const Material& materialA = materials[currentMaterialIndexA];
+    const Material& materialB = materials[currentMaterialIndexB];
+
+    // Interpolate physical properties
+    float iorA = materialA.refractiveIndex;
+    float iorB = materialB.refractiveIndex;
+    float ior = lerp(iorA, iorB, mixAmount);
+
+    float transmissionA = calculateAverageTransmission(materialA);
+    float transmissionB = calculateAverageTransmission(materialB);
+    float avgTransmission = lerp(transmissionA, transmissionB, mixAmount);
 
     // Attack: higher intensity = faster attack (more photon energy)
     physicalEnvelope.attack = lerp(0.5f, 0.005f, avgIntensity);
@@ -1022,28 +1197,12 @@ void ElementsSynth::setFilterEnvAmount(float amount)
 // INTERNAL METHODS
 // ==============================================================================
 
-void ElementsSynth::updateSpectrum()
+// Helper function: Calculate spectrum for a specific material
+void ElementsSynth::calculateSpectrumForMaterial(int matIndex, std::array<float, NUM_WAVELENGTHS>& outputSpectrum)
 {
     // Get material
     const auto& materials = getMaterials();
-    const Material& material = materials[currentMaterialIndex];
-
-    // Count active lights
-    int activeLightCount = 0;
-    for (int i = 0; i < 3; ++i)
-    {
-        if (lights[i].enabled)
-            ++activeLightCount;
-    }
-
-    // PROBLEM 3: No lights → silence
-    hasActiveLights = (activeLightCount > 0);
-    if (!hasActiveLights)
-    {
-        std::fill(spectrum.begin(), spectrum.end(), 0.0f);
-        // Don't regenerate wavetables — processBlock will output silence
-        return;
-    }
+    const Material& material = materials[matIndex];
 
     // SUM contributions from all active lights
     // Each light adds its own spectral contribution based on:
@@ -1086,30 +1245,40 @@ void ElementsSynth::updateSpectrum()
     }
 
     // Beer-Lambert thickness: T_effective = T^thickness
-    // thickness < 1.0 = thinner walls = more transmission = brighter sound
-    // thickness > 1.0 = thicker walls = more absorption = darker/bassier sound
-    if (std::abs(thickness - 1.0f) > 0.001f)
+    // Only applies to the dielectric component — metals have no bulk transmission.
+    // For mixed materials, the effective exponent is scaled by (1 - metallicFactor):
+    //   pure dielectric → full thickness effect
+    //   pure metal      → effectiveThickness = 1.0 (no-op)
+    //   blended         → proportional attenuation
     {
-        for (int w = 0; w < NUM_WAVELENGTHS; ++w)
-            combinedSpectrum[w] = std::pow(std::max(combinedSpectrum[w], 0.001f), thickness);
+        float dielectricFraction = 1.0f - material.metallicFactor;
+        float effectiveThickness = 1.0f + (thickness - 1.0f) * dielectricFraction;
+        if (std::abs(effectiveThickness - 1.0f) > 0.001f)
+        {
+            for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+                combinedSpectrum[w] = std::pow(std::max(combinedSpectrum[w], 0.001f), effectiveThickness);
+        }
     }
 
     // Per-material gain compensation.
     // Normalizes perceived volume across materials with different total transmission.
     // Gains calculated from avg transmission ratio to Diamond (baseline ~0.96).
     static const float materialGain[NUM_MATERIALS] = {
-        1.0f,   // Diamond  — baseline (flat ~0.96 transmission)
-        1.6f,   // Water    — red absorption, needs slight brightness boost
-        1.7f,   // Amber    — strong blue absorption
-        2.5f,   // Ruby     — near-zero below 600nm, low total energy
-        2.0f,   // Gold     — sharper interband step, less total energy
-        2.8f,   // Emerald  — narrow green peak, most energy concentrated
-        2.2f,   // Amethyst — bimodal, green/yellow absorbed
-        4.0f,   // Sapphire — steep cutoff, only blue/high harmonics pass
-        2.8f,   // Copper   — deep red only, very low total energy
-        4.5f    // Obsidian — near-opaque, minimal transmission
+        1.0f,   // Diamond     — baseline (flat ~0.96 transmission)
+        1.6f,   // Water       — red absorption, needs slight brightness boost
+        1.7f,   // Amber       — strong blue absorption
+        2.5f,   // Ruby        — near-zero below 600nm, low total energy
+        2.0f,   // Gold        — sharper interband step, less total energy
+        2.8f,   // Emerald     — narrow green peak, most energy concentrated
+        2.2f,   // Amethyst    — bimodal, green/yellow absorbed
+        4.0f,   // Sapphire    — steep cutoff, only blue/high harmonics pass
+        2.8f,   // Copper      — deep red only, very low total energy
+        4.5f,   // Obsidian    — near-opaque, minimal transmission
+        2.4f,   // Alexandrite — bimodal (green+red), moderate average energy
+        3.2f,   // Malachite   — narrow green window, high absorption elsewhere
+        1.9f,   // Neodymium   — comb spectrum, moderate average transmission across all windows
     };
-    float matGain = materialGain[currentMaterialIndex];
+    float matGain = materialGain[matIndex];
     if (matGain != 1.0f)
     {
         for (int w = 0; w < NUM_WAVELENGTHS; ++w)
@@ -1128,8 +1297,8 @@ void ElementsSynth::updateSpectrum()
     float scaleFactor = (maxVal > 1.0f) ? (1.0f / maxVal) : 1.0f;
     for (int w = 0; w < NUM_WAVELENGTHS; ++w)
     {
-        spectrum[w] = combinedSpectrum[w] * scaleFactor;
-        spectrumTotal += spectrum[w];
+        outputSpectrum[w] = combinedSpectrum[w] * scaleFactor;
+        spectrumTotal += outputSpectrum[w];
     }
 
     // BUG 3 FIX: If total spectrum is near zero (total internal reflection / no light),
@@ -1152,10 +1321,41 @@ void ElementsSynth::updateSpectrum()
     spectralAmplitudeTarget = clamp(avgSpectrum * 1.5f, 0.1f, 1.0f);
 
     DBG("Spectral amplitude target: " << spectralAmplitudeTarget);
+}
 
-    // THROTTLING: Don't regenerate wavetables too frequently to prevent clicks
-    // Store the pending spectrum and mark for regeneration
-    pendingSpectrum = spectrum;
+// Main spectrum update function: calculates both oscillator spectra
+void ElementsSynth::updateSpectrum()
+{
+    // Count active lights
+    int activeLightCount = 0;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (lights[i].enabled)
+            ++activeLightCount;
+    }
+
+    // No lights → silence
+    hasActiveLights = (activeLightCount > 0);
+    if (!hasActiveLights)
+    {
+        std::fill(spectrumA.begin(), spectrumA.end(), 0.0f);
+        std::fill(spectrumB.begin(), spectrumB.end(), 0.0f);
+        // Don't regenerate wavetables — processBlock will output silence
+        return;
+    }
+
+    // Calculate spectrum A (always)
+    calculateSpectrumForMaterial(currentMaterialIndexA, spectrumA);
+
+    // Calculate spectrum B (only if dual-osc is active)
+    if (mixAmount > 0.001f)
+    {
+        calculateSpectrumForMaterial(currentMaterialIndexB, spectrumB);
+    }
+
+    // Store pending spectra and mark for regeneration
+    pendingSpectrumA = spectrumA;
+    pendingSpectrumB = spectrumB;
     regenPending = true;
 }
 
@@ -1165,32 +1365,51 @@ void ElementsSynth::regenerateWavetables()
     bool hasActiveVoices = false;
     for (const auto& voice : voices)
     {
-        if (voice.active)
+        if (voice.active && !voice.stealing)
         {
             hasActiveVoices = true;
             break;
         }
     }
 
+    // Oscillator A crossfade setup
     if (hasActiveVoices)
     {
         // CLICK FIX: If a crossfade is already in progress, don't restart it.
         // Just update the target wavetables. The crossfade will naturally morph
         // to the new target without an abrupt restart.
-        if (!crossfade.active)
+        if (!crossfadeA.active)
         {
             // Start new crossfade only if one isn't already running
-            crossfade.oldTables = currentWavetables;
-            crossfade.progress = 0.0f;
-            crossfade.increment = 1.0f / (crossfadeDuration * static_cast<float>(sampleRate));
-            crossfade.active = true;
+            crossfadeA.oldTables = currentWavetablesA;
+            crossfadeA.progress = 0.0f;
+            crossfadeA.increment = 1.0f / (crossfadeDuration * static_cast<float>(sampleRate));
+            crossfadeA.active = true;
         }
-        // If crossfade is active, we just update currentWavetables below,
-        // and the ongoing crossfade will blend toward the new values
     }
 
-    // Generate new wavetables (target for crossfade, or immediate if no voices)
-    wavetableGen.generateBandLimitedSet(spectrum, static_cast<float>(sampleRate), currentWavetables);
+    // Generate wavetables A (always)
+    wavetableGen.generateBandLimitedSet(pendingSpectrumA, static_cast<float>(sampleRate), currentWavetablesA);
+    spectrumA = pendingSpectrumA;
+
+    // Oscillator B crossfade setup (only if dual-osc is active)
+    if (mixAmount > 0.001f)
+    {
+        if (hasActiveVoices && !crossfadeB.active)
+        {
+            crossfadeB.oldTables = currentWavetablesB;
+            crossfadeB.progress = 0.0f;
+            crossfadeB.increment = 1.0f / (crossfadeDuration * static_cast<float>(sampleRate));
+            crossfadeB.active = true;
+        }
+
+        // Generate wavetables B
+        wavetableGen.generateBandLimitedSet(pendingSpectrumB, static_cast<float>(sampleRate), currentWavetablesB);
+        spectrumB = pendingSpectrumB;
+
+    }
+
+    regenPending = false;
 }
 
 float ElementsSynth::generateEnvelopeSample(Voice& voice)
