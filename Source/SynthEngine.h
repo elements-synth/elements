@@ -421,6 +421,11 @@ public:
     float getDeformAmount() const { return deformAmount; }
     float getDeformFrequency() const { return deformFrequency; }
 
+    void setDeformNoiseType(int type);
+    void setDeformRate(float rate)    { deformRate = juce::jlimit(0.0f, 3.0f, rate); }
+    int   getDeformNoiseType() const  { return deformNoiseType; }
+    float getDeformRate() const       { return deformRate; }
+
     // --- Thickness (Beer-Lambert) ---
 
     void setThickness(float t);
@@ -515,7 +520,7 @@ private:
 
     // Throttling for wavetable regeneration (prevents clicks during fast rotation)
     int samplesSinceLastRegen = 0;
-    int regenThrottleSamples = 4410;  // ~100ms at 44.1kHz - minimum time between regenerations
+    int regenThrottleSamples = 882;   // ~20ms at 44.1kHz — fast enough for deform animation at high Rate
     bool regenPending = false;
 
     // Voices
@@ -534,13 +539,24 @@ private:
     float pitchOffsetSemitones = 0.0f;
     float pitchOffsetTarget = 0.0f;
 
-    // Wavefolding
+    // Wavefolding / Deform
     float deformAmount = 0.0f;
     float deformAmountTarget = 0.0f;
     float deformFrequency = 2.0f;
     float lastSpectrumDeformAmount = 0.0f;
     float deformNoiseTimeOffset = 0.0f;
-    int deformAnimBlockCounter = 0;
+    int   deformNoiseType = 1;    // 0=Perlin, 1=Simplex, 2=Alligator, 3=Worley
+    float deformRate = 1.0f;      // animation speed multiplier
+    float deformRateSmooth = 1.0f;
+    bool deformEvolutionRegen = false;  // true when regen triggered by deform time evolution (uses short crossfade)
+
+    // Per-wavelength shimmer state: smoothed noise values that modulate the spectrum at regen time.
+    // Low deformFrequency → small filterCoeff → slow evolution → wobbly.
+    // High deformFrequency → large filterCoeff → fast evolution → shimmery.
+    std::array<float, NUM_WAVELENGTHS> shimmerCurrentAmp{};
+
+    // Layer 3 wavefolder: smoothed fold drive derived from shimmerCurrentAmp mean (coupled noise).
+    float foldDriveSmooth = 0.0f;
 
     // Filter Envelope (global, not per-voice)
     ADSREnvelope filterEnvelope{0.01f, 0.3f, 0.0f, 0.3f};

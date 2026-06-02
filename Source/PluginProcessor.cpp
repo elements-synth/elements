@@ -203,6 +203,20 @@ ElementsAudioProcessor::createParameterLayout()
         juce::NormalisableRange<float>(0.5f, 10.0f, 0.1f),
         2.0f));
 
+    // Noise Type: 0=Perlin, 1=Simplex, 2=Alligator, 3=Worley (default Simplex)
+    layout.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"deformNoiseType", 1},
+        "Noise Type",
+        juce::StringArray{"Perlin", "Simplex", "Alligator", "Worley"},
+        1));
+
+    // Deform Rate: animation speed multiplier 0.0–3.0, default 1.0
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"deformRate", 1},
+        "Deform Rate",
+        juce::NormalisableRange<float>(0.0f, 3.0f, 0.01f, 0.7f),
+        1.0f));
+
     // Volume: 0.0 – 1.0, default 0.95
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"volume", 1},
@@ -504,6 +518,20 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         {
             lastDeformFrequency = newDeformFreq;
             synth.setDeformFrequency(newDeformFreq);
+        }
+
+        int newNoiseType = static_cast<int>(apvts.getRawParameterValue("deformNoiseType")->load());
+        if (newNoiseType != lastDeformNoiseType)
+        {
+            lastDeformNoiseType = newNoiseType;
+            synth.setDeformNoiseType(newNoiseType);
+        }
+
+        float newDeformRate = apvts.getRawParameterValue("deformRate")->load();
+        if (std::abs(newDeformRate - lastDeformRate) > 0.01f)
+        {
+            lastDeformRate = newDeformRate;
+            synth.setDeformRate(newDeformRate);
         }
     }
 

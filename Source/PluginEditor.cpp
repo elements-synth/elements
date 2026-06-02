@@ -375,9 +375,16 @@ void Viewport3D::timerCallback()
     // Deform noise animation (sphere only)
     float deformAmt = processor.getSynth().getDeformAmount();
     float deformFreq = processor.getSynth().getDeformFrequency();
+    int noiseType = processor.getSynth().getDeformNoiseType();
     if (geom == Geometry::Sphere && deformAmt > 0.001f)
     {
-        noiseTimeOffset += 0.02f;
+        float deformRate = processor.getSynth().getDeformRate();
+        noiseTimeOffset += 0.02f * deformRate;
+        if (noiseType != lastDeformNoiseType)
+        {
+            lastDeformNoiseType = noiseType;
+            displacedVBODirty = true;
+        }
         displacedVBODirty = true;
         needsRepaint = true;
     }
@@ -862,7 +869,7 @@ void Viewport3D::createVBOs()
     using namespace juce::gl;
 
     auto cubeVerts   = generateCubeVertices(1.0f);
-    auto sphereVerts = generateSphereVertices(0.8f, 32);
+    auto sphereVerts = generateSphereVertices(0.8f, 96);
     auto torusVerts  = generateTorusVertices(0.6f, 0.25f, 32);
     auto dodecaVerts = generateDodecahedronVertices(0.85f);
 
@@ -908,7 +915,7 @@ void Viewport3D::destroyVBOs()
     if (displacedSphereVBO) { glDeleteBuffers(1, &displacedSphereVBO); displacedSphereVBO = 0; }
 }
 
-void Viewport3D::updateDisplacedSphere(float amount, float frequency)
+void Viewport3D::updateDisplacedSphere(float amount, float frequency, int noiseType)
 {
     using namespace juce::gl;
 
@@ -918,8 +925,17 @@ void Viewport3D::updateDisplacedSphere(float amount, float frequency)
     std::vector<PBRVertex> displaced(numVerts);
 
     constexpr float eps = 0.01f;
-    const float dispScale = amount * 0.3f;
+    const float dispScale = amount * 1.5f;
     const float normalScale = dispScale * frequency;
+
+    auto noiseFunc = [noiseType](float nx, float ny, float nz) -> float {
+        switch (noiseType) {
+            case 0:  return perlin3D(nx, ny, nz);
+            case 2:  return alligator3D(nx, ny, nz);
+            case 3:  return worley3D(nx, ny, nz);
+            default: return simplex3D(nx, ny, nz);
+        }
+    };
 
     for (size_t i = 0; i < numVerts; ++i)
     {
@@ -927,13 +943,13 @@ void Viewport3D::updateDisplacedSphere(float amount, float frequency)
         float nx = base.normal[0], ny = base.normal[1], nz = base.normal[2];
         float px = base.position[0], py = base.position[1], pz = base.position[2];
 
-        // Sample coordinates (position * frequency + animated offset)
+        // Sample coordinates (position * frequency + animated offset, 3-axis uncorrelated)
         float sx = px * frequency + noiseTimeOffset;
-        float sy = py * frequency + noiseTimeOffset * 0.7f;
-        float sz = pz * frequency + noiseTimeOffset * 0.3f;
+        float sy = py * frequency + noiseTimeOffset * 0.6180339887f;
+        float sz = pz * frequency + noiseTimeOffset * 0.3819660113f;
 
         // Noise value for position displacement
-        float noise = simplex3D(sx, sy, sz);
+        float noise = noiseFunc(sx, sy, sz);
 
         // Displace position along base normal
         float displacement = noise * dispScale;
@@ -941,37 +957,47 @@ void Viewport3D::updateDisplacedSphere(float amount, float frequency)
         displaced[i].position[1] = py + ny * displacement;
         displaced[i].position[2] = pz + nz * displacement;
 
-        // Analytical smooth normal via noise gradient (same approach as Physics.cpp)
-        // Compute gradient of noise in sample-coordinate space
-        float dndx = (simplex3D(sx + eps, sy, sz) - simplex3D(sx - eps, sy, sz)) / (2.0f * eps);
-        float dndy = (simplex3D(sx, sy + eps, sz) - simplex3D(sx, sy - eps, sz)) / (2.0f * eps);
-        float dndz = (simplex3D(sx, sy, sz + eps) - simplex3D(sx, sy, sz - eps)) / (2.0f * eps);
+        // Worley and Alligator are O(27) per call — skip gradient for those types
+        // and use base normal directly (displacement shape still fully visible)
+        const bool skipGradient = (noiseType == 2 || noiseType == 3);
 
-        // Project gradient onto tangent plane (remove radial/normal component)
-        float radialComp = dndx * nx + dndy * ny + dndz * nz;
-        float tanX = dndx - nx * radialComp;
-        float tanY = dndy - ny * radialComp;
-        float tanZ = dndz - nz * radialComp;
-
-        // Tilt base normal by tangential gradient
-        // Chain rule: d(displacement)/d(pos) = frequency * d(noise)/d(sample) * dispScale
-        float newNx = nx - tanX * normalScale;
-        float newNy = ny - tanY * normalScale;
-        float newNz = nz - tanZ * normalScale;
-
-        // Normalize (always points outward since tilt is small relative to base normal)
-        float len = std::sqrt(newNx * newNx + newNy * newNy + newNz * newNz);
-        if (len > 1e-6f)
-        {
-            displaced[i].normal[0] = newNx / len;
-            displaced[i].normal[1] = newNy / len;
-            displaced[i].normal[2] = newNz / len;
-        }
-        else
+        if (skipGradient)
         {
             displaced[i].normal[0] = nx;
             displaced[i].normal[1] = ny;
             displaced[i].normal[2] = nz;
+        }
+        else
+        {
+            // Forward differences: reuse center sample, 3 extra calls vs 6 for central
+            float dndx = (noiseFunc(sx+eps, sy, sz) - noise) / eps;
+            float dndy = (noiseFunc(sx, sy+eps, sz) - noise) / eps;
+            float dndz = (noiseFunc(sx, sy, sz+eps) - noise) / eps;
+
+            // Project gradient onto tangent plane (remove radial/normal component)
+            float radialComp = dndx * nx + dndy * ny + dndz * nz;
+            float tanX = dndx - nx * radialComp;
+            float tanY = dndy - ny * radialComp;
+            float tanZ = dndz - nz * radialComp;
+
+            // Tilt base normal by tangential gradient
+            float newNx = nx - tanX * normalScale;
+            float newNy = ny - tanY * normalScale;
+            float newNz = nz - tanZ * normalScale;
+
+            float len = std::sqrt(newNx * newNx + newNy * newNy + newNz * newNz);
+            if (len > 1e-6f)
+            {
+                displaced[i].normal[0] = newNx / len;
+                displaced[i].normal[1] = newNy / len;
+                displaced[i].normal[2] = newNz / len;
+            }
+            else
+            {
+                displaced[i].normal[0] = nx;
+                displaced[i].normal[1] = ny;
+                displaced[i].normal[2] = nz;
+            }
         }
     }
 
@@ -1343,7 +1369,7 @@ void Viewport3D::renderGeometryPBR()
             if (lastDeformAmount > 0.001f && displacedSphereVBO != 0)
             {
                 if (displacedVBODirty)
-                    updateDisplacedSphere(lastDeformAmount, lastDeformFrequency);
+                    updateDisplacedSphere(lastDeformAmount, lastDeformFrequency, lastDeformNoiseType);
                 vbo = displacedSphereVBO;
             }
             else
@@ -2763,6 +2789,51 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     accordion.geoPanel.addAndMakeVisible(deformSlider);
     deformAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "deformAmount", deformSlider);
 
+    // Noise Type combo
+    noiseTypeLabel.setText("Noise", juce::dontSendNotification);
+    noiseTypeLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    noiseTypeLabel.setJustificationType(juce::Justification::centredLeft);
+    noiseTypeLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    accordion.geoPanel.addAndMakeVisible(noiseTypeLabel);
+
+    noiseTypeCombo.addItem("Perlin",    1);
+    noiseTypeCombo.addItem("Simplex",   2);
+    noiseTypeCombo.addItem("Alligator", 3);
+    noiseTypeCombo.addItem("Worley",    4);
+    noiseTypeCombo.setSelectedId(2, juce::dontSendNotification);  // default Simplex
+    accordion.geoPanel.addAndMakeVisible(noiseTypeCombo);
+    noiseTypeAttachment = std::make_unique<ComboBoxAttachment>(audioProcessor.apvts, "deformNoiseType", noiseTypeCombo);
+
+    // Freq slider (binds to existing deformFrequency param)
+    freqLabel.setText("Freq", juce::dontSendNotification);
+    freqLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    freqLabel.setJustificationType(juce::Justification::centredLeft);
+    freqLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    accordion.geoPanel.addAndMakeVisible(freqLabel);
+
+    freqSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    freqSlider.setRange(0.5, 10.0, 0.1);
+    freqSlider.setValue(2.0);
+    freqSlider.setDoubleClickReturnValue(true, 2.0);
+    freqSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
+    accordion.geoPanel.addAndMakeVisible(freqSlider);
+    freqAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "deformFrequency", freqSlider);
+
+    // Rate slider (deformRate — animation speed)
+    rateLabel.setText("Rate", juce::dontSendNotification);
+    rateLabel.setFont(juce::Font(10.0f, juce::Font::bold));
+    rateLabel.setJustificationType(juce::Justification::centredLeft);
+    rateLabel.setColour(juce::Label::textColourId, ElementsColors::text);
+    accordion.geoPanel.addAndMakeVisible(rateLabel);
+
+    rateSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    rateSlider.setRange(0.0, 3.0, 0.01);
+    rateSlider.setValue(1.0);
+    rateSlider.setDoubleClickReturnValue(true, 1.0);
+    rateSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
+    accordion.geoPanel.addAndMakeVisible(rateSlider);
+    rateAttachment = std::make_unique<SliderAttachment>(audioProcessor.apvts, "deformRate", rateSlider);
+
     // === MAT accordion panel controls ===
     matLabel.setText("MAT A", juce::dontSendNotification);
     matLabel.setFont(juce::Font(10.0f, juce::Font::bold));
@@ -3095,10 +3166,17 @@ void ElementsAudioProcessorEditor::timerCallback()
     if (geoCombo.getSelectedId() != geo)
         geoCombo.setSelectedId(geo, juce::dontSendNotification);
 
-    // Deform slider only active for Sphere
+    // Deform + noise controls only active for Sphere
     bool isSphere = (geo == 2);
+    float sphereAlpha = isSphere ? 1.0f : 0.35f;
     deformSlider.setEnabled(isSphere);
-    deformLabel.setAlpha(isSphere ? 1.0f : 0.35f);
+    deformLabel.setAlpha(sphereAlpha);
+    noiseTypeCombo.setEnabled(isSphere);
+    noiseTypeLabel.setAlpha(sphereAlpha);
+    freqSlider.setEnabled(isSphere);
+    freqLabel.setAlpha(sphereAlpha);
+    rateSlider.setEnabled(isSphere);
+    rateLabel.setAlpha(sphereAlpha);
 
     int mat = audioProcessor.getMaterial() + 1;
     if (matCombo.getSelectedId() != mat)
@@ -3325,6 +3403,18 @@ void ElementsAudioProcessorEditor::resized()
 
         deformLabel.setBounds(px, py, 60, rH);
         deformSlider.setBounds(px + 62, py + 2, pw - 62, rH - 4);
+        py += rH + gap;
+
+        noiseTypeLabel.setBounds(px, py, 44, rH);
+        noiseTypeCombo.setBounds(px + 46, py, pw - 46, rH);
+        py += rH + gap;
+
+        freqLabel.setBounds(px, py, 44, rH);
+        freqSlider.setBounds(px + 46, py + 2, pw - 46, rH - 4);
+        py += rH + gap;
+
+        rateLabel.setBounds(px, py, 44, rH);
+        rateSlider.setBounds(px + 46, py + 2, pw - 46, rH - 4);
     }
 
     // MAT panel controls (local coordinates of matPanel)
@@ -3425,8 +3515,15 @@ void ElementsAudioProcessorEditor::comboBoxChanged(juce::ComboBox* combo)
         int id = geoCombo.getSelectedId();  // 1=Sphere, 2=Cube, 3=Torus, 4=Dodeca
         audioProcessor.setGeometry(static_cast<Geometry>(id - 1));
         bool isSphere = (id == 2);
+        float sphereAlpha = isSphere ? 1.0f : 0.35f;
         deformSlider.setEnabled(isSphere);
-        deformLabel.setAlpha(isSphere ? 1.0f : 0.35f);
+        deformLabel.setAlpha(sphereAlpha);
+        noiseTypeCombo.setEnabled(isSphere);
+        noiseTypeLabel.setAlpha(sphereAlpha);
+        freqSlider.setEnabled(isSphere);
+        freqLabel.setAlpha(sphereAlpha);
+        rateSlider.setEnabled(isSphere);
+        rateLabel.setAlpha(sphereAlpha);
     }
     else if (combo == &matCombo)
     {

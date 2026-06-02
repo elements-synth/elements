@@ -140,6 +140,25 @@ Each `Material` struct now carries:
 - Soft clipper (tanh) on master output
 - Audio buffer exposed for oscilloscope display
 
+## Project Status (as of May 18, 2026)
+
+### Repository
+- **Local version**: 0.9.4 — `Elements.jucer`, `JucePluginDefines.h`, About tab all updated
+- **Remote (`origin/main`)**: 0.9.4 — fully in sync; `mix_materials` merged and pushed
+
+### Online Documentation (`docs/` → GitHub Pages)
+- **Outdated**: `docs/index.md` and `docs/installation.md` still reference v0.9.3
+- `docs/science.md` exists but has not been synced with the updated `science.md` in the project root
+- Weekly `update_docs.py` action (Mondays) may not handle version strings — needs manual review
+- **TODO**: update version references and sync science.md before next public release
+
+### GitHub Actions
+- **Windows VST3 build**: failing — `actions/cache@v4` and `actions/checkout@v4` use deprecated Node.js 20; must upgrade to Node.js 24-compatible versions before June 2, 2026 deadline
+- **Docs update action**: same Node.js 20 deprecation issue
+- **TODO**: bump both workflows to Node.js 24 before June 2
+
+---
+
 ## Current State (as of May 17, 2026) — v0.9.4 Beta
 
 - Full working prototype with **PBR shader rendering** (Cook-Torrance BRDF)

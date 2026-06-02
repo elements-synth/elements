@@ -178,5 +178,9 @@ private:
     float lastAmDepth = 0.5f;
     float lastOscBDetune = 0.0f;
 
+    // Deform noise cache
+    int   lastDeformNoiseType = 1;
+    float lastDeformRate = 1.0f;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ElementsAudioProcessor)
 };

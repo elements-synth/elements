@@ -1003,6 +1003,12 @@ void calculateSpectrum(const Material& material,
 // MULTI-FACE SPECTRUM CALCULATION
 // ==============================================================================
 
+// Forward declarations for noise functions defined below
+float perlin3D(float x, float y, float z);
+float simplex3D(float x, float y, float z);
+float alligator3D(float x, float y, float z);
+float worley3D(float x, float y, float z);
+
 void calculateSpectrumMultiFace(const Material& material,
                                 const LightSource& light,
                                 const Vec3& lightPosition,
@@ -1011,7 +1017,8 @@ void calculateSpectrumMultiFace(const Material& material,
                                 std::array<float, NUM_WAVELENGTHS>& output,
                                 float deformAmount,
                                 float deformFrequency,
-                                float noiseTimeOffset)
+                                float noiseTimeOffset,
+                                int noiseType)
 {
     std::fill(output.begin(), output.end(), 0.0f);
 
@@ -1032,39 +1039,55 @@ void calculateSpectrumMultiFace(const Material& material,
             return;
         }
 
-        // Sample 12 uniformly-distributed directions (icosahedron vertices)
-        // and compute displaced normals from simplex noise
-        static const float phi = (1.0f + std::sqrt(5.0f)) / 2.0f;
-        static const float icosaLen = std::sqrt(1.0f + phi * phi);
-        static const Vec3 icosaDirs[12] = {
-            Vec3( 0.0f,  1.0f / icosaLen,  phi / icosaLen),
-            Vec3( 0.0f, -1.0f / icosaLen,  phi / icosaLen),
-            Vec3( 0.0f,  1.0f / icosaLen, -phi / icosaLen),
-            Vec3( 0.0f, -1.0f / icosaLen, -phi / icosaLen),
-            Vec3( 1.0f / icosaLen,  phi / icosaLen,  0.0f),
-            Vec3(-1.0f / icosaLen,  phi / icosaLen,  0.0f),
-            Vec3( 1.0f / icosaLen, -phi / icosaLen,  0.0f),
-            Vec3(-1.0f / icosaLen, -phi / icosaLen,  0.0f),
-            Vec3( phi / icosaLen,  0.0f,  1.0f / icosaLen),
-            Vec3(-phi / icosaLen,  0.0f,  1.0f / icosaLen),
-            Vec3( phi / icosaLen,  0.0f, -1.0f / icosaLen),
-            Vec3(-phi / icosaLen,  0.0f, -1.0f / icosaLen)
+        // 32 uniformly-distributed sphere normals via Fibonacci/golden-ratio mapping.
+        // More normals → finer spectral resolution → richer timbre.
+        constexpr int NUM_DIRS = 32;
+        static Vec3 sphereDirs[NUM_DIRS];
+        static bool dirsInitialized = false;
+        if (!dirsInitialized)
+        {
+            dirsInitialized = true;
+            constexpr float gr  = 1.6180339887f;  // golden ratio
+            constexpr float pi  = 3.14159265359f;
+            for (int i = 0; i < NUM_DIRS; ++i)
+            {
+                float t    = (i + 0.5f) / NUM_DIRS;
+                float incl = std::acos(1.0f - 2.0f * t);
+                float azim = 2.0f * pi * i / gr;
+                sphereDirs[i] = Vec3(std::sin(incl) * std::cos(azim),
+                                     std::sin(incl) * std::sin(azim),
+                                     std::cos(incl)).normalized();
+            }
+        }
+
+        // Select noise function based on type (0=Perlin, 1=Simplex, 2=Alligator, 3=Worley)
+        auto noiseFunc = [noiseType](float nx, float ny, float nz) -> float {
+            switch (noiseType) {
+                case 0:  return perlin3D(nx, ny, nz);
+                case 2:  return alligator3D(nx, ny, nz);
+                case 3:  return worley3D(nx, ny, nz);
+                default: return simplex3D(nx, ny, nz);
+            }
         };
 
-        // Compute displaced normals via noise gradient (finite differences)
-        Vec3 deformedNormals[12];
+        // Compute displaced normals via noise gradient (finite differences).
+        // All 3 axes advance through the noise field at different rates (golden ratio
+        // multiples) so the 32 normals evolve along uncorrelated temporal trajectories.
+        Vec3 deformedNormals[NUM_DIRS];
         constexpr float eps = 0.01f;
-        const float freq = deformFrequency;
-        const float scale = deformAmount * 0.3f;
+        const float freq  = deformFrequency;
+        const float scale = deformAmount * 1.5f;
 
-        for (int i = 0; i < 12; ++i)
+        for (int i = 0; i < NUM_DIRS; ++i)
         {
-            const Vec3& p = icosaDirs[i];
-            float px = p.x * freq + noiseTimeOffset, py = p.y * freq, pz = p.z * freq;
+            const Vec3& p = sphereDirs[i];
+            float px = p.x * freq + noiseTimeOffset;
+            float py = p.y * freq + noiseTimeOffset * 0.6180339887f;   // 1/gr
+            float pz = p.z * freq + noiseTimeOffset * 0.3819660113f;   // 1/gr²
 
-            float dndx = (simplex3D(px + eps, py, pz) - simplex3D(px - eps, py, pz)) / (2.0f * eps);
-            float dndy = (simplex3D(px, py + eps, pz) - simplex3D(px, py - eps, pz)) / (2.0f * eps);
-            float dndz = (simplex3D(px, py, pz + eps) - simplex3D(px, py, pz - eps)) / (2.0f * eps);
+            float dndx = (noiseFunc(px+eps,py,pz) - noiseFunc(px-eps,py,pz)) / (2.0f*eps);
+            float dndy = (noiseFunc(px,py+eps,pz) - noiseFunc(px,py-eps,pz)) / (2.0f*eps);
+            float dndz = (noiseFunc(px,py,pz+eps) - noiseFunc(px,py,pz-eps)) / (2.0f*eps);
             Vec3 grad(dndx, dndy, dndz);
 
             float radialComp = grad.dot(p);
@@ -1086,7 +1109,7 @@ void calculateSpectrumMultiFace(const Material& material,
         std::array<float, NUM_WAVELENGTHS> fresnelCurve;
         float totalWeight = 0.0f;
 
-        for (int face = 0; face < 12; ++face)
+        for (int face = 0; face < NUM_DIRS; ++face)
         {
             Vec3 rotatedNormal = rotMatrix.apply(deformedNormals[face]);
             float cosAngle = lightPosition.dot(rotatedNormal);
@@ -1094,7 +1117,7 @@ void calculateSpectrumMultiFace(const Material& material,
                 continue;
 
             float angleDeg = std::acos(clamp(cosAngle, -1.0f, 1.0f)) * 180.0f / 3.14159265359f;
-            float weight = cosAngle * cosAngle;
+            float weight = cosAngle;  // linear: more influence from grazing normals (high Fresnel variation)
 
             calculateFresnelSpectral(angleDeg, light.wavelengths, fresnelCurve, material.refractiveIndex);
 
@@ -1278,7 +1301,36 @@ static float snGrad3(int hash, float x, float y, float z)
     return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
 }
 
+// ---------------------------------------------------------------------------
+// Perlin 3D — classic gradient noise, smooth fade curve
+// ---------------------------------------------------------------------------
+static float pFade(float t) { return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f); }
+
 } // anonymous namespace
+
+float perlin3D(float x, float y, float z)
+{
+    int ix = static_cast<int>(std::floor(x)) & 255;
+    int iy = static_cast<int>(std::floor(y)) & 255;
+    int iz = static_cast<int>(std::floor(z)) & 255;
+    float fx = x - std::floor(x);
+    float fy = y - std::floor(y);
+    float fz = z - std::floor(z);
+    float u = pFade(fx), v = pFade(fy), w = pFade(fz);
+
+    int A  = snPerm[ix]   + iy,  AA = snPerm[A]   + iz, AB = snPerm[A+1] + iz;
+    int B  = snPerm[ix+1] + iy,  BA = snPerm[B]   + iz, BB = snPerm[B+1] + iz;
+
+    auto g = [](int h, float gx, float gy, float gz) {
+        return snGrad3(snPerm[h & 255], gx, gy, gz);
+    };
+    float r = lerp(w,
+        lerp(v, lerp(u, g(AA,   fx,   fy,   fz),   g(BA,   fx-1.f, fy,   fz)),
+                lerp(u, g(AB,   fx,   fy-1.f, fz),  g(BB,   fx-1.f, fy-1.f, fz))),
+        lerp(v, lerp(u, g(AA+1, fx,   fy,   fz-1.f), g(BA+1, fx-1.f, fy,   fz-1.f)),
+                lerp(u, g(AB+1, fx,   fy-1.f, fz-1.f), g(BB+1, fx-1.f, fy-1.f, fz-1.f))));
+    return r * 1.4f;  // scale to approximate -1..1 range
+}
 
 float simplex3D(float x, float y, float z)
 {
@@ -1323,4 +1375,60 @@ float simplex3D(float x, float y, float z)
     if (t3 > 0) { t3 *= t3; n += t3 * t3 * snGrad3(snPerm[ii+1 + snPerm[jj+1 + snPerm[kk+1]]], x3, y3, z3); }
 
     return 32.0f * n;
+}
+
+// ---------------------------------------------------------------------------
+// Worley 3D — F1 cellular noise, sharp Voronoi-like cell boundaries
+// Returns approximately -1..1 (mapped from F1 distance)
+// ---------------------------------------------------------------------------
+float worley3D(float x, float y, float z)
+{
+    int ix = static_cast<int>(std::floor(x));
+    int iy = static_cast<int>(std::floor(y));
+    int iz = static_cast<int>(std::floor(z));
+    float fx = x - ix, fy = y - iy, fz = z - iz;
+
+    float minDist = 9.0f;
+    for (int dx = -1; dx <= 1; ++dx)
+    for (int dy = -1; dy <= 1; ++dy)
+    for (int dz = -1; dz <= 1; ++dz)
+    {
+        int cx = (ix + dx) & 255, cy = (iy + dy) & 255, cz = (iz + dz) & 255;
+        float px = dx + (snPerm[(snPerm[(snPerm[cx] + cy) & 255] + cz) & 255]         / 255.0f);
+        float py = dy + (snPerm[(snPerm[(snPerm[(cx+37)&255] + (cy+17)) & 255] + (cz+29)) & 255] / 255.0f);
+        float pz = dz + (snPerm[(snPerm[(snPerm[(cx+59)&255] + (cy+43)) & 255] + (cz+71)) & 255] / 255.0f);
+        float d2 = (px-fx)*(px-fx) + (py-fy)*(py-fy) + (pz-fz)*(pz-fz);
+        if (d2 < minDist) minDist = d2;
+    }
+    return 2.0f * std::sqrt(minDist) - 1.0f;  // remap: 0 at cell center, ~1 at boundary
+}
+
+// ---------------------------------------------------------------------------
+// Alligator 3D — smooth cellular noise (rounded bumps, no sharp edges)
+// Uses F2-F1 to carve out cell ridges, then inverts for bump-at-center
+// Returns approximately -1..1
+// ---------------------------------------------------------------------------
+float alligator3D(float x, float y, float z)
+{
+    int ix = static_cast<int>(std::floor(x));
+    int iy = static_cast<int>(std::floor(y));
+    int iz = static_cast<int>(std::floor(z));
+    float fx = x - ix, fy = y - iy, fz = z - iz;
+
+    float f1 = 9.0f, f2 = 9.0f;
+    for (int dx = -1; dx <= 1; ++dx)
+    for (int dy = -1; dy <= 1; ++dy)
+    for (int dz = -1; dz <= 1; ++dz)
+    {
+        int cx = (ix + dx) & 255, cy = (iy + dy) & 255, cz = (iz + dz) & 255;
+        float px = dx + (snPerm[(snPerm[(snPerm[cx] + cy) & 255] + cz) & 255]         / 255.0f);
+        float py = dy + (snPerm[(snPerm[(snPerm[(cx+37)&255] + (cy+17)) & 255] + (cz+29)) & 255] / 255.0f);
+        float pz = dz + (snPerm[(snPerm[(snPerm[(cx+59)&255] + (cy+43)) & 255] + (cz+71)) & 255] / 255.0f);
+        float d2 = (px-fx)*(px-fx) + (py-fy)*(py-fy) + (pz-fz)*(pz-fz);
+        if (d2 < f1) { f2 = f1; f1 = d2; }
+        else if (d2 < f2) { f2 = d2; }
+    }
+    // F2-F1 highlights ridges between cells; invert so bumps peak at cell centers
+    float ridge = std::sqrt(f2) - std::sqrt(f1);
+    return 1.0f - 2.0f * clamp(ridge, 0.0f, 1.0f);
 }

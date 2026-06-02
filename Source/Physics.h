@@ -322,15 +322,22 @@ void calculateSpectrumMultiFace(const Material& material,
                                 std::array<float, NUM_WAVELENGTHS>& output,
                                 float deformAmount = 0.0f,
                                 float deformFrequency = 2.0f,
-                                float noiseTimeOffset = 0.0f);
+                                float noiseTimeOffset = 0.0f,
+                                int noiseType = 1);
 
-// --- Noise ---
+// --- Noise (0=Perlin, 1=Simplex, 2=Alligator, 3=Worley) ---
 
-/**
- * 3D simplex noise. Returns values in approximately -1..1.
- * Used for sphere deformation (visual + Fresnel normal perturbation).
- */
+/** 3D Perlin gradient noise. Returns approximately -1..1. */
+float perlin3D(float x, float y, float z);
+
+/** 3D simplex noise. Returns approximately -1..1. */
 float simplex3D(float x, float y, float z);
+
+/** 3D alligator (smooth cellular) noise. Returns approximately -1..1. */
+float alligator3D(float x, float y, float z);
+
+/** 3D Worley cellular noise. Returns approximately -1..1. */
+float worley3D(float x, float y, float z);
 
 // --- Utility Functions ---
 

@@ -271,12 +271,14 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
 
     // THROTTLING: Check if we have a pending wavetable regeneration
     samplesSinceLastRegen += numSamples;
-    if (regenPending && samplesSinceLastRegen >= regenThrottleSamples)
     {
-        // Enough time has passed, regenerate now
-        regenerateWavetables();
-        regenPending = false;
-        samplesSinceLastRegen = 0;
+        int throttle = deformEvolutionRegen ? (regenThrottleSamples / 2) : regenThrottleSamples;
+        if (regenPending && samplesSinceLastRegen >= throttle)
+        {
+            regenerateWavetables();
+            regenPending = false;
+            samplesSinceLastRegen = 0;
+        }
     }
 
     // Smooth filter parameters toward targets (per-block, but with gentler coefficient)
@@ -294,6 +296,8 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     // Smooth pitch offset from light intensity
     pitchOffsetSemitones += (pitchOffsetTarget - pitchOffsetSemitones) * 0.05f;
 
+    deformRateSmooth += (deformRate - deformRateSmooth) * 0.05f;
+
     // Smooth deform amount for wavefolding (0.15 = ~0.35s settle time at 86 blocks/sec)
     float prevDeformAmount = deformAmount;
     deformAmount += (deformAmountTarget - deformAmount) * 0.15f;
@@ -302,36 +306,75 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     if (deformAmountTarget <= 0.0f && deformAmount < 0.001f)
         deformAmount = 0.0f;
 
-    // Spectrum tracks smoothed deformAmount (not target) to avoid volume jumps
-    // Also animates noise time offset for timbral movement when deforming
+    // Deform: advance noise time offset, then request a spectrum update so the
+    // deformed surface normals feed through Fresnel into the wavetable.
+    // The regen throttle limits actual wavetable rebuilds; the crossfade system
+    // smooths transitions. Material always shapes output — deform tilts the normals.
     if (currentGeometry == Geometry::Sphere)
     {
         bool settled = (prevDeformAmount > 0.001f && deformAmount <= 0.001f);
 
-        // Animate noise offset for timbral drift when actively deforming
-        bool animatedUpdate = false;
         if (deformAmount > 0.001f)
         {
-            deformNoiseTimeOffset += 0.005f;  // ~0.43 units/sec at 86 blocks/sec
-            deformAnimBlockCounter++;
-            if (deformAnimBlockCounter >= 11)  // ~8Hz spectrum updates
+            deformNoiseTimeOffset += 0.002f * std::exp(deformRateSmooth * 1.0f);
+
+            // Update per-wavelength shimmer state.
+            // Each wavelength gets a unique point in noise space (w * 0.4 separates bands by
+            // ~2.5x the noise correlation length, giving partially-independent spectral ripples).
+            // filterCoeff maps deformFrequency: low→slow drift (wobbly), high→fast tracking (shimmer).
             {
-                deformAnimBlockCounter = 0;
-                animatedUpdate = true;
+                float freqNorm = (deformFrequency - 0.5f) / 9.5f;  // 0..1
+                float filterCoeff = 0.001f + freqNorm * freqNorm * 0.8f;
+
+                for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+                {
+                    float rawNoise;
+                    switch (deformNoiseType)
+                    {
+                        case 0: rawNoise = perlin3D  (w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
+                        case 2: rawNoise = alligator3D(w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
+                        case 3: rawNoise = worley3D  (w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
+                        default: rawNoise = simplex3D(w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
+                    }
+                    shimmerCurrentAmp[static_cast<size_t>(w)] +=
+                        (rawNoise - shimmerCurrentAmp[static_cast<size_t>(w)]) * filterCoeff;
+                }
             }
+
+            deformEvolutionRegen = true;
+            updateSpectrum();  // deformed normals → Fresnel → spectrum → wavetable
         }
         else
         {
             deformNoiseTimeOffset = 0.0f;
-            deformAnimBlockCounter = 0;
+            shimmerCurrentAmp.fill(0.0f);
         }
 
-        if (settled || animatedUpdate || std::abs(deformAmount - lastSpectrumDeformAmount) > 0.001f)
+        if (settled)
         {
-            lastSpectrumDeformAmount = deformAmount;
-            updateSpectrum();
+            lastSpectrumDeformAmount = 0.0f;
+            updateSpectrum();  // restore undeformed wavetable when deform turns off
         }
     }
+
+    // Layer 3: fold drive derived from mean absolute shimmer state (same noise as Layer 2).
+    // Wavefolding breathes in sync with spectral shimmer — no independent noise call needed.
+    float foldDriveStart = foldDriveSmooth;
+    if (currentGeometry == Geometry::Sphere && deformAmount > 0.001f)
+    {
+        float shimmerMean = 0.0f;
+        for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+            shimmerMean += std::abs(shimmerCurrentAmp[static_cast<size_t>(w)]);
+        shimmerMean /= NUM_WAVELENGTHS;
+        float foldTarget = deformAmount * shimmerMean;
+        foldDriveSmooth += (foldTarget - foldDriveSmooth) * 0.15f;
+    }
+    else
+    {
+        foldDriveSmooth *= 0.9f;
+        if (foldDriveSmooth < 0.001f) foldDriveSmooth = 0.0f;
+    }
+    float foldDriveEnd = foldDriveSmooth;
 
     // Filter envelope: compute start and end values for per-sample interpolation
     float filterEnvStart = filterEnvValue;
@@ -552,6 +595,15 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                 }
             }
 
+            // Layer 3: sin() wavefolder, drive coupled to shimmer noise (breathes with spectral changes)
+            if (foldDriveEnd > 0.001f || foldDriveStart > 0.001f)
+            {
+                float t = static_cast<float>(i) / numSamples;
+                float drive = lerp(foldDriveStart, foldDriveEnd, t);
+                float driven = sample * (1.0f + drive * 3.0f);
+                sample = lerp(sample, std::sin(driven * 1.5707963f), drive);
+            }
+
             // Calculate envelope level with velocity
             float envWithVelocity = env * voice.velocity;
 
@@ -568,15 +620,6 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             // Apply amplitude and spectral amplitude (interpolated per-sample to avoid zipper noise)
             float interpSpectralAmp = spectralAmpStart + (spectralAmpEnd - spectralAmpStart) * (static_cast<float>(i) / numSamples);
             sample *= envWithVelocity * voice.amplitude * interpSpectralAmp;
-
-            // Wavefolding: sinusoidal fold driven by deform amount (Sphere only)
-            // drive=1 → sin(x)≈x (transparent), drive=15 → heavy folding + harmonics
-            // Divide by drive to normalize small-signal gain: sin(d*x)/d ≈ x for small x
-            if (currentGeometry == Geometry::Sphere && deformAmount > 0.001f)
-            {
-                float drive = 1.0f + deformAmount * 14.0f;  // 1 to 15
-                sample = std::sin(drive * sample) / drive;
-            }
 
             // Anti-click fade-in for NEW voices
             if (voice.fadeInRemaining > 0)
@@ -902,6 +945,18 @@ void ElementsSynth::setDeformAmount(float amount)
     // Spectrum update is driven by the smoothed value in processBlock
 }
 
+void ElementsSynth::setDeformNoiseType(int type)
+{
+    int clamped = juce::jlimit(0, 3, type);
+    if (clamped != deformNoiseType)
+    {
+        deformNoiseType = clamped;
+        if (currentGeometry == Geometry::Sphere && deformAmount > 0.001f)
+            updateSpectrum();
+    }
+}
+
+
 void ElementsSynth::setDeformFrequency(float freq)
 {
     float clamped = clamp(freq, 0.5f, 10.0f);
@@ -1225,7 +1280,8 @@ void ElementsSynth::calculateSpectrumForMaterial(int matIndex, std::array<float,
         std::array<float, NUM_WAVELENGTHS> lightSpectrum{};
         calculateSpectrumMultiFace(material, light, lightPos.position,
                                    objectRotationMatrix, currentGeometry, lightSpectrum,
-                                   deformAmount, deformFrequency, deformNoiseTimeOffset);
+                                   deformAmount, deformFrequency, deformNoiseTimeOffset,
+                                   deformNoiseType);
 
         float effectiveIntensity = lights[i].intensity;
         for (int w = 0; w < NUM_WAVELENGTHS; ++w)
@@ -1361,6 +1417,12 @@ void ElementsSynth::updateSpectrum()
 
 void ElementsSynth::regenerateWavetables()
 {
+    // Deform-evolution regens use a short crossfade (10ms) so timbral changes
+    // are perceived as continuous motion rather than smeared into one slow fade.
+    // Parameter-change regens keep the long crossfade (200ms) to avoid clicks.
+    float xfadeDuration = deformEvolutionRegen ? 0.010f : crossfadeDuration;
+    deformEvolutionRegen = false;  // consumed
+
     // Store old wavetables for crossfade if voices are playing
     bool hasActiveVoices = false;
     for (const auto& voice : voices)
@@ -1375,22 +1437,34 @@ void ElementsSynth::regenerateWavetables()
     // Oscillator A crossfade setup
     if (hasActiveVoices)
     {
-        // CLICK FIX: If a crossfade is already in progress, don't restart it.
-        // Just update the target wavetables. The crossfade will naturally morph
-        // to the new target without an abrupt restart.
         if (!crossfadeA.active)
         {
-            // Start new crossfade only if one isn't already running
             crossfadeA.oldTables = currentWavetablesA;
             crossfadeA.progress = 0.0f;
-            crossfadeA.increment = 1.0f / (crossfadeDuration * static_cast<float>(sampleRate));
+            crossfadeA.increment = 1.0f / (xfadeDuration * static_cast<float>(sampleRate));
             crossfadeA.active = true;
         }
     }
 
-    // Generate wavetables A (always)
-    wavetableGen.generateBandLimitedSet(pendingSpectrumA, static_cast<float>(sampleRate), currentWavetablesA);
-    spectrumA = pendingSpectrumA;
+    // Generate wavetables A — when deform is active, apply per-wavelength shimmer modulation
+    // so the wavetable reflects the current noise-sculpted spectrum without altering the
+    // stored physics spectrum (used for display and as the base for the next regen).
+    if (deformAmount > 0.001f)
+    {
+        auto shimmerSpectrum = pendingSpectrumA;
+        for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+        {
+            float mod = 1.0f + shimmerCurrentAmp[static_cast<size_t>(w)] * deformAmount * 2.0f;
+            shimmerSpectrum[static_cast<size_t>(w)] =
+                clamp(shimmerSpectrum[static_cast<size_t>(w)] * mod, 0.0f, 1.0f);
+        }
+        wavetableGen.generateBandLimitedSet(shimmerSpectrum, static_cast<float>(sampleRate), currentWavetablesA);
+    }
+    else
+    {
+        wavetableGen.generateBandLimitedSet(pendingSpectrumA, static_cast<float>(sampleRate), currentWavetablesA);
+    }
+    spectrumA = pendingSpectrumA;  // store unmodulated physics spectrum for display
 
     // Oscillator B crossfade setup (only if dual-osc is active)
     if (mixAmount > 0.001f)
@@ -1399,14 +1473,12 @@ void ElementsSynth::regenerateWavetables()
         {
             crossfadeB.oldTables = currentWavetablesB;
             crossfadeB.progress = 0.0f;
-            crossfadeB.increment = 1.0f / (crossfadeDuration * static_cast<float>(sampleRate));
+            crossfadeB.increment = 1.0f / (xfadeDuration * static_cast<float>(sampleRate));
             crossfadeB.active = true;
         }
 
-        // Generate wavetables B
         wavetableGen.generateBandLimitedSet(pendingSpectrumB, static_cast<float>(sampleRate), currentWavetablesB);
         spectrumB = pendingSpectrumB;
-
     }
 
     regenPending = false;

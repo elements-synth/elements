@@ -176,8 +176,9 @@ private:
     bool displacedVBODirty = true;
     float lastDeformAmount = 0.0f;
     float lastDeformFrequency = 2.0f;
+    int   lastDeformNoiseType = 1;
     float noiseTimeOffset = 0.0f;
-    void updateDisplacedSphere(float amount, float frequency);
+    void updateDisplacedSphere(float amount, float frequency, int noiseType);
 
     // Environment map (equirectangular HDR loaded as GL_TEXTURE_2D)
     GLuint envTexture = 0;
@@ -919,7 +920,7 @@ class ViewportAccordion : public juce::Component
 {
 public:
     static constexpr int kHeaderH = 28;
-    static constexpr int kGeoPanH = 108;
+    static constexpr int kGeoPanH = 200;
     static constexpr int kMatPanH = 224;
 
     std::function<void()> onLayoutChanged;
@@ -1300,6 +1301,14 @@ private:
     juce::Label deformLabel;
     juce::Slider deformSlider;
 
+    // Noise controls (Sphere only, under Deform)
+    juce::Label    noiseTypeLabel;
+    juce::ComboBox noiseTypeCombo;
+    juce::Label    freqLabel;
+    juce::Slider   freqSlider;
+    juce::Label    rateLabel;
+    juce::Slider   rateSlider;
+
     // Rotation (floating inside viewport)
     juce::Label rotXLabel, rotYLabel, rotZLabel;
     juce::Label rotXValue, rotYValue, rotZValue;
@@ -1368,8 +1377,11 @@ private:
     std::unique_ptr<SliderAttachment> ampDecayAttachment;
     std::unique_ptr<SliderAttachment> ampSustainAttachment;
     std::unique_ptr<SliderAttachment> ampReleaseAttachment;
-    std::unique_ptr<SliderAttachment> thicknessAttachment;
-    std::unique_ptr<SliderAttachment> deformAttachment;
+    std::unique_ptr<SliderAttachment>    thicknessAttachment;
+    std::unique_ptr<SliderAttachment>    deformAttachment;
+    std::unique_ptr<ComboBoxAttachment>  noiseTypeAttachment;
+    std::unique_ptr<SliderAttachment>    freqAttachment;
+    std::unique_ptr<SliderAttachment>    rateAttachment;
     std::unique_ptr<SliderAttachment> keyIntensityAttachment;
     std::unique_ptr<SliderAttachment> fillIntensityAttachment;
     std::unique_ptr<SliderAttachment> rimIntensityAttachment;
