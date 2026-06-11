@@ -147,7 +147,7 @@ Each `Material` struct now carries:
 - **Remote (`origin/main`)**: 0.9.4 — fully in sync; `mix_materials` merged and pushed
 
 ### Online Documentation (`docs/` → GitHub Pages)
-- **Outdated**: `docs/index.md` and `docs/installation.md` still reference v0.9.3
+- `docs/index.md` and `docs/installation.md` updated to v0.9.4
 - `docs/science.md` exists but has not been synced with the updated `science.md` in the project root
 - Weekly `update_docs.py` action (Mondays) may not handle version strings — needs manual review
 - **TODO**: update version references and sync science.md before next public release

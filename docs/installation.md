@@ -81,7 +81,7 @@ If your DAW does not find the plugin after scanning, verify that the files are i
 
 ---
 
-## Hosts tested in Beta v0.9.3
+## Hosts tested in Beta v0.9.4
 
 | Host | macOS VST3 | Windows VST3 |
 |------|------------|--------------|

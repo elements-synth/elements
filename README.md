@@ -2,13 +2,13 @@
 
 A VST3 synthesizer where **light generates sound**. Materials with real optical properties (Fresnel equations, wavelength-dependent transmission) shape harmonic spectra through physics simulation.
 
-**[Download Beta v0.9.3](https://github.com/elements-synth/elements/releases)** — macOS & Windows · Free
+**[Download Beta v0.9.4](https://github.com/elements-synth/elements/releases)** — macOS & Windows · Free
 
 **[Documentation](https://elements-synth.github.io/elements/)**
 
 ## How It Works
 
-Choose a material (Diamond, Ruby, Gold, Emerald...) and a geometry (Cube, Sphere, Torus, Dodecahedron). Three colored lights illuminate the object. The physics of how light passes through the material produces a visible light spectrum that maps directly to audio harmonics:
+Choose a material (Diamond, Ruby, Gold, Emerald...) and a geometry (Cube, Sphere, Torus, Dodecahedron, Teapot). Three colored lights illuminate the object. The physics of how light passes through the material produces a visible light spectrum that maps directly to audio harmonics:
 
 - **Red wavelengths** (600-780nm) → low harmonics (warmth)
 - **Green wavelengths** (500-600nm) → mid harmonics (body)
@@ -18,18 +18,21 @@ Rotating the object changes the angle between each face and the lights, producin
 
 ## Current State
 
-**v0.9.3-beta** — Bugfix: Volume now persists across editor close/reopen and is DAW-automatable.
+**v0.9.4-beta**
 
 Core functionality working:
 
-- 8 materials with distinct spectral signatures
-- 4 geometries (Cube, Sphere, Torus, Dodecahedron)
+- 13 materials with distinct spectral signatures (Diamond, Water, Amber, Ruby, Gold, Emerald, Amethyst, Sapphire, Copper, Obsidian, Alexandrite, Malachite, Neodymium)
+- 5 geometries (Cube, Sphere, Torus, Dodecahedron, Teapot) with PBR shader rendering (Cook-Torrance BRDF)
 - 3-point lighting system (Sunset, Daylight, LED Cool)
 - Rotation X/Y/Z exposed as DAW-automatable parameters
-- PBR shader rendering (Cook-Torrance BRDF) with environment mapping
-- Polyphonic wavetable synthesis (8 voices, band-limited)
+- **Dual-oscillator** with 4 blend modes (Ring Mod, AM, XOR, FM); independent material per oscillator
+- **Geometric Deformer** — 3-layer noise (Simplex, Alligator, Worley) deforms surface normals for timbral drift
+- **Physical Envelope** mode — ADSR derived from optical material properties
+- Polyphonic wavetable synthesis (8 voices, band-limited, 5 frequency bands)
 - Biquad filter (LP/HP/BP), ADSR envelope, ADSR graph display
 - Anti-click system (crossfades, voice stealing, retrigger fades)
+- Volume and all key parameters are DAW-automatable via APVTS
 
 ### Platforms
 
