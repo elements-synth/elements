@@ -331,10 +331,9 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                     float rawNoise;
                     switch (deformNoiseType)
                     {
-                        case 0: rawNoise = perlin3D  (w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
-                        case 2: rawNoise = alligator3D(w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
-                        case 3: rawNoise = worley3D  (w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
-                        default: rawNoise = simplex3D(w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
+                        case 1:  rawNoise = alligator3D(w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
+                        case 2:  rawNoise = worley3D   (w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
+                        default: rawNoise = simplex3D  (w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
                     }
                     shimmerCurrentAmp[static_cast<size_t>(w)] +=
                         (rawNoise - shimmerCurrentAmp[static_cast<size_t>(w)]) * filterCoeff;
@@ -947,7 +946,7 @@ void ElementsSynth::setDeformAmount(float amount)
 
 void ElementsSynth::setDeformNoiseType(int type)
 {
-    int clamped = juce::jlimit(0, 3, type);
+    int clamped = juce::jlimit(0, 2, type);
     if (clamped != deformNoiseType)
     {
         deformNoiseType = clamped;
@@ -1437,13 +1436,29 @@ void ElementsSynth::regenerateWavetables()
     // Oscillator A crossfade setup
     if (hasActiveVoices)
     {
-        if (!crossfadeA.active)
+        if (crossfadeA.active)
+        {
+            // Mid-crossfade regen: capture the currently-heard blend as the new start point
+            // so the new crossfade fades FROM what the listener is actually hearing.
+            // Without this, rapid regens (e.g. rotation dragging) always fade from the very
+            // first snapshot, making the 200ms crossfade permanently block timbre changes.
+            float p = crossfadeA.progress;
+            for (int i = 0; i < WAVETABLE_SIZE; ++i)
+            {
+                crossfadeA.oldTables.low[i]     = lerp(crossfadeA.oldTables.low[i],     currentWavetablesA.low[i],     p);
+                crossfadeA.oldTables.midLow[i]  = lerp(crossfadeA.oldTables.midLow[i],  currentWavetablesA.midLow[i],  p);
+                crossfadeA.oldTables.mid[i]     = lerp(crossfadeA.oldTables.mid[i],     currentWavetablesA.mid[i],     p);
+                crossfadeA.oldTables.midHigh[i] = lerp(crossfadeA.oldTables.midHigh[i], currentWavetablesA.midHigh[i], p);
+                crossfadeA.oldTables.high[i]    = lerp(crossfadeA.oldTables.high[i],    currentWavetablesA.high[i],    p);
+            }
+        }
+        else
         {
             crossfadeA.oldTables = currentWavetablesA;
-            crossfadeA.progress = 0.0f;
-            crossfadeA.increment = 1.0f / (xfadeDuration * static_cast<float>(sampleRate));
-            crossfadeA.active = true;
         }
+        crossfadeA.progress = 0.0f;
+        crossfadeA.increment = 1.0f / (xfadeDuration * static_cast<float>(sampleRate));
+        crossfadeA.active = true;
     }
 
     // Generate wavetables A — when deform is active, apply per-wavelength shimmer modulation
@@ -1469,9 +1484,24 @@ void ElementsSynth::regenerateWavetables()
     // Oscillator B crossfade setup (only if dual-osc is active)
     if (mixAmount > 0.001f)
     {
-        if (hasActiveVoices && !crossfadeB.active)
+        if (hasActiveVoices)
         {
-            crossfadeB.oldTables = currentWavetablesB;
+            if (crossfadeB.active)
+            {
+                float p = crossfadeB.progress;
+                for (int i = 0; i < WAVETABLE_SIZE; ++i)
+                {
+                    crossfadeB.oldTables.low[i]     = lerp(crossfadeB.oldTables.low[i],     currentWavetablesB.low[i],     p);
+                    crossfadeB.oldTables.midLow[i]  = lerp(crossfadeB.oldTables.midLow[i],  currentWavetablesB.midLow[i],  p);
+                    crossfadeB.oldTables.mid[i]     = lerp(crossfadeB.oldTables.mid[i],     currentWavetablesB.mid[i],     p);
+                    crossfadeB.oldTables.midHigh[i] = lerp(crossfadeB.oldTables.midHigh[i], currentWavetablesB.midHigh[i], p);
+                    crossfadeB.oldTables.high[i]    = lerp(crossfadeB.oldTables.high[i],    currentWavetablesB.high[i],    p);
+                }
+            }
+            else
+            {
+                crossfadeB.oldTables = currentWavetablesB;
+            }
             crossfadeB.progress = 0.0f;
             crossfadeB.increment = 1.0f / (xfadeDuration * static_cast<float>(sampleRate));
             crossfadeB.active = true;

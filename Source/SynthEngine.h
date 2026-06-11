@@ -545,7 +545,7 @@ private:
     float deformFrequency = 2.0f;
     float lastSpectrumDeformAmount = 0.0f;
     float deformNoiseTimeOffset = 0.0f;
-    int   deformNoiseType = 1;    // 0=Perlin, 1=Simplex, 2=Alligator, 3=Worley
+    int   deformNoiseType = 0;    // 0=Simplex, 1=Alligator, 2=Worley
     float deformRate = 1.0f;      // animation speed multiplier
     float deformRateSmooth = 1.0f;
     bool deformEvolutionRegen = false;  // true when regen triggered by deform time evolution (uses short crossfade)

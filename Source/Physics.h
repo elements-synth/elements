@@ -199,7 +199,8 @@ enum class Geometry
     Cube,
     Sphere,
     Torus,
-    Dodecahedron
+    Dodecahedron,
+    Teapot
 };
 
 // ==============================================================================
@@ -325,10 +326,7 @@ void calculateSpectrumMultiFace(const Material& material,
                                 float noiseTimeOffset = 0.0f,
                                 int noiseType = 1);
 
-// --- Noise (0=Perlin, 1=Simplex, 2=Alligator, 3=Worley) ---
-
-/** 3D Perlin gradient noise. Returns approximately -1..1. */
-float perlin3D(float x, float y, float z);
+// --- Noise (0=Simplex, 1=Alligator, 2=Worley) ---
 
 /** 3D simplex noise. Returns approximately -1..1. */
 float simplex3D(float x, float y, float z);

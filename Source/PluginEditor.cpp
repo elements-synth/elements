@@ -7,6 +7,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "TeapotData.h"
 #include <cmath>
 
 // stb_image for loading HDR environment maps
@@ -864,6 +865,118 @@ std::vector<Viewport3D::PBRVertex> Viewport3D::generateDodecahedronVertices(floa
     return verts;
 }
 
+std::vector<Viewport3D::PBRVertex> Viewport3D::generateTeapotVertices(float scale)
+{
+    // Tessellate 28 bicubic Bézier patches at N×N quads each.
+    // Data from TeapotData.h (Newell 1975, public domain).
+    const int N = 8;
+    std::vector<PBRVertex> verts;
+    verts.reserve(28 * N * N * 6);
+
+    const float cy = 1.5f;  // y center (teapot spans y=0..3)
+
+    auto B = [](int i, float t) -> float {
+        float s = 1.0f - t;
+        switch (i) {
+            case 0: return s*s*s;
+            case 1: return 3*t*s*s;
+            case 2: return 3*t*t*s;
+            default: return t*t*t;
+        }
+    };
+
+    auto dB = [](int i, float t) -> float {
+        float s = 1.0f - t;
+        switch (i) {
+            case 0: return -3*s*s;
+            case 1: return  3*s*s - 6*t*s;
+            case 2: return  6*t*s - 3*t*t;
+            default: return  3*t*t;
+        }
+    };
+
+    auto evalP = [&](const float cp[4][4][3], float u, float v, float out[3]) {
+        out[0] = out[1] = out[2] = 0.0f;
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j) {
+                float w = B(i,u) * B(j,v);
+                for (int k = 0; k < 3; ++k) out[k] += w * cp[i][j][k];
+            }
+    };
+
+    auto evalDu = [&](const float cp[4][4][3], float u, float v, float out[3]) {
+        out[0] = out[1] = out[2] = 0.0f;
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j) {
+                float w = dB(i,u) * B(j,v);
+                for (int k = 0; k < 3; ++k) out[k] += w * cp[i][j][k];
+            }
+    };
+
+    auto evalDv = [&](const float cp[4][4][3], float u, float v, float out[3]) {
+        out[0] = out[1] = out[2] = 0.0f;
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j) {
+                float w = B(i,u) * dB(j,v);
+                for (int k = 0; k < 3; ++k) out[k] += w * cp[i][j][k];
+            }
+    };
+
+    auto makeVertex = [&](const float cp[4][4][3], float u, float v) -> PBRVertex {
+        float p[3], du[3], dv[3];
+        evalP(cp, u, v, p);
+        evalDu(cp, u, v, du);
+        evalDv(cp, u, v, dv);
+
+        // Normal = dPdu × dPdv
+        float n[3] = {
+            du[1]*dv[2] - du[2]*dv[1],
+            du[2]*dv[0] - du[0]*dv[2],
+            du[0]*dv[1] - du[1]*dv[0]
+        };
+        float len = std::sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+        if (len > 1e-10f) { n[0] /= len; n[1] /= len; n[2] /= len; }
+        else              { n[0] = 0; n[1] = 1; n[2] = 0; }
+
+        // Ensure outward-facing from teapot center
+        float toCenter[3] = { p[0], p[1] - cy, p[2] };
+        if (n[0]*toCenter[0] + n[1]*toCenter[1] + n[2]*toCenter[2] < 0.0f) {
+            n[0] = -n[0]; n[1] = -n[1]; n[2] = -n[2];
+        }
+
+        PBRVertex vtx;
+        vtx.position[0] = p[0] * scale;
+        vtx.position[1] = (p[1] - cy) * scale;
+        vtx.position[2] = p[2] * scale;
+        vtx.normal[0] = n[0];
+        vtx.normal[1] = n[1];
+        vtx.normal[2] = n[2];
+        return vtx;
+    };
+
+    for (int pi = 0; pi < 28; ++pi) {
+        const float (*cp)[4][3] = teapotPatches[pi];
+        for (int ui = 0; ui < N; ++ui) {
+            for (int vi = 0; vi < N; ++vi) {
+                float u0 = static_cast<float>(ui)   / N;
+                float u1 = static_cast<float>(ui+1) / N;
+                float v0 = static_cast<float>(vi)   / N;
+                float v1 = static_cast<float>(vi+1) / N;
+
+                PBRVertex a = makeVertex(cp, u0, v0);
+                PBRVertex b = makeVertex(cp, u1, v0);
+                PBRVertex c = makeVertex(cp, u1, v1);
+                PBRVertex d = makeVertex(cp, u0, v1);
+
+                verts.push_back(a); verts.push_back(b); verts.push_back(c);
+                verts.push_back(a); verts.push_back(c); verts.push_back(d);
+            }
+        }
+    }
+
+    return verts;
+}
+
 void Viewport3D::createVBOs()
 {
     using namespace juce::gl;
@@ -872,11 +985,13 @@ void Viewport3D::createVBOs()
     auto sphereVerts = generateSphereVertices(0.8f, 96);
     auto torusVerts  = generateTorusVertices(0.6f, 0.25f, 32);
     auto dodecaVerts = generateDodecahedronVertices(0.85f);
+    auto teapotVerts = generateTeapotVertices(0.45f);
 
     cubeVertexCount   = static_cast<int>(cubeVerts.size());
     sphereVertexCount = static_cast<int>(sphereVerts.size());
     torusVertexCount  = static_cast<int>(torusVerts.size());
     dodecaVertexCount = static_cast<int>(dodecaVerts.size());
+    teapotVertexCount = static_cast<int>(teapotVerts.size());
 
     auto uploadVBO = [](GLuint& vbo, const void* data, size_t bytes) {
         using namespace juce::gl;
@@ -888,10 +1003,11 @@ void Viewport3D::createVBOs()
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     };
 
-    uploadVBO(cubeVBO, cubeVerts.data(), cubeVerts.size() * sizeof(PBRVertex));
+    uploadVBO(cubeVBO,   cubeVerts.data(),   cubeVerts.size()   * sizeof(PBRVertex));
     uploadVBO(sphereVBO, sphereVerts.data(), sphereVerts.size() * sizeof(PBRVertex));
-    uploadVBO(torusVBO, torusVerts.data(), torusVerts.size() * sizeof(PBRVertex));
+    uploadVBO(torusVBO,  torusVerts.data(),  torusVerts.size()  * sizeof(PBRVertex));
     uploadVBO(dodecaVBO, dodecaVerts.data(), dodecaVerts.size() * sizeof(PBRVertex));
+    uploadVBO(teapotVBO, teapotVerts.data(), teapotVerts.size() * sizeof(PBRVertex));
 
     // Store base sphere vertices for noise displacement
     baseSphereVerts = sphereVerts;
@@ -912,6 +1028,7 @@ void Viewport3D::destroyVBOs()
     if (sphereVBO) { glDeleteBuffers(1, &sphereVBO); sphereVBO = 0; }
     if (torusVBO)  { glDeleteBuffers(1, &torusVBO);  torusVBO = 0; }
     if (dodecaVBO) { glDeleteBuffers(1, &dodecaVBO); dodecaVBO = 0; }
+    if (teapotVBO) { glDeleteBuffers(1, &teapotVBO); teapotVBO = 0; }
     if (displacedSphereVBO) { glDeleteBuffers(1, &displacedSphereVBO); displacedSphereVBO = 0; }
 }
 
@@ -930,9 +1047,8 @@ void Viewport3D::updateDisplacedSphere(float amount, float frequency, int noiseT
 
     auto noiseFunc = [noiseType](float nx, float ny, float nz) -> float {
         switch (noiseType) {
-            case 0:  return perlin3D(nx, ny, nz);
-            case 2:  return alligator3D(nx, ny, nz);
-            case 3:  return worley3D(nx, ny, nz);
+            case 1:  return alligator3D(nx, ny, nz);
+            case 2:  return worley3D(nx, ny, nz);
             default: return simplex3D(nx, ny, nz);
         }
     };
@@ -951,15 +1067,15 @@ void Viewport3D::updateDisplacedSphere(float amount, float frequency, int noiseT
         // Noise value for position displacement
         float noise = noiseFunc(sx, sy, sz);
 
-        // Displace position along base normal
-        float displacement = noise * dispScale;
+        // Displace position along base normal — clamp inward so vertices never cross center
+        float displacement = std::max(noise * dispScale, -0.75f);
         displaced[i].position[0] = px + nx * displacement;
         displaced[i].position[1] = py + ny * displacement;
         displaced[i].position[2] = pz + nz * displacement;
 
         // Worley and Alligator are O(27) per call — skip gradient for those types
         // and use base normal directly (displacement shape still fully visible)
-        const bool skipGradient = (noiseType == 2 || noiseType == 3);
+        const bool skipGradient = (noiseType == 1 || noiseType == 2);
 
         if (skipGradient)
         {
@@ -1378,8 +1494,9 @@ void Viewport3D::renderGeometryPBR()
             }
             vertexCount = sphereVertexCount;
             break;
-        case Geometry::Torus:         vbo = torusVBO;  vertexCount = torusVertexCount;  break;
-        case Geometry::Dodecahedron:  vbo = dodecaVBO; vertexCount = dodecaVertexCount; break;
+        case Geometry::Torus:         vbo = torusVBO;   vertexCount = torusVertexCount;   break;
+        case Geometry::Dodecahedron:  vbo = dodecaVBO;  vertexCount = dodecaVertexCount;  break;
+        case Geometry::Teapot:        vbo = teapotVBO;  vertexCount = teapotVertexCount;  break;
     }
 
     // Bind VBO and set vertex attributes
@@ -2757,6 +2874,7 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     geoCombo.addItem("Sphere", 2);
     geoCombo.addItem("Torus", 3);
     geoCombo.addItem("Dodeca", 4);
+    geoCombo.addItem("Teapot", 5);
     geoCombo.setSelectedId(static_cast<int>(audioProcessor.getGeometry()) + 1, juce::dontSendNotification);
     geoCombo.addListener(this);
     accordion.geoPanel.addAndMakeVisible(geoCombo);
@@ -2796,11 +2914,10 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     noiseTypeLabel.setColour(juce::Label::textColourId, ElementsColors::text);
     accordion.geoPanel.addAndMakeVisible(noiseTypeLabel);
 
-    noiseTypeCombo.addItem("Perlin",    1);
-    noiseTypeCombo.addItem("Simplex",   2);
-    noiseTypeCombo.addItem("Alligator", 3);
-    noiseTypeCombo.addItem("Worley",    4);
-    noiseTypeCombo.setSelectedId(2, juce::dontSendNotification);  // default Simplex
+    noiseTypeCombo.addItem("Simplex",   1);
+    noiseTypeCombo.addItem("Alligator", 2);
+    noiseTypeCombo.addItem("Worley",    3);
+    noiseTypeCombo.setSelectedId(1, juce::dontSendNotification);  // default Simplex
     accordion.geoPanel.addAndMakeVisible(noiseTypeCombo);
     noiseTypeAttachment = std::make_unique<ComboBoxAttachment>(audioProcessor.apvts, "deformNoiseType", noiseTypeCombo);
 

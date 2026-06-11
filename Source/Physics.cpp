@@ -522,6 +522,63 @@ float calculateLightAngleForGeometryFromMatrix(const Vec3& lightPosition,
         return 85.0f;
     }
 
+    if (geometry == Geometry::Teapot)
+    {
+        // TEAPOT: 28 Bézier patch normals — asymmetric (spout +x, handle -x, lid +y)
+        // Produces rich rotation-dependent timbre unlike any symmetric geometry.
+        static const Vec3 tpNormals[28] = {
+            { 0.000000f,  1.000000f,  0.000000f },
+            {-0.000000f,  1.000000f,  0.000000f },
+            {-0.000000f,  1.000000f, -0.000000f },
+            { 0.000000f,  1.000000f, -0.000000f },
+            { 0.662761f,  0.348563f,  0.662761f },
+            {-0.662761f,  0.348563f,  0.662761f },
+            {-0.662761f,  0.348563f, -0.662761f },
+            { 0.662761f,  0.348563f, -0.662761f },
+            { 0.492597f, -0.717423f,  0.492597f },
+            {-0.492597f, -0.717423f,  0.492597f },
+            {-0.492597f, -0.717423f, -0.492597f },
+            { 0.492597f, -0.717423f, -0.492597f },
+            { 0.000000f,  0.000000f,  1.000000f },
+            {-0.000000f,  0.000000f, -1.000000f },
+            { 0.000000f,  0.000000f,  1.000000f },
+            {-0.000000f,  0.000000f, -1.000000f },
+            { 0.214084f,  0.180281f,  0.960035f },
+            { 0.214084f,  0.180281f, -0.960035f },
+            {-0.034891f,  0.997622f,  0.059444f },
+            {-0.034891f,  0.997622f, -0.059444f },
+            {-0.548362f,  0.631347f, -0.548362f },
+            { 0.548362f,  0.631347f, -0.548362f },
+            { 0.548362f,  0.631347f,  0.548362f },
+            {-0.548362f,  0.631347f,  0.548362f },
+            { 0.104474f,  0.989025f,  0.104474f },
+            {-0.104474f,  0.989025f,  0.104474f },
+            {-0.104474f,  0.989025f, -0.104474f },
+            { 0.104474f,  0.989025f, -0.104474f }
+        };
+
+        float totalAngle = 0.0f;
+        float totalWeight = 0.0f;
+
+        for (int i = 0; i < 28; ++i)
+        {
+            Vec3 rotatedNormal = rotMatrix.apply(tpNormals[i]);
+            float cosAngle = lightPosition.dot(rotatedNormal);
+
+            if (cosAngle > 0.0f)
+            {
+                float angleDeg = std::acos(clamp(cosAngle, -1.0f, 1.0f)) * 180.0f / 3.14159265359f;
+                float weight = cosAngle * cosAngle;
+                totalAngle += angleDeg * weight;
+                totalWeight += weight;
+            }
+        }
+
+        if (totalWeight > 0.0f)
+            return totalAngle / totalWeight;
+        return 85.0f;
+    }
+
     // CUBE: Discrete faces, jumpy transitions (physically correct)
     // Find the face that best sees the light and use its angle.
     return calculateLightAngleFromMatrix(lightPosition, rotMatrix);
@@ -869,8 +926,11 @@ void calculateGeometryFresnel(Geometry geometry,
             calculateFresnelTorus(angleDeg, wavelengths, output, baseIndex);
             break;
         case Geometry::Dodecahedron:
-            // Dodecahedron: flat faces like cube, direct Fresnel per face
             calculateFresnelCube(angleDeg, wavelengths, output, baseIndex);
+            break;
+        case Geometry::Teapot:
+            // Curved surface like sphere — use sphere Fresnel (rim boost)
+            calculateFresnelSphere(angleDeg, wavelengths, output, baseIndex);
             break;
         case Geometry::Cube:
         default:
@@ -1004,7 +1064,6 @@ void calculateSpectrum(const Material& material,
 // ==============================================================================
 
 // Forward declarations for noise functions defined below
-float perlin3D(float x, float y, float z);
 float simplex3D(float x, float y, float z);
 float alligator3D(float x, float y, float z);
 float worley3D(float x, float y, float z);
@@ -1060,12 +1119,11 @@ void calculateSpectrumMultiFace(const Material& material,
             }
         }
 
-        // Select noise function based on type (0=Perlin, 1=Simplex, 2=Alligator, 3=Worley)
+        // Select noise function based on type (0=Simplex, 1=Alligator, 2=Worley)
         auto noiseFunc = [noiseType](float nx, float ny, float nz) -> float {
             switch (noiseType) {
-                case 0:  return perlin3D(nx, ny, nz);
-                case 2:  return alligator3D(nx, ny, nz);
-                case 3:  return worley3D(nx, ny, nz);
+                case 1:  return alligator3D(nx, ny, nz);
+                case 2:  return worley3D(nx, ny, nz);
                 default: return simplex3D(nx, ny, nz);
             }
         };
@@ -1169,6 +1227,39 @@ void calculateSpectrumMultiFace(const Material& material,
         Vec3( 0.0f, -0.707f,  0.707f)
     };
 
+    // Teapot: 28 precomputed surface normals (one per Bézier patch at u=v=0.5)
+    // Patches: 0-3 rim, 4-11 body, 12-15 handle(-x), 16-19 spout(+x), 20-27 lid
+    static const Vec3 teapotNormals[28] = {
+        { 0.000000f,  1.000000f,  0.000000f },  //  0: rim
+        {-0.000000f,  1.000000f,  0.000000f },  //  1: rim
+        {-0.000000f,  1.000000f, -0.000000f },  //  2: rim
+        { 0.000000f,  1.000000f, -0.000000f },  //  3: rim
+        { 0.662761f,  0.348563f,  0.662761f },  //  4: body upper
+        {-0.662761f,  0.348563f,  0.662761f },  //  5: body upper
+        {-0.662761f,  0.348563f, -0.662761f },  //  6: body upper
+        { 0.662761f,  0.348563f, -0.662761f },  //  7: body upper
+        { 0.492597f, -0.717423f,  0.492597f },  //  8: body lower
+        {-0.492597f, -0.717423f,  0.492597f },  //  9: body lower
+        {-0.492597f, -0.717423f, -0.492597f },  // 10: body lower
+        { 0.492597f, -0.717423f, -0.492597f },  // 11: body lower
+        { 0.000000f,  0.000000f,  1.000000f },  // 12: handle
+        {-0.000000f,  0.000000f, -1.000000f },  // 13: handle
+        { 0.000000f,  0.000000f,  1.000000f },  // 14: handle
+        {-0.000000f,  0.000000f, -1.000000f },  // 15: handle
+        { 0.214084f,  0.180281f,  0.960035f },  // 16: spout
+        { 0.214084f,  0.180281f, -0.960035f },  // 17: spout
+        {-0.034891f,  0.997622f,  0.059444f },  // 18: spout tip
+        {-0.034891f,  0.997622f, -0.059444f },  // 19: spout tip
+        {-0.548362f,  0.631347f, -0.548362f },  // 20: lid top
+        { 0.548362f,  0.631347f, -0.548362f },  // 21: lid top
+        { 0.548362f,  0.631347f,  0.548362f },  // 22: lid top
+        {-0.548362f,  0.631347f,  0.548362f },  // 23: lid top
+        { 0.104474f,  0.989025f,  0.104474f },  // 24: lid lower
+        {-0.104474f,  0.989025f,  0.104474f },  // 25: lid lower
+        {-0.104474f,  0.989025f, -0.104474f },  // 26: lid lower
+        { 0.104474f,  0.989025f, -0.104474f }   // 27: lid lower
+    };
+
     // Dodecahedron: 12 pentagonal faces with uniformly distributed normals
     static const float phi = (1.0f + std::sqrt(5.0f)) / 2.0f;
     static const Vec3 dodecaNormals[12] = {
@@ -1198,6 +1289,11 @@ void calculateSpectrumMultiFace(const Material& material,
     {
         normals = dodecaNormals;
         numNormals = 12;
+    }
+    else if (geometry == Geometry::Teapot)
+    {
+        normals = teapotNormals;
+        numNormals = 28;
     }
     else
     {
@@ -1301,36 +1397,7 @@ static float snGrad3(int hash, float x, float y, float z)
     return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
 }
 
-// ---------------------------------------------------------------------------
-// Perlin 3D — classic gradient noise, smooth fade curve
-// ---------------------------------------------------------------------------
-static float pFade(float t) { return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f); }
-
 } // anonymous namespace
-
-float perlin3D(float x, float y, float z)
-{
-    int ix = static_cast<int>(std::floor(x)) & 255;
-    int iy = static_cast<int>(std::floor(y)) & 255;
-    int iz = static_cast<int>(std::floor(z)) & 255;
-    float fx = x - std::floor(x);
-    float fy = y - std::floor(y);
-    float fz = z - std::floor(z);
-    float u = pFade(fx), v = pFade(fy), w = pFade(fz);
-
-    int A  = snPerm[ix]   + iy,  AA = snPerm[A]   + iz, AB = snPerm[A+1] + iz;
-    int B  = snPerm[ix+1] + iy,  BA = snPerm[B]   + iz, BB = snPerm[B+1] + iz;
-
-    auto g = [](int h, float gx, float gy, float gz) {
-        return snGrad3(snPerm[h & 255], gx, gy, gz);
-    };
-    float r = lerp(w,
-        lerp(v, lerp(u, g(AA,   fx,   fy,   fz),   g(BA,   fx-1.f, fy,   fz)),
-                lerp(u, g(AB,   fx,   fy-1.f, fz),  g(BB,   fx-1.f, fy-1.f, fz))),
-        lerp(v, lerp(u, g(AA+1, fx,   fy,   fz-1.f), g(BA+1, fx-1.f, fy,   fz-1.f)),
-                lerp(u, g(AB+1, fx,   fy-1.f, fz-1.f), g(BB+1, fx-1.f, fy-1.f, fz-1.f))));
-    return r * 1.4f;  // scale to approximate -1..1 range
-}
 
 float simplex3D(float x, float y, float z)
 {
@@ -1381,7 +1448,8 @@ float simplex3D(float x, float y, float z)
 // Worley 3D — F1 cellular noise, sharp Voronoi-like cell boundaries
 // Returns approximately -1..1 (mapped from F1 distance)
 // ---------------------------------------------------------------------------
-float worley3D(float x, float y, float z)
+// Single-octave F1 Worley cellular value in [-1, 1]
+static float worleyCell(float x, float y, float z)
 {
     int ix = static_cast<int>(std::floor(x));
     int iy = static_cast<int>(std::floor(y));
@@ -1400,7 +1468,26 @@ float worley3D(float x, float y, float z)
         float d2 = (px-fx)*(px-fx) + (py-fy)*(py-fy) + (pz-fz)*(pz-fz);
         if (d2 < minDist) minDist = d2;
     }
-    return 2.0f * std::sqrt(minDist) - 1.0f;  // remap: 0 at cell center, ~1 at boundary
+    return 2.0f * std::sqrt(minDist) - 1.0f;
+}
+
+// 3-octave fBm Worley: softens the sharp cell-boundary ridges of single-octave F1.
+float worley3D(float x, float y, float z)
+{
+    constexpr float gain       = 0.5f;
+    constexpr float lacunarity = 2.0f;
+    constexpr float totalAmp   = 1.0f + gain + gain * gain;  // 1.75
+
+    float value = 0.0f;
+    float amp   = 1.0f;
+    float freq  = 1.0f;
+    for (int oct = 0; oct < 3; ++oct)
+    {
+        value += worleyCell(x * freq, y * freq, z * freq) * amp;
+        amp   *= gain;
+        freq  *= lacunarity;
+    }
+    return value / totalAmp;
 }
 
 // ---------------------------------------------------------------------------
@@ -1408,7 +1495,8 @@ float worley3D(float x, float y, float z)
 // Uses F2-F1 to carve out cell ridges, then inverts for bump-at-center
 // Returns approximately -1..1
 // ---------------------------------------------------------------------------
-float alligator3D(float x, float y, float z)
+// Single-octave F2-F1 cellular value in [-1, 1]
+static float alligatorCell(float x, float y, float z)
 {
     int ix = static_cast<int>(std::floor(x));
     int iy = static_cast<int>(std::floor(y));
@@ -1428,7 +1516,26 @@ float alligator3D(float x, float y, float z)
         if (d2 < f1) { f2 = f1; f1 = d2; }
         else if (d2 < f2) { f2 = d2; }
     }
-    // F2-F1 highlights ridges between cells; invert so bumps peak at cell centers
     float ridge = std::sqrt(f2) - std::sqrt(f1);
     return 1.0f - 2.0f * clamp(ridge, 0.0f, 1.0f);
+}
+
+// 3-octave fBm alligator: blends coarse cells + medium detail + fine detail.
+// Stacking softens the sawtooth ridge artifact of single-octave F2-F1.
+float alligator3D(float x, float y, float z)
+{
+    constexpr float gain       = 0.5f;
+    constexpr float lacunarity = 2.0f;
+    constexpr float totalAmp   = 1.0f + gain + gain * gain;  // 1.75
+
+    float value = 0.0f;
+    float amp   = 1.0f;
+    float freq  = 1.0f;
+    for (int oct = 0; oct < 3; ++oct)
+    {
+        value += alligatorCell(x * freq, y * freq, z * freq) * amp;
+        amp   *= gain;
+        freq  *= lacunarity;
+    }
+    return value / totalAmp;
 }

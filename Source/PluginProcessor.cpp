@@ -203,12 +203,12 @@ ElementsAudioProcessor::createParameterLayout()
         juce::NormalisableRange<float>(0.5f, 10.0f, 0.1f),
         2.0f));
 
-    // Noise Type: 0=Perlin, 1=Simplex, 2=Alligator, 3=Worley (default Simplex)
+    // Noise Type: 0=Simplex, 1=Alligator, 2=Worley (default Simplex)
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"deformNoiseType", 1},
         "Noise Type",
-        juce::StringArray{"Perlin", "Simplex", "Alligator", "Worley"},
-        1));
+        juce::StringArray{"Simplex", "Alligator", "Worley"},
+        0));
 
     // Deform Rate: animation speed multiplier 0.0–3.0, default 1.0
     layout.add(std::make_unique<juce::AudioParameterFloat>(

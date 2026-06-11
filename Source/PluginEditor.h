@@ -156,14 +156,15 @@ private:
     bool shaderReady = false;
 
     // VBO/VAO per geometry
-    GLuint cubeVBO = 0, sphereVBO = 0, torusVBO = 0, dodecaVBO = 0;
-    int cubeVertexCount = 0, sphereVertexCount = 0, torusVertexCount = 0, dodecaVertexCount = 0;
+    GLuint cubeVBO = 0, sphereVBO = 0, torusVBO = 0, dodecaVBO = 0, teapotVBO = 0;
+    int cubeVertexCount = 0, sphereVertexCount = 0, torusVertexCount = 0, dodecaVertexCount = 0, teapotVertexCount = 0;
 
     // Vertex data generation
     std::vector<PBRVertex> generateCubeVertices(float size);
     std::vector<PBRVertex> generateSphereVertices(float radius, int segments);
     std::vector<PBRVertex> generateTorusVertices(float majorR, float minorR, int segments);
     std::vector<PBRVertex> generateDodecahedronVertices(float radius);
+    std::vector<PBRVertex> generateTeapotVertices(float scale);
 
     void createVBOs();
     void destroyVBOs();
