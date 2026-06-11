@@ -52,6 +52,7 @@ open Builds/MacOSX/build/Debug/Elements.app
 | `Source/SynthEngine.h/.cpp` | Polyphonic synth engine, additive synthesis, ADSR, filters |
 | `Source/Shaders.h` | PBR GLSL shaders (Cook-Torrance vertex + fragment) as constexpr strings |
 | `Source/Physics.h/.cpp` | Optical physics: Fresnel equations, spectral calculations, materials data |
+| `Source/TeapotData.h` | Utah Teapot: 28 bicubic Bézier patch control points (Newell/Blinn dataset) |
 
 ## Architecture
 
@@ -72,13 +73,13 @@ Semi-transparent collapsible header at top of viewport (both groups closed by de
 
 ### 3D Viewport (Viewport3D class)
 - Uses `juce::OpenGLRenderer` with legacy fixed-function OpenGL pipeline
-- Renders: grid, axes, geometry (cube/sphere/torus), light indicators, rotation gizmo
+- Renders: grid, axes, geometry (Cube/Sphere/Torus/Dodecahedron/Teapot), light indicators, rotation gizmo
 - Mouse-drag rotation on gizmo rings (X=red, Y=green, Z=blue)
 - Accumulated rotation via 4x4 matrix (column-major), not Euler angles
 - Dirty-flag optimization: only repaints when state changes
 
-### Materials (10 total)
-Diamond, Water, Amber, Ruby, Gold, Emerald, Amethyst, Sapphire, Copper, Obsidian — each has:
+### Materials (13 total)
+Diamond, Water, Amber, Ruby, Gold, Emerald, Amethyst, Sapphire, Copper, Obsidian, Alexandrite, Malachite, Neodymium — each has:
 - `wavelengths[]` — nm values (50 samples from ~380-780nm)
 - `transmission[]` — 0.0 to 1.0 per wavelength
 - `refractiveIndex` — for Fresnel calculations
@@ -94,7 +95,7 @@ Diamond, Water, Amber, Ruby, Gold, Emerald, Amethyst, Sapphire, Copper, Obsidian
 
 ### Materials
 Each `Material` struct now carries:
-- `wavelengths[]` / `transmission[]` — 8-point spectral curve (transmission for dielectrics, reflectance for metals)
+- `wavelengths[]` / `transmission[]` — 32-point spectral curve (transmission for dielectrics, reflectance for metals)
 - `refractiveIndex` (n) — real part of complex IOR
 - `extinctionCoeff` (k) — imaginary part; 0 for dielectrics, ~2.83 for Gold/Copper
 - `metallicFactor` — 0 = pure dielectric path, 1 = pure metallic path
@@ -116,14 +117,14 @@ Each `Material` struct now carries:
 **Blended** (0 < metallicFactor < 1): lerp between both path outputs. Thickness slider effect fades as metallicFactor increases.
 
 **Multi-face calculation** (`calculateSpectrumMultiFace`):
-- Samples normals from all faces of geometry (Cube: 6, Sphere: 32, Torus: ~128, Dodecahedron: 12)
+- Samples normals from all faces of geometry (Cube: 6, Sphere: 32, Torus: ~128, Dodecahedron: 12, Teapot: 28 patch-center normals)
 - Per-face Fresnel reflectance (angle-dependent via rotation matrix)
 - Weighted contribution summation from all visible faces
-- **Deformation** (Sphere only): noise bumps perturb normals, making Fresnel angle vary with rotation
+- **Deformation** (Sphere only): noise bumps perturb normals, making Fresnel angle vary with rotation; noise type selectable in UI (Simplex / Alligator / Worley)
 - Output spectrum → `WavetableGenerator` → harmonic amplitudes
 
 ### Synth Engine
-- **Single-oscillator architecture**: one wavetable oscillator per voice
+- **Dual-oscillator architecture**: two independent wavetable oscillators per voice (A and B), each with its own material/spectrum
 - Polyphonic (8 voices, `MAX_POLYPHONY`)
 - Band-limited wavetables (5 frequency bands to avoid aliasing)
 - Harmonic amplitudes from physics spectrum (50 wavelength samples → harmonic mapping)
@@ -140,26 +141,28 @@ Each `Material` struct now carries:
 - Soft clipper (tanh) on master output
 - Audio buffer exposed for oscilloscope display
 
-## Project Status (as of May 18, 2026)
+## Project Status (as of June 11, 2026)
 
 ### Repository
 - **Local version**: 0.9.4 — `Elements.jucer`, `JucePluginDefines.h`, About tab all updated
-- **Remote (`origin/main`)**: 0.9.4 — fully in sync; `mix_materials` merged and pushed
+- **Remote (`origin/main`)**: 0.9.4 — fully in sync
+
+### Releases
+- **v0.9.4-beta on GitHub Releases** — macOS Universal (arm64+x86_64) + Windows x64 VST3 uploaded
+- Download links in README/docs point to `/releases` (latest = v0.9.4-beta)
 
 ### Online Documentation (`docs/` → GitHub Pages)
 - `docs/index.md` and `docs/installation.md` updated to v0.9.4
-- `docs/science.md` exists but has not been synced with the updated `science.md` in the project root
-- Weekly `update_docs.py` action (Mondays) may not handle version strings — needs manual review
-- **TODO**: update version references and sync science.md before next public release
+- `docs/science.md` has not been synced with the updated `science.md` in the project root
+- **TODO**: sync science.md before next public release
 
 ### GitHub Actions
-- **Windows VST3 build**: failing — `actions/cache@v4` and `actions/checkout@v4` use deprecated Node.js 20; must upgrade to Node.js 24-compatible versions before June 2, 2026 deadline
-- **Docs update action**: same Node.js 20 deprecation issue
-- **TODO**: bump both workflows to Node.js 24 before June 2
+- **Windows VST3 build**: passing — fixed missing PNG assets (`elements_spectra_panel.png`, `swap_arrows.png`) in CMakeLists.txt
+- **Node.js deprecation**: `actions/cache@v4` and `actions/checkout@v4` still use deprecated Node.js 20 — upgrade to Node.js 24-compatible versions ASAP (deadline was June 2)
 
 ---
 
-## Current State (as of May 17, 2026) — v0.9.4 Beta
+## Current State (as of June 11, 2026) — v0.9.4 Beta
 
 - Full working prototype with **PBR shader rendering** (Cook-Torrance BRDF)
 - All features functional: materials, geometries, 3-point lighting, Fresnel physics, synth, MIDI
@@ -182,10 +185,13 @@ Each `Material` struct now carries:
 - **Preset combo re-selection fixed** — `setText()` called before `addItem()` so selectedId stays 0; any click on any preset always fires `onChange`
 - **Science tab** — spectral chart PNG embedded in Help overlay with per-material scientific sources; measurement conditions section
 - **Materials grouped in dropdowns** — GEMS / MINERALS / METALS / SPECIAL with section headers and separators
+- **Utah Teapot geometry** — 5th geometry; 28-patch Bézier tessellation (N=8, 10,752 vertices); 28 precomputed patch-center normals for Fresnel physics; renders correctly in PBR viewport
+- **Crossfade regression fix** — rotation now reliably changes timbre in real time; fixed stale-table bug where mid-crossfade regeneration always faded back to the first wavetable snapshot
+- **Noise type selector** — UI control to choose Simplex / Alligator / Worley for the Sphere deformer
 
 ### PBR Shader Pipeline (implemented)
 - `Source/Shaders.h` — vertex + fragment GLSL shaders as `constexpr const char*`
-- VBOs for cube (36 verts), sphere (32x32), torus (32x32) created in `newOpenGLContextCreated()`
+- VBOs for Cube (36 verts), Sphere (32×32), Torus (32×32), Dodecahedron, Teapot (28 patches × 8×8 × 2 tris = 10,752 verts) created in `newOpenGLContextCreated()`
 - Cook-Torrance BRDF: GGX distribution, Schlick-GGX geometry, Schlick Fresnel
 - 3 point lights as uniforms with enable/disable
 - Per-material PBR properties (metallic + roughness):
@@ -262,7 +268,7 @@ All parameters exposed to DAW automation:
 
 ## Stashed Work
 
-**Branch/Stash**: `stash@{0}` contains **Fog/Environment Feature**
+**`stash@{0}`** — **Fog/Environment Feature** (on hold)
 - Volumetric fog with ray-marched simplex noise
 - Parameters: `envType`, `fogDensity`
 - Fullscreen fog shader + on-geometry fog blending
@@ -270,9 +276,9 @@ All parameters exposed to DAW automation:
 
 ## Pending Work / Future Features
 
-### Dual-Oscillator Material Mixing (IN PROGRESS — branch `mix_materials`)
+### Dual-Oscillator Material Mixing (COMPLETE — merged to main May 2026)
 
-**Status**: Points 1–5 complete (Apr 17, 2026). Point 6 pending.
+**Status**: All 6 points done and shipped in v0.9.4.
 
 **Goal**: Two fully independent oscillators, each with its own material/spectrum, interacting through sample-level blend modes.
 
@@ -349,10 +355,9 @@ These are NOT APVTS parameters. They are saved as manual XML attributes and read
 ### Future Features
 
 **Deform Noise Controls**
-Expose noise parameters to the user for the Sphere deform effect. Currently `noiseTimeOffset += 0.02f` is hardcoded. Planned:
-- `deformSpeed` — rate of noise animation (easy, ~1hr: add APVTS param, read in timerCallback)
-- `noiseType` — selector for noise algorithm (moderate, ~1-2 days: requires multiple noise implementations)
-- `deformFrequency` — already exposed as APVTS parameter
+- `noiseType` — UI selector for Simplex / Alligator / Worley: **implemented**
+- `deformFrequency` — exposed as APVTS parameter: **implemented**
+- `deformSpeed` — rate of noise animation: still hardcoded (`noiseTimeOffset += 0.02f`); easy addition (~1hr: add APVTS param, read in timerCallback)
 
 **Filter B Bypass**
 Allow Material B to bypass the global filter (currently both A and B pass through the same filter). In FM mode the modulator (B) gets filtered alongside the carrier. Architectural split of the filter path required (~1 day).
@@ -369,8 +374,8 @@ Filter value labels showing readable values (e.g. "2.5kHz", "Q:1.5") under the k
 **PBR Spectral Accuracy — Alexandrite, Malachite, Neodymium**
 Current spectral curves are qualitatively correct but estimated. Sourcing USGS/literature data for these three would improve audio accuracy.
 
-**Fog / Environment Feature** (stashed)
-`stash@{0}` contains volumetric fog with ray-marched simplex noise, `envType`/`fogDensity` parameters, fullscreen fog shader. Ready to resume.
+**Fog / Environment Feature** (on hold)
+`stash@{0}` contains volumetric fog with ray-marched simplex noise, `envType`/`fogDensity` parameters, fullscreen fog shader. On hold — not a current priority.
 
 ## Materials: Scientific Data Policy
 
