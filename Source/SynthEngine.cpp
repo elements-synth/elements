@@ -1363,7 +1363,7 @@ void ElementsSynth::calculateSpectrumForMaterial(int matIndex, std::array<float,
     {
         hasActiveLights = false;
         // Don't regenerate wavetables — processBlock will output silence
-        DBG("Spectrum total: " << spectrumTotal << " < threshold → SILENCE");
+        DBG("Spectrum total: " << spectrumTotal << " < threshold -> SILENCE");
         return;
     }
 

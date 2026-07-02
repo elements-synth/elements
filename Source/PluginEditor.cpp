@@ -42,7 +42,7 @@ void Viewport3D::newOpenGLContextCreated()
     createEnvironmentMap();
     shaderReady = compileShader();
     if (!shaderReady)
-        DBG("PBR shader compilation failed — falling back to fixed-function");
+        DBG("PBR shader compilation failed - falling back to fixed-function");
 }
 
 void Viewport3D::applyIncrementalRotation(float angleDeg, float axisX, float axisY, float axisZ)

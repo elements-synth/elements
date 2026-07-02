@@ -311,7 +311,7 @@ namespace HelpContent
 
     inline juce::String materials()
     {
-        return
+        return juce::String(juce::CharPointer_UTF8(
             "MATERIALS\n"
             "\n"
             "Each material produces different timbres based on its\n"
@@ -424,12 +424,12 @@ namespace HelpContent
             "{#ff9070c8}NEODYMIUM\n"
             "Nd\u00b3\u207a rare-earth glass: 6 narrow f-f absorption bands\n"
             "(432/522/583/625/677/741nm). Comb-filter character.\n"
-            "Harmonically rich, otherworldly, complex spectrum.";
+            "Harmonically rich, otherworldly, complex spectrum."));
     }
 
     inline juce::String science()
     {
-        return
+        return juce::String(juce::CharPointer_UTF8(
             "SPECTRAL SCIENCE\n"
             "\n"
             "Each material curve shows optical transmission (0-1)\n"
@@ -497,7 +497,7 @@ namespace HelpContent
             "\n"
             "{#ff7ec8e3}WATER  n=1.33  Pope & Fry (1997)\n"
             "Direct Beer-Lambert from measured absorption data\n"
-            "(1m path). OH overtone causes steep drop above 700nm.";
+            "(1m path). OH overtone causes steep drop above 700nm."));
     }
 
     inline juce::String geometry()

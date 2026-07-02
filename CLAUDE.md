@@ -485,3 +485,45 @@ Diamond, Water, Amber, Ruby, Gold, Emerald, Amethyst, Sapphire, Copper, Obsidian
 
 ### JUCE Module Dependencies
 `juce_opengl` is required for the 3D viewport. Module path: `~/JUCE/modules`
+
+---
+
+## Automated Test Suite — ElementsTests
+
+Separate JUCE console app project at `/Users/matiasderose/Documents/JUCE_Projects/ElementsTests/`. Compiles `Physics.cpp` and `SynthEngine.cpp` directly from the Elements source tree — no duplication.
+
+### Run tests
+
+```bash
+# Build
+xcodebuild -project ../ElementsTests/Builds/MacOSX/ElementsTests.xcodeproj \
+  -scheme "ElementsTests - ConsoleApp" -configuration Debug \
+  build CONFIGURATION_BUILD_DIR=/tmp/ElementsTestsBuild
+
+# Run (exit code 0 = all pass, 1 = failures)
+/tmp/ElementsTestsBuild/ElementsTests
+```
+
+### Test groups (14 tests total)
+
+| Group | What it checks |
+|-------|---------------|
+| **Physics** | `calculateSpectrum` for all 13 materials × 3 lights × 3 angles (no NaN/Inf/negative); `interpolateMaterial` range (0..1); Fresnel factor range; noise functions (simplex/alligator/worley) no NaN |
+| **SynthEngine** | `BiquadFilter` stability at 5 cutoffs × 4 Q values × LP/HP/BP (impulse response stays bounded); `WavetableGenerator` output in −1..1; `ElementsSynth` produces audio after noteOn |
+| **Mix** | `mixAmount=0` — changing MAT B produces zero bleed on output; all 4 blend modes (Ring Mod/AM/XOR/FM) produce valid audio at mix=1 |
+| **Regression** | Voice stealing with >8 simultaneous notes (no NaN); rapid note on/off × 20 cycles; filter toggle mid-note (no NaN, no jump > 0.5 per sample); all 13 materials × 5 geometries × 3 blocks each |
+
+### Structure
+
+```
+ElementsTests/
+├── ElementsTests.jucer          # consoleapp, modules: juce_core/events/audio_basics/data_structures
+├── Tests/
+│   ├── main.cpp                 # UnitTestRunner, exits 0/1
+│   ├── PhysicsTests.cpp
+│   ├── SynthEngineTests.cpp
+│   ├── MixTests.cpp
+│   └── RegressionTests.cpp
+```
+
+Source files reference Elements via relative path (`../../Elements/Source/Physics.h` etc.). If the jucer is resaved with Projucer, no extra steps needed — include paths are baked into the xcodeproj.
