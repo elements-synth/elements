@@ -488,6 +488,41 @@ Diamond, Water, Amber, Ruby, Gold, Emerald, Amethyst, Sapphire, Copper, Obsidian
 
 ---
 
+## Testing Phase (v0.9.4)
+
+### Status
+
+| Step | Description | Status |
+|------|-------------|--------|
+| 1 | pluginval strictness-10 | ✅ Done — 0 assertions |
+| 2 | Manual state round-trip (materialA/B, blendMode, geometry) | ⏭ Skipped |
+| 3 | Automated unit test harness (ElementsTests) | ✅ Done — 14/14 pass |
+| 4 | Manual regression + coverage matrix | 🔲 Pending |
+
+### Step 1 — pluginval
+Fixed 3 UTF-8 encoding bugs that caused JUCE `String(const char*)` ASCII assertion failures at strictness 10:
+- `HelpContent::materials()` and `HelpContent::science()` in `PluginEditor.h` — wrapped in `juce::String(juce::CharPointer_UTF8(...))`
+- Two `DBG()` strings with unicode arrows/dashes — replaced with ASCII equivalents
+
+### Step 4 — Manual regression + coverage matrix (PENDING)
+
+**Targeted regression** — listen specifically for:
+- `mixAmount=0`: any audible bleed from MAT B
+- Voice stealing >8 simultaneous notes: glitches, stuck voices
+- Filter toggle mid-note: click or amplitude spike
+- Same-note retrigger: doubling artifact
+- Rapid note on/off sequence: zipper noise
+
+**Coverage matrix** — play through every combination:
+- 13 materials × 5 geometries × 4 blend modes
+- Filter: LP/HP/BP at extreme cutoff and resonance
+- ADSR mode: Classic vs Physical
+- Deform noise type: Simplex / Alligator / Worley
+- Lighting: toggle each of 3 lights, change sources
+- Automation: automate MIX and DETUNE in Bitwig — check for zipper noise or jumps
+
+---
+
 ## Automated Test Suite — ElementsTests
 
 Separate JUCE console app project at `/Users/matiasderose/Documents/JUCE_Projects/ElementsTests/`. Compiles `Physics.cpp` and `SynthEngine.cpp` directly from the Elements source tree — no duplication.
