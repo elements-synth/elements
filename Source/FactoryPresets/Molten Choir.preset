@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ElementsState category="Choir" material="3" materialB="2" blendMode="1" geometry="1" lightEnabled0="1"
+               lightSource0="0" lightEnabled1="1" lightSource1="1" lightEnabled2="0"
+               lightSource2="0">
+  <Parameters>
+    <PARAM id="amDepth" value="0.55"/>
+    <PARAM id="ampAttack" value="0.5"/>
+    <PARAM id="ampDecay" value="0.3"/>
+    <PARAM id="ampRelease" value="1.0"/>
+    <PARAM id="ampSustain" value="0.8"/>
+    <PARAM id="blendMode" value="1.0"/>
+    <PARAM id="deformAmount" value="0.2"/>
+    <PARAM id="deformFrequency" value="7.0"/>
+    <PARAM id="deformNoiseType" value="0.0"/>
+    <PARAM id="deformRate" value="0.35"/>
+    <PARAM id="envMode" value="0.0"/>
+    <PARAM id="filterAttack" value="0.5"/>
+    <PARAM id="filterCutoff" value="2000.0"/>
+    <PARAM id="filterDecay" value="0.3"/>
+    <PARAM id="filterEnvAmount" value="0.15"/>
+    <PARAM id="filterRelease" value="0.9"/>
+    <PARAM id="filterResonance" value="1.2"/>
+    <PARAM id="filterSustain" value="0.65"/>
+    <PARAM id="filterType" value="0.0"/>
+    <PARAM id="lightIntensityFill" value="0.35"/>
+    <PARAM id="lightIntensityKey" value="0.5"/>
+    <PARAM id="lightIntensityRim" value="0.5"/>
+    <PARAM id="mixAmount" value="0.55"/>
+    <PARAM id="oscBDetune" value="5.0"/>
+    <PARAM id="rotationX" value="10.0"/>
+    <PARAM id="rotationY" value="140.0"/>
+    <PARAM id="rotationZ" value="0.0"/>
+    <PARAM id="thickness" value="0.7"/>
+    <PARAM id="transpose" value="0.0"/>
+    <PARAM id="volume" value="0.75"/>
+  </Parameters>
+</ElementsState>

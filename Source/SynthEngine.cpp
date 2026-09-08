@@ -10,6 +10,18 @@
 #include <algorithm>
 #include <cstring>
 
+// FM blend mode: max phase-modulation index at amDepth=1 (cycles of phase
+// deviation). depth=0 -> modIndex=0 -> dry (identical to sampleA); depth=1 ->
+// modIndex=FM_MOD_INDEX_MAX -> full inharmonic FM character.
+constexpr float FM_MOD_INDEX_MAX = 4.0f;
+
+// AM blend mode: max modulation depth at amDepth=1. Values above 1.0 let the
+// envelope (1 + modDepth*sampleB) swing negative, flipping A's polarity
+// instead of just dimming it -- an over-modulation character that morphs
+// continuously toward Ring Mod (pure A*B) as depth rises, without ever fully
+// reaching it (the fixed "1*sampleA" term always remains underneath).
+constexpr float AM_MOD_DEPTH_MAX = 3.0f;
+
 // ==============================================================================
 // TPT SVF FILTER IMPLEMENTATION
 // ==============================================================================
@@ -88,7 +100,8 @@ void WavetableGenerator::generateFromSpectrum(
     float fundamentalFreq,
     float sampleRate,
     int maxHarmonics,
-    std::array<float, WAVETABLE_SIZE>& output)
+    std::array<float, WAVETABLE_SIZE>& output,
+    const std::array<float, NUM_WAVELENGTHS>* harmonicPhases)
 {
     // Clear output
     std::fill(output.begin(), output.end(), 0.0f);
@@ -141,12 +154,18 @@ void WavetableGenerator::generateFromSpectrum(
         float rolloff = 1.0f / (1.0f + (h - 1) * 0.05f);
         float amplitude = specAmp * rolloff;
 
+        // Interference phase offset, interpolated from the same spectral position
+        float phaseOffset = 0.0f;
+        if (harmonicPhases != nullptr)
+            phaseOffset = (*harmonicPhases)[static_cast<size_t>(i0)] * (1.0f - frac)
+                        + (*harmonicPhases)[static_cast<size_t>(i1)] * frac;
+
         if (amplitude > 0.001f)
         {
             for (int i = 0; i < WAVETABLE_SIZE; ++i)
             {
                 float phase = static_cast<float>(i) / WAVETABLE_SIZE * TWO_PI * h;
-                output[i] += amplitude * std::sin(phase);
+                output[i] += amplitude * std::sin(phase + phaseOffset);
             }
         }
     }
@@ -159,22 +178,23 @@ void WavetableGenerator::generateFromSpectrum(
 void WavetableGenerator::generateBandLimitedSet(
     const std::array<float, NUM_WAVELENGTHS>& spectrum,
     float sampleRate,
-    WavetableSet& output)
+    WavetableSet& output,
+    const std::array<float, NUM_WAVELENGTHS>* harmonicPhases)
 {
     // Low frequencies (< 200Hz): Full harmonics
-    generateFromSpectrum(spectrum, 100.0f, sampleRate, 20, output.low);
+    generateFromSpectrum(spectrum, 100.0f, sampleRate, 20, output.low, harmonicPhases);
 
     // Mid-low frequencies (200-400Hz)
-    generateFromSpectrum(spectrum, 300.0f, sampleRate, 20, output.midLow);
+    generateFromSpectrum(spectrum, 300.0f, sampleRate, 20, output.midLow, harmonicPhases);
 
     // Mid frequencies (400-800Hz)
-    generateFromSpectrum(spectrum, 600.0f, sampleRate, 16, output.mid);
+    generateFromSpectrum(spectrum, 600.0f, sampleRate, 16, output.mid, harmonicPhases);
 
     // Mid-high frequencies (800-1600Hz)
-    generateFromSpectrum(spectrum, 1200.0f, sampleRate, 12, output.midHigh);
+    generateFromSpectrum(spectrum, 1200.0f, sampleRate, 12, output.midHigh, harmonicPhases);
 
     // High frequencies (> 1600Hz)
-    generateFromSpectrum(spectrum, 2000.0f, sampleRate, 8, output.high);
+    generateFromSpectrum(spectrum, 2000.0f, sampleRate, 8, output.high, harmonicPhases);
 }
 
 void WavetableGenerator::applySoftSaturation(std::array<float, WAVETABLE_SIZE>& wavetable, float drive)
@@ -316,24 +336,35 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
 
         if (deformAmount > 0.001f)
         {
-            deformNoiseTimeOffset += 0.002f * std::exp(deformRateSmooth * 1.0f);
+            // deformFrequency's dominant audible role: how fast the shimmer noise
+            // source itself evolves. At the old fixed 0.002 advance rate the source
+            // was bandlimited to well under 1Hz regardless of deformFrequency, so
+            // no amount of tracking-filter tuning below could make it "shimmer" —
+            // there was nothing fast to track. 0.3x..4.0x spans slow drift to fast twinkle.
+            float freqNorm = (deformFrequency - 0.5f) / 9.5f;  // 0..1
+            float timeRateScale = 0.3f + freqNorm * 3.7f;
+            deformNoiseTimeOffset += 0.002f * std::exp(deformRateSmooth * 1.0f) * timeRateScale;
 
             // Update per-wavelength shimmer state.
-            // Each wavelength gets a unique point in noise space (w * 0.4 separates bands by
-            // ~2.5x the noise correlation length, giving partially-independent spectral ripples).
-            // filterCoeff maps deformFrequency: low→slow drift (wobbly), high→fast tracking (shimmer).
+            // Per-harmonic decorrelation also scales with deformFrequency: a small step
+            // keeps neighboring wavelengths sampling nearby noise (they rise/fall together —
+            // coherent wobble); a large step spreads them further than the noise correlation
+            // length so they move independently (twinkling shimmer).
+            // filterCoeff maps deformFrequency: low→slow tracking (matches the slow source),
+            // high→fast tracking (needed to follow the now much faster-evolving source).
             {
-                float freqNorm = (deformFrequency - 0.5f) / 9.5f;  // 0..1
                 float filterCoeff = 0.001f + freqNorm * freqNorm * 0.8f;
+                float harmonicStep = 0.05f + freqNorm * 1.45f;  // 0.05 .. 1.5
 
                 for (int w = 0; w < NUM_WAVELENGTHS; ++w)
                 {
+                    float wPos = w * harmonicStep;
                     float rawNoise;
                     switch (deformNoiseType)
                     {
-                        case 1:  rawNoise = alligator3D(w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
-                        case 2:  rawNoise = worley3D   (w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
-                        default: rawNoise = simplex3D  (w * 0.4f, deformNoiseTimeOffset, w * 0.17f); break;
+                        case 1:  rawNoise = alligator3D(wPos, deformNoiseTimeOffset, wPos * 0.425f); break;
+                        case 2:  rawNoise = worley3D   (wPos, deformNoiseTimeOffset, wPos * 0.425f); break;
+                        default: rawNoise = simplex3D  (wPos, deformNoiseTimeOffset, wPos * 0.425f); break;
                     }
                     shimmerCurrentAmp[static_cast<size_t>(w)] +=
                         (rawNoise - shimmerCurrentAmp[static_cast<size_t>(w)]) * filterCoeff;
@@ -474,6 +505,23 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                 oldWavetableBPtr = &crossfadeBPtr->oldTables.getForFrequency(freqB);
         }
 
+        // FM mode reads A's wavetable at a phase offset by B (see blend switch below).
+        // At high modIndex, that read can momentarily traverse the table faster than
+        // the fundamental — by Carson's rule the highest sideband is roughly
+        // freq * (1 + (modIndex+1) * detuneRatio) — so pick a band pre-band-limited
+        // for that boosted frequency instead of the fundamental's band, to avoid
+        // aliasing past Nyquist at high depth.
+        const std::array<float, WAVETABLE_SIZE>* wavetableAFm = &wavetableA;
+        const std::array<float, WAVETABLE_SIZE>* oldWavetableAFm = oldWavetableA;
+        if (dualOscActive && blendMode == 3 && !oscAMuted)
+        {
+            float modIndex = amDepth * FM_MOD_INDEX_MAX;
+            float effectiveFreq = voice.frequency * (1.0f + (modIndex + 1.0f) * detuneRatio);
+            wavetableAFm = &currentWavetablesA.getForFrequency(effectiveFreq);
+            if (crossfadeA.active)
+                oldWavetableAFm = &crossfadeA.oldTables.getForFrequency(effectiveFreq);
+        }
+
         // Apply pitch modulation from light intensity (+-2 semitones)
         float pitchMod = std::pow(2.0f, pitchOffsetSemitones / 12.0f);
         float phaseIncrement = (voice.frequency * pitchMod) / static_cast<float>(sampleRate);
@@ -566,22 +614,24 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
                         case 0:  // Ring Mod: multiply — creates sidebands
                             blended = sampleA * sampleB;
                             break;
-                        case 1:  // AM: B modulates amplitude of A
-                            blended = sampleA * (1.0f + amDepth * sampleB);
+                        case 1:  // AM: B modulates amplitude of A. Envelope floor clamped at 0
+                                 // (rectified) instead of allowed to go negative -- gates/silences
+                                 // A rhythmically in sync with B instead of flipping its polarity.
+                            blended = sampleA * std::max(0.0f, 1.0f + amDepth * AM_MOD_DEPTH_MAX * sampleB);
                             break;
                         case 2:  // XOR: |A-B| — spectral subtraction effect
                             blended = std::abs(sampleA - sampleB) * (sampleA >= sampleB ? 1.0f : -1.0f);
                             break;
-                        case 3:  // FM: B modulates phase of A
+                        case 3:  // FM: B modulates phase of A (frequency-domain, not amplitude)
                         {
-                            float fmIndex = amDepth * 0.25f;
+                            float fmIndex = amDepth * FM_MOD_INDEX_MAX;
                             float modPhase = voice.phase + fmIndex * sampleB;
                             modPhase -= std::floor(modPhase);
-                            blended = readWavetable(modPhase, wavetableA);
-                            if (oldWavetableA != nullptr)
+                            blended = readWavetable(modPhase, *wavetableAFm);
+                            if (oldWavetableAFm != nullptr)
                             {
                                 float t = lerp(xfadeAStart, xfadeAEnd, static_cast<float>(i) / numSamples);
-                                blended = lerp(readWavetable(modPhase, *oldWavetableA), blended, t);
+                                blended = lerp(readWavetable(modPhase, *oldWavetableAFm), blended, t);
                             }
                             break;
                         }
@@ -833,7 +883,7 @@ void ElementsSynth::noteOn(int noteNumber, float velocity)
 
     Voice& voice = voices[voiceIndex];
     voice.reset();
-    voice.frequency = midiNoteToFrequency(noteNumber);
+    voice.frequency = midiNoteToFrequency(noteNumber + transposeSemitones);
     voice.velocity = 0.2f + velocity * 0.8f;  // Velocity sensitivity
     voice.amplitude = 1.0f;  // Could be based on spectrum mean
     voice.noteId = noteNumber;
@@ -1466,14 +1516,41 @@ void ElementsSynth::regenerateWavetables()
     // stored physics spectrum (used for display and as the base for the next regen).
     if (deformAmount > 0.001f)
     {
+        // Tilt modulation depth toward high harmonics (short wavelengths, low w) as
+        // deformFrequency rises: shimmer reads perceptually as a treble phenomenon,
+        // wobble as broadband. freqNorm=0 → flat (uniform depth); freqNorm=1 → depth
+        // ranges from ~0.25x at the red end to ~1.75x at the blue/high-harmonic end.
+        float freqNormTilt = (deformFrequency - 0.5f) / 9.5f;
         auto shimmerSpectrum = pendingSpectrumA;
         for (int w = 0; w < NUM_WAVELENGTHS; ++w)
         {
-            float mod = 1.0f + shimmerCurrentAmp[static_cast<size_t>(w)] * deformAmount * 2.0f;
+            float wNorm = 1.0f - static_cast<float>(w) / static_cast<float>(NUM_WAVELENGTHS - 1);
+            float tilt = 1.0f + freqNormTilt * (wNorm - 0.5f) * 1.5f;
+            float mod = 1.0f + shimmerCurrentAmp[static_cast<size_t>(w)] * deformAmount * 2.0f * tilt;
             shimmerSpectrum[static_cast<size_t>(w)] =
                 clamp(shimmerSpectrum[static_cast<size_t>(w)] * mod, 0.0f, 1.0f);
         }
-        wavetableGen.generateBandLimitedSet(shimmerSpectrum, static_cast<float>(sampleRate), currentWavetablesA);
+
+        // Interference phase from optical path differences: a surface point
+        // displaced by height h shifts the reflected wave by Δφ(λ) = 4π·h/λ
+        // (round-trip). Local peak excursions of a Gaussian rough surface reach
+        // ~3σ, so h = shimmer · 3σ with the same RMS roughness σ that drives the
+        // Bennett-Porteus scattering in Physics.cpp. Shorter wavelengths (higher
+        // harmonics) swing proportionally more — the waveform shape itself morphs
+        // as the surface evolves, instead of only harmonic amplitudes changing.
+        const float sigmaNm = deformAmount * DEFORM_ROUGHNESS_MAX_NM;
+        constexpr float FOUR_PI = 4.0f * 3.14159265359f;
+        std::array<float, NUM_WAVELENGTHS> harmonicPhases;
+        for (int w = 0; w < NUM_WAVELENGTHS; ++w)
+        {
+            float lambdaNm = WAVELENGTH_MIN + (WAVELENGTH_MAX - WAVELENGTH_MIN)
+                             * static_cast<float>(w) / (NUM_WAVELENGTHS - 1);
+            harmonicPhases[static_cast<size_t>(w)] =
+                FOUR_PI * shimmerCurrentAmp[static_cast<size_t>(w)] * 3.0f * sigmaNm / lambdaNm;
+        }
+
+        wavetableGen.generateBandLimitedSet(shimmerSpectrum, static_cast<float>(sampleRate),
+                                            currentWavetablesA, &harmonicPhases);
     }
     else
     {
@@ -1620,10 +1697,17 @@ float ElementsSynth::readWavetable(float phase, const std::array<float, WAVETABL
 
 int ElementsSynth::findFreeVoice()
 {
+    // First pass: genuinely free voices
     for (int i = 0; i < MAX_POLYPHONY; ++i)
     {
-        // Skip voices that are active OR currently being stolen (fade-out in progress)
         if (!voices[i].active && !voices[i].stealing)
+            return i;
+    }
+    // Second pass: voices already committed to dying — reusing them interrupts the
+    // steal fade, but the new fadeInRemaining provides equivalent click protection.
+    for (int i = 0; i < MAX_POLYPHONY; ++i)
+    {
+        if (voices[i].stealing)
             return i;
     }
     return -1;

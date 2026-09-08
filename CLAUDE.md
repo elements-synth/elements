@@ -120,7 +120,7 @@ Each `Material` struct now carries:
 - Samples normals from all faces of geometry (Cube: 6, Sphere: 32, Torus: ~128, Dodecahedron: 12, Teapot: 28 patch-center normals)
 - Per-face Fresnel reflectance (angle-dependent via rotation matrix)
 - Weighted contribution summation from all visible faces
-- **Deformation** (Sphere only): noise bumps perturb normals, making Fresnel angle vary with rotation; noise type selectable in UI (Simplex / Alligator / Worley)
+- **Deformation** (Sphere only): noise bumps perturb normals, making Fresnel angle vary with rotation; noise type selectable in UI (Simplex / Alligator / Worley). Rough-surface scattering (Bennett-Porteus) and interference phase offsets also apply — see "Deform / Surface Roughness Feature" section
 - Output spectrum → `WavetableGenerator` → harmonic amplitudes
 
 ### Synth Engine
@@ -232,8 +232,96 @@ Soft clipper (tanh) implemented, but with very strong spectra and multiple voice
 ### Timbre Movement Too Subtle (ACTIVE)
 Rotation affects timbre via multi-face Fresnel calculations, but spectral changes lack dramatic movement. Current mitigation: emphasis curve (`^3.0`) exaggerates differences, but more exploration needed.
 
+### Deform Wobble/Shimmer Too Subtle (RESOLVED — Aug 25, 2026)
+`deformFrequency` (low=wobbly, high=shimmery) was previously almost inaudible: the shimmer noise source itself only advanced at <1Hz regardless of `deformFrequency` (it only tuned a tracking-filter cutoff, not the source's own rate), so there was nothing fast to track at high settings. Fixed in `SynthEngine.cpp` `processBlock`:
+- `deformFrequency` now scales the shimmer noise's own time-advance rate (0.3x–4x), not just the tracking filter.
+- Per-harmonic noise sampling step scales with `deformFrequency` — low freq keeps neighboring harmonics correlated (coherent wobble), high freq decorrelates them (twinkling shimmer).
+- Modulation depth (in `regenerateWavetables`) tilts toward high harmonics as `deformFrequency` rises (shimmer reads as treble, wobble as broadband).
+- Confirmed audibly improved in Bitwig by the user.
+
+### FM Blend Mode DEPTH Too Subtle (RESOLVED — Aug 25, 2026)
+`amDepth` in FM mode (blendMode=3) only reached a max phase-modulation index of 0.25 cycles — inaudible next to AM's up-to-2x amplitude swing at the same depth value. Fixed in `SynthEngine.cpp`: raised the max index to `FM_MOD_INDEX_MAX = 4.0` cycles (constant near top of file). `amDepth=0` still gives `modIndex=0` → dry (identical to `sampleA`, matching AM's depth=0 convention exactly); `amDepth=1` now gives strong DX-style inharmonic FM character. Added anti-aliasing: the FM read now selects a wavetable band pre-band-limited for the boosted effective frequency (`freq * (1 + (modIndex+1) * detuneRatio)`, Carson's-rule approximation) instead of the fundamental's band, since the widened index can otherwise read the table faster than the fundamental and alias past Nyquist.
+
+### AM Blend Mode DEPTH Felt Weak Next to Widened FM (RESOLVED — Aug 25, 2026)
+Once FM's depth range was widened (above), AM's textbook 0–100% modulation (`1 + amDepth*sampleB`, envelope range `[0,2]`) felt weak by comparison. Fixed in `SynthEngine.cpp`: `amDepth` now scales up to `AM_MOD_DEPTH_MAX = 3.0` (constant near top of file), envelope range `[-2,4]` before clamping — see below for the clamp actually shipped.
+
+**Shipped version — gated/rectified**: envelope floor clamped at 0 (`std::max(0.0f, 1.0f + amDepth*AM_MOD_DEPTH_MAX*sampleB)`), range `[0,4]`. This rectifies the modulator, producing rhythmic silences/gating synced to B's waveform — a choppier, percussive/stuttery texture. Preferred by ear over the alternative below.
+
+**Alternative tried, kept for reference — unclamped over-modulation**: `blended = sampleA * (1.0f + amDepth * AM_MOD_DEPTH_MAX * sampleB)`, no floor clamp, envelope allowed to swing to `[-2,4]`. Negative envelope values flip A's polarity instead of gating it to silence. Mathematically this is still linear in `amDepth` (no new frequencies vs. standard AM — same sum/difference cross-terms between every harmonic of A and B), but as depth rises past 1 those cross-term sidebands increasingly dominate over the fixed `1*sampleA` term, so the sound morphs smoothly and continuously toward the existing Ring Mod mode's character (pure `A*B`) without ever fully reaching it. No silence/gating, just a smooth AM→ring-mod-like wash. If gating ever feels too abrupt/rhythmic for a given patch, this is the fallback to revisit — swap the clamp line above for this one.
+
+### Light Source Choice Barely Audible, Regardless of Material (RESOLVED — Aug 25, 2026)
+Switching a light's SOURCE (Sunset/Daylight/LED Cool) had almost no audible effect on timbre for any material. Root cause verified with a standalone probe (`Physics.cpp` compiles standalone, no JUCE dependency — see scratch probe used during investigation): the pipeline is multiplicative, `output[w] = materialCurve[w] * fresnelCurve[w] * lightIntensity[w]`. The light Gaussians had a high floor (`base=0.3-0.5`, only ~2-3x dynamic range across 380-780nm) versus material/Fresnel curves that vary far more sharply (Ruby's output alone spans ~700x) — in a product, the factor with the largest dynamic range dominates the resulting shape, so the light's tint got almost entirely swamped. Measured shape correlation between different lights' output spectra: 0.75-0.995 (nearly identical) across Diamond/Ruby/Sapphire.
+
+Fixed in `Physics.cpp` `getLightSources()`: lowered `base` / tightened `sigma` on all 3 Gaussians (Sunset: σ80→70, base 0.3→0.15; Daylight: σ120→100, base 0.5→0.20; LED Cool: σ90→75, base 0.4→0.15), raising raw dynamic range from ~2-3x to ~4-6.6x. Re-measured correlation after the change: 0.6-0.86 for broad-spectrum materials (Diamond, Water), some pairs anti-correlated (Sunset↔LED Cool on Diamond: -0.60) — genuinely distinct shapes now. Narrow-band gems (Ruby, Sapphire) still show high correlation (0.9+) between light choices — physically expected, since a material that only transmits in a narrow window can't be reshaped much by light variation outside that window; not fixable by light-curve tuning alone.
+
+A more dramatic tuning (`base=0.03-0.1`, tested and available if the moderate version still feels too subtle) produces stronger, more sign-flipping differentiation but makes each light go nearly dark at wavelengths far from its peak — a bigger change to the instrument's baseline character. User chose the moderate version for 1.0.
+
+Unrelated dead code noticed while here, not yet removed: `createLightSources()` and the `s_lightSources` static (`Physics.cpp` ~line 57-95) duplicate `getLightSources()`'s data and are never called from anywhere — safe to delete if cleaning up.
+
 ### Pending Spectrum Race Condition (KNOWN, NO AUDIBLE ISSUE)
 `pendingSpectrum[]` array can race between GUI thread (Physics update) and audio thread (wavetable generation). Not causing clicks or artifacts currently, but theoretically unsafe.
+
+## Preset Bank (COMPLETE & SHIPPED — 15/15, Aug–Sep 2026)
+
+### Where presets live
+Plain XML `.preset` files (root `<ElementsState>` with manual attributes `material`, `materialB`, `blendMode`, `geometry`, `lightEnabled0/1/2`, `lightSource0/1/2`, a `category` attribute, plus a child `<Parameters>` element with one `<PARAM id="..." value="..."/>` per APVTS parameter including `transpose`), split across two directories under `~/Library/Application Support/Elements/Presets/`:
+- **`Presets/Factory/`** — the 15 factory presets. Rewritten from `BinaryData` **every time the editor is constructed**, always overwriting — this folder is never meant to be hand-edited, so there's no versioning concern, it just always mirrors whatever's embedded in the currently-running build.
+- **`Presets/` (top level)** — user's own `SAVE`-button presets. Untouched by the factory-sync logic.
+
+### Packaging (DONE — Sep 2026)
+Presets are now bundled directly into the plugin binary via JUCE's `BinaryData` mechanism — the same pattern already used in this project for the PNG/font assets. Mechanics:
+1. The 15 approved `.preset` files live in `Source/FactoryPresets/` in the repo (real project source, not a build artifact).
+2. Each is registered as a `<FILE resource="1">` in `Elements.jucer` (see the `factorypresetsgroup` GROUP).
+3. `Projucer --resave Elements.jucer` (headless CLI, no GUI needed — `/Applications/Projucer.app/Contents/MacOS/Projucer --resave Elements.jucer`) regenerates `JuceLibraryCode/BinaryData.h/.cpp` and the Xcode project. **Run this after adding/removing/renaming anything in `Source/FactoryPresets/`.**
+4. `ElementsAudioProcessorEditor::writeFactoryPresets()` (`PluginEditor.cpp`, called from the constructor before `refreshPresetList()`) iterates `BinaryData::namedResourceList`/`originalFilenames` generically — filtering for anything ending in `.preset` — and writes each one into `getFactoryPresetsDir()`. This is fully generic: adding a 16th factory preset later needs zero C++ changes, just add the file to `Source/FactoryPresets/`, register it in the `.jucer`, and resave.
+5. `refreshPresetList()` globs **both** `getFactoryPresetsDir()` and `getPresetsDir()` (both non-recursive, so no double-counting) before running the existing category-grouping logic — grouping itself is unchanged, since it already keys off the `category` XML attribute regardless of file location.
+6. `deletePreset()` refuses outright (returns early) if `isFactoryPreset(currentPresetFile)` is true, and `deletePresetButton` is disabled/re-enabled to match whenever `currentPresetFile` changes (`loadPreset()`, `savePreset()`, `deletePreset()`) — clicking DEL on a factory preset would be a no-op anyway (rewritten on next launch) but silently doing nothing mid-session would be confusing, so it's blocked instead.
+
+A fresh install now has all 15 presets available immediately with no manual setup — verified end-to-end by launching Standalone from a clean `Presets/` directory and confirming `Factory/` populated correctly, byte-identical to the `Source/FactoryPresets/` source files.
+
+### Category grouping in the preset dropdown (DONE)
+`refreshPresetList()` groups presets by a fixed `categoryOrder` array (`{"Bass", "Lead", "Pad", "Drone", "Choir"}`), inserting a bold `addSectionHeading()` before each non-empty group; anything with a missing/unrecognized `category` attribute (all of the user's own manual `SAVE`-button presets, which never write that attribute) falls into a trailing "USER PRESETS" heading. A member `presetFilesInDisplayOrder` is filled in the exact order items are added to the combo (headings consume no id) and `onChange` indexes into that array instead of re-scanning/re-sorting the directory — this closes an index-desync hazard that existed before grouping was added. Must preserve the existing "Preset Combo — Key Pattern" (`setText()` before `addItem()`) exactly — section heading calls happen in the same phase as `addItem`, after `setText`.
+
+### Categories (5 total, in dropdown order)
+**Bass, Lead, Pad, Drone, Choir** — set in `categoryOrder` in `refreshPresetList()`. History: originally 5 categories with "Secondary Voice" instead of Bass; briefly became 6 with a "Textures" category (Secondary Voice removed, its one preset Ruby Veil deleted); Textures was then removed the same day since its remit overlapped too much with Drone. Net result: 5 categories, Secondary Voice → Bass is the real swap.
+
+### Transpose (DONE — Sep 2026)
+New `AudioParameterInt` `transpose` (-24..+24 semitones, default 0), applied once in `ElementsSynth::noteOn()` (`voice.frequency = midiNoteToFrequency(noteNumber + transposeSemitones)`) — not read continuously in `processBlock` like most params, so nudging it never bends a note already sounding, only new notes pick up the change. Deliberately **not** tied to any physics/material parameter — it's a plain register/design choice, same as how a bass guitar's range isn't derived from "physics of a bigger guitar." UI: a 5-item stepped `ComboBox` (`-2 OCT`..`+2 OCT`, exactly 12 semitones apart) at the left edge of the piano-roll strip, wired manually (gesture-based, like the rotation params) rather than via `ComboBoxAttachment` since the UI only exposes octave-quantized steps while the underlying parameter is continuous. The piano roll's own octave number labels (`C2`, `C3`...) are offset by `transpose/12` so they always show the note that will actually sound, not just the raw key position (`PianoRoll::paint()`); `PianoRoll::timerCallback()` tracks `lastKnownTranspose` to repaint immediately when it changes even with no notes playing. All 15 factory presets have an explicit `transpose` value (critical: `apvts.replaceState()` only updates parameters actually present in a loaded preset's XML — a preset missing the `transpose` PARAM would silently inherit whatever the *previously loaded* preset left it at). Currently only Sub Womb uses a non-zero value (`-24`, two octaves down, for a genuinely deep sub character).
+
+### Current bank (15/15 — final, approved)
+| File | Category | Material(s) | Geometry | Blend | Notes |
+|---|---|---|---|---|---|
+| Diamond Lead | Lead | Diamond | Cube | — (single osc) | `thickness=0.2`, `ampRelease=0.04` |
+| Gold Spike | Lead | Gold | Sphere | — (single osc) | First metallic Lead. Sphere fixes quietness (Thickness inert on Gold). `ampRelease=0.04` |
+| Hollow Lead | Lead | Diamond + Sapphire (B) | Dodecahedron | XOR | Sapphire never used as carrier (narrow-band lesson) |
+| Amber Pad | Pad | Amber + Ruby | Sphere | AM, mix=75% | Physical env, depth=0.7, Alligator noise, thickness=0.5, freq=7.5, **transpose=+12** |
+| Amethyst Veil | Pad | Amethyst + Water (B) | Teapot | Ring Mod, mix=0.2 | Static (no deform). First use of Teapot geometry |
+| Copper Bloom | Pad | Copper + Diamond (B) | Sphere | FM, mix=80% | depth=1.0, thickness=0.25 |
+| Obsidian Drone | Drone | Obsidian + Ruby (B) | Sphere | Ring Mod | materialB changed from Copper → Ruby (Copper's ~0.50 gain ceiling made it the quietest preset in the bank — see lesson below). deform=0.9, Worley noise, freq=1.5, rate=0.6, detune=50¢ |
+| Alexandrite Hum | Drone | Alexandrite + Diamond (B) | Sphere | XOR, mix=75% | **transpose=-12**. thickness=0.5, deform=0.85, Alligator noise, rate=0.35 |
+| Teapot Void | Drone | Water + Amethyst (B) | Teapot | FM, mix=0.5 | Static — movement from FM phase modulation, not geometry. thickness=0.35 |
+| Water Choir | Choir | Water + Alexandrite (B) | Sphere | AM, mix=75% | materialB changed from Water → Alexandrite (was the one actual same-material-twice violation in the bank — see lesson below). detune=5¢, depth=0.5, thickness=0.5 |
+| Molten Choir | Choir | Ruby + Amber (B) | Sphere | AM, mix=55% | Two different broad-warm materials, not one copied twice. detune=5¢, depth=0.55, thickness=0.7, freq=7 |
+| Crystal Choir | Choir | Gold + Diamond (B) | Sphere | Ring Mod, mix=50% | materialB=Diamond guarantees healthy gain regardless of Gold's own weak output (dual-osc gain lesson, applied deliberately this time). Physical env, detune=5¢, thickness=0.5, deform=0.15, freq=8, rate=2.5 |
+| Sub Womb | Bass | Amber | Sphere | — (single osc) | **transpose=-24** (2 octaves down). Muted/sub character from hard Lowpass (~180Hz, Q0.5), not low volume. `thickness=0.15`, `ampRelease=0.125` |
+| Deep Current | Bass | Ruby | Cube | — (single osc) | **transpose=-12**. Lowpass ~600Hz, Q1.5. `thickness=0.3`, `ampRelease=0.075` |
+| Resonant Fang | Bass | Copper | Sphere | — (single osc) | **transpose=-12**. Acid pluck: filterResonance=5.2, fast filter-env snap. Copper's gain caps ~0.50 regardless of tuning — compensated with `volume=1.0`. `ampRelease=0.0375` |
+
+**First revision of Choir was rejected and rebuilt**: the original Amber Choir/Gold Choir used the "same material on both oscillators" mechanism (Water Choir's original design) and were reported as sounding indistinguishable from each other and "boring" — same-material-twice doesn't scale as a differentiation strategy across multiple presets in one category, even though it works fine as a single flagship example. Rebuilt as Molten Choir / Crystal Choir using genuine two-material contrast instead (see lesson below).
+
+### Sound-design lessons learned
+- **Narrow-band materials are dangerous as the carrier (materialA or single-osc), fine as materialB.** Emerald ("narrow green peak") as a Pad primary caused a nasal/formant complaint; Sapphire ("steep cutoff, only blue/high harmonics pass") as a solo carrier caused a "no low end" complaint — both traced to `generateFromSpectrum`'s emphasis curve (`pow(specAmp, 3.0)`) exaggerating an already-narrow curve into one dominant resonance. A narrow materialB is much safer (e.g. Sapphire as materialB in Hollow Lead, Ruby as materialB in Amber Pad). Narrow-band materials confirmed: Emerald, Sapphire, Malachite, Neodymium (comb spectrum), Copper (metallic, deep-red-only). Broad-safe-as-carrier materials confirmed: Diamond (flat), Water (flat), Amber (broad rolloff favoring red), Ruby (broad shelf favoring red), Amethyst (weak/nearly flat).
+- **Thickness is inert on true metals — confirmed by design, not a bug.** `effectiveThickness = 1.0 + (thickness-1)*(1-metallicFactor)` collapses to exactly `1.0` whenever `metallicFactor=1` (Gold, Copper). Verified numerically with a standalone probe (thickness 0.1/1.0/2.0 all gave bit-identical output). This is intentional: `SynthEngine.cpp` (~1352) and `Physics.cpp` (~1027) both document that Beer-Lambert transmission only applies to the dielectric path — metals are opaque and interact via surface reflectance (Fresnel from complex IOR), not bulk transmission, so "thickness" has no physical quantity to act on. If a future Gold/Copper preset is too quiet, do NOT reach for Thickness — use geometry, filterCutoff, mixAmount, or volume instead (see below).
+- **Geometry has a large, measurable effect on perceived loudness — bigger than expected.** Confirmed with the standalone probe (see below): holding material/lights/rotation/thickness fixed, Sphere gave ~2–2.3x the `spectralAmplitudeTarget` of Cube for both a dielectric (Diamond: 0.965 vs 0.487) and a metal (Gold: 0.677 vs 0.288), because Sphere samples far more surface normals so more of them catch light at favorable angles. Cube was consistently the quietest of the 5 geometries in testing. **When a preset needs more presence without changing its character, try Sphere before touching gain/volume/thickness.**
+- **Dual-oscillator presets: materialB's spectrum — not materialA's — controls the overall output gain.** `calculateSpectrumForMaterial()` writes to a single shared `spectralAmplitudeTarget` member every call; `updateSpectrum()` calls it for A first, then for B whenever `mixAmount > 0.001`, and B's call unconditionally overwrites A's. So for any dual-osc preset, the real gain-determining spectrum is whichever material is in the **B** slot, regardless of which one is the perceptual "carrier." Confirmed via probe on Hollow Lead: Diamond (A) alone gives 0.585, Sapphire (B) alone gives 0.913 — B's number is what's actually used. **When tuning thickness/lights for a dual-osc preset's loudness, target materialB's spectrum, not materialA's.** This is existing, working engine behavior — not something to "fix" without being asked; design around it.
+- **The Harmonic-to-wavelength mapping defines "warm" vs "bright" in this engine.** In `generateFromSpectrum`, harmonic 1 (fundamental) maps to the red end (~780nm) of the material's transmission curve, the highest harmonic maps to blue (~380nm). A material with strong content at the red end and rolloff toward blue reads as warm/full-bodied (Amber, Ruby); the inverse (strong blue, weak red — Sapphire) reads as bright/thin with little to no perceived fundamental/bass, regardless of filter settings.
+- **Chorus/ensemble character**: `oscBDetune` (beating between two nearly-identical waveforms) is the mechanism, but the SAME material on both oscillators is not a good template to repeat across multiple presets in one category — tried for Amber Choir/Gold Choir, reported as sounding indistinguishable from each other and "boring." Same-material-twice removes the one thing (real harmonic contrast between A and B) that makes a dual-osc preset read as rich rather than just phase-shifted. Prefer two genuinely different materials (ideally same broad spectral family, e.g. Ruby+Amber for Molten Choir) with a small detune (5-10¢) for the beating, rather than relying on detune alone as the only differentiator. Water Choir (the one working same-material example) is the exception that stays, not the rule to extend.
+- **"Mixing the same material twice" is only a real problem when `mixAmount > 0`.** Several single-osc presets have `material == materialB` (Diamond Lead, Gold Spike, Sub Womb, Deep Current, Resonant Fang) — harmless, since `materialB` is an inert unused placeholder whenever `mixAmount = 0` (materialB's spectrum is never blended in). The actual bug class is a dual-osc preset (`mixAmount > 0`) with `material == materialB` — found once, in the original Water Choir (`materialB` was Water, same as `material`), fixed by changing `materialB` to Alexandrite. Audit for this by checking `material != materialB` only among presets with `mixAmount > 0`.
+- **Copper has a hard gain ceiling (~0.50) regardless of tuning, and it shows up wherever Copper is used, not just when it's the obvious "carrier."** Confirmed twice: Resonant Fang (Copper solo) and Obsidian Drone (Obsidian + Copper as materialB) were both measured as the quietest presets in the bank, with the exact same root cause — Copper's own `spectralAmpTarget` caps around 0.48-0.50 no matter what lights/rotation/geometry are tried (all already at their best settings), and being metallic it's also thickness-inert, so the two most obvious levers are both unavailable. Since materialB governs gain in dual-osc presets, putting Copper in the B slot silently imports this ceiling into the whole preset even when Copper is meant to be a minor color, not the main event. Fix used for Obsidian Drone: swap materialB away from Copper entirely (→ Ruby, chosen for a "molten obsidian" thematic fit, also fixed the loudness since Ruby responds normally to thickness). If Copper's darker metallic color is specifically wanted, treat its ~0.50 ceiling as a fixed constraint to design around (short/percussive envelopes, resonant filter peaks for perceived punch, `volume=1.0`) rather than something tuning can fix.
+- **Bandpass filters double-narrow an already-narrow material** — cuts on both sides of the passband, compounding the material's own narrowness. Prefer Highpass or Lowpass (single-sided cut) on narrow-band materials.
+- **Volume has a hard ceiling of 1.0** — once a preset is maxed there, further "make it more powerful" requests must come from thickness reduction, geometry choice (Sphere), filterCutoff increase, or mixAmount increase, not the volume parameter itself.
+- **Standalone probe harness**: `Physics.cpp` has zero JUCE dependency and can be compiled standalone (`clang++ -std=c++17 -I Source probe.cpp Source/Physics.cpp`) alongside a small hand-ported copy of `SynthEngine.cpp`'s `calculateSpectrumForMaterial` post-processing math (light sum → thickness → materialGain → clip-prevention normalize → `spectralAmplitudeTarget`). This lets `spectralAmplitudeTarget` be measured exactly for any material/geometry/lights/rotation/thickness combo (and, for dual-osc, both A's and B's numbers) without needing to build/load the plugin or listen by ear — used to diagnose the Gold Spike/Diamond Lead loudness issue and to level-check the two new Pad presets before presenting them. Prefer this over one-at-a-time manual correction rounds by ear when a loudness question is measurable rather than purely aesthetic.
+- **Differentiation axes for new presets within a category** (in priority order, so multiple presets in the same category sound genuinely different): 1) material spectral family — broad-warm, broad-neutral, metallic, chromism/bimodal (Alexandrite unused so far); 2) static vs moving (deform only works on Sphere; Teapot geometry now used once, in Amethyst Veil); 3) blend mode — Ring Mod and FM now each used once outside their original preset (Amethyst Veil, Copper Bloom), XOR used once (Hollow Lead); 4) envelope articulation — weakest axis, use last.
 
 ## Current APVTS Parameters (DAW-Automatable)
 
@@ -262,9 +350,11 @@ All parameters exposed to DAW automation:
 **Deformation** (Sphere only):
 - `deformAmount` (0.0 – 1.0)
 - `deformFrequency` (0.5 – 10.0)
+- `deformRate` — rate of noise animation
 
 **Master**:
 - `volume` (0.0 - 1.0) — **Added Apr 5, 2026**
+- `transpose` (-24 to +24 semitones, `AudioParameterInt`) — **Added Sep 2026**. Applied once at `noteOn`, not physics-derived. See "Transpose" section above.
 
 ## Stashed Work
 
@@ -334,7 +424,7 @@ Bottom: 3 light panels (Key / Fill / Rim) spanning full width
 | 0 | Ring Mod | `A * B` | Sidebands, metallic, inharmonic |
 | 1 | AM | `A * (1 + depth * B)` | Classic AM, depth controls modulation |
 | 2 | XOR | `\|A-B\|` with sign | Spectral subtraction, hollow timbres |
-| 3 | FM | phase of A modulated by B | Rich inharmonics, depth = FM index |
+| 3 | FM | phase of A modulated by B | Rich inharmonics, depth = FM index (0..4 cycles at depth=1) |
 
 #### Architecture Notes
 
@@ -354,10 +444,10 @@ These are NOT APVTS parameters. They are saved as manual XML attributes and read
 
 ### Future Features
 
-**Deform Noise Controls**
+**Deform Noise Controls** — all implemented
 - `noiseType` — UI selector for Simplex / Alligator / Worley: **implemented**
 - `deformFrequency` — exposed as APVTS parameter: **implemented**
-- `deformSpeed` — rate of noise animation: still hardcoded (`noiseTimeOffset += 0.02f`); easy addition (~1hr: add APVTS param, read in timerCallback)
+- `deformRate` — exposed as APVTS parameter: **implemented**
 
 **Filter B Bypass**
 Allow Material B to bypass the global filter (currently both A and B pass through the same filter). In FM mode the modulator (B) gets filtered alongside the carrier. Architectural split of the filter path required (~1 day).

@@ -181,9 +181,24 @@ void Viewport3D::renderOpenGL()
                static_cast<GLsizei>(getWidth() * desktopScale),
                static_cast<GLsizei>(getHeight() * desktopScale));
 
-    // Gray background
-    glClearColor(0.22f, 0.22f, 0.24f, 1.0f);
+    // Background: cleared to the gradient's darker shade as a fallback, then
+    // painted over by an actual top-lighter/bottom-darker gradient quad below.
+    glClearColor(0.14f, 0.14f, 0.16f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Full-screen gradient quad, drawn in NDC space before the 3D scene's
+    // projection/depth setup so it sits behind all 3D content untouched by it.
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glDisable(GL_DEPTH_TEST);
+    glBegin(GL_QUADS);
+        glColor3f(0.14f, 0.14f, 0.16f); glVertex2f(-1.0f, -1.0f);  // bottom-left, darker
+        glColor3f(0.14f, 0.14f, 0.16f); glVertex2f( 1.0f, -1.0f);  // bottom-right, darker
+        glColor3f(0.30f, 0.30f, 0.33f); glVertex2f( 1.0f,  1.0f);  // top-right, lighter
+        glColor3f(0.30f, 0.30f, 0.33f); glVertex2f(-1.0f,  1.0f);  // top-left, lighter
+    glEnd();
 
     glEnable(GL_DEPTH_TEST);
 
@@ -2251,6 +2266,16 @@ void PianoRoll::timerCallback()
             changed = true;
         }
     }
+
+    // Octave labels depend on the current transpose — repaint if it moved,
+    // even if no notes are currently active (e.g. user just changed the OCT combo).
+    int currentTranspose = processor.getSynth().getTranspose();
+    if (currentTranspose != lastKnownTranspose)
+    {
+        lastKnownTranspose = currentTranspose;
+        changed = true;
+    }
+
     if (changed)
         repaint();
 }
@@ -2268,6 +2293,11 @@ void PianoRoll::paint(juce::Graphics& g)
     int whiteKeyWidth = bounds.getWidth() / (numOctaves * 7);
     int blackKeyWidth = static_cast<int>(whiteKeyWidth * 0.6f);
     int blackKeyHeight = static_cast<int>(bounds.getHeight() * 0.6f);
+
+    // Labels show the octave that will actually SOUND, not the key's raw MIDI
+    // note — e.g. with transpose=-12, the key labeled "C4" is what you click,
+    // but it plays C3, so the label reads "C3" to match what you hear.
+    int transposeOctaves = processor.getSynth().getTranspose() / 12;
 
     // Draw white keys
     int x = 0;
@@ -2291,7 +2321,7 @@ void PianoRoll::paint(juce::Graphics& g)
             {
                 g.setColour(isActive ? juce::Colours::white : juce::Colour(0xFF888888));
                 g.setFont(juce::Font(9.0f));
-                g.drawText("C" + juce::String(startOctave + oct),
+                g.drawText("C" + juce::String(startOctave + oct + transposeOctaves),
                            keyRect.withTrimmedTop(keyRect.getHeight() - 14),
                            juce::Justification::centred);
             }
@@ -2776,7 +2806,7 @@ void ElementsLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Recta
     if (isTicked)
     {
         g.setColour(itemColour);
-        auto tickArea = textArea.removeFromLeft(textArea.getHeight()).reduced(6);
+        auto tickArea = textArea.removeFromLeft(textArea.getHeight()).reduced(getPopupTickInset());
         g.fillEllipse(tickArea.toFloat());
     }
 
@@ -2833,16 +2863,12 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     presetCombo.setColour(juce::ComboBox::outlineColourId, ElementsColors::bg3);
     presetCombo.onChange = [this]() {
         int id = presetCombo.getSelectedId();
-        if (id >= 2) {
-            juce::Array<juce::File> files;
-            getPresetsDir().findChildFiles(files, juce::File::findFiles, false, "*.preset");
-            files.sort();
-            int idx = id - 2;
-            if (idx < files.size())
-                loadPreset(files[idx]);
-        }
+        int idx = id - 2;
+        if (idx >= 0 && idx < presetFilesInDisplayOrder.size())
+            loadPreset(presetFilesInDisplayOrder[idx]);
     };
     addAndMakeVisible(presetCombo);
+    writeFactoryPresets();
     refreshPresetList();
 
     // Save button
@@ -3178,6 +3204,24 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     addAndMakeVisible(viewport3D);
     addAndMakeVisible(pianoRoll);
 
+    // Transpose — octave-stepped view of the "transpose" APVTS param (-24..+24 semitones).
+    // Lives next to the piano roll (not the MATERIALS accordion with Detune) since it
+    // changes what the keys play, not the material/physics timbre.
+    setupLabel(transposeLabel, "OCT", 18.0f, true);
+    transposeLabel.setColour(juce::Label::textColourId, ElementsColors::mid);
+    transposeCombo.addItem("-2 OCT", 1);
+    transposeCombo.addItem("-1 OCT", 2);
+    transposeCombo.addItem("0",      3);
+    transposeCombo.addItem("+1 OCT", 4);
+    transposeCombo.addItem("+2 OCT", 5);
+    transposeCombo.setColour(juce::ComboBox::backgroundColourId, ElementsColors::bg2);
+    transposeCombo.setColour(juce::ComboBox::textColourId, ElementsColors::mid);
+    transposeCombo.setColour(juce::ComboBox::outlineColourId, ElementsColors::bg3);
+    transposeCombo.setLookAndFeel(&transposeLookAndFeel);
+    transposeCombo.addListener(this);
+    addAndMakeVisible(transposeCombo);
+    refreshTransposeCombo();
+
     // === RIGHT COLUMN: Spectrum + Oscilloscope + Controls ===
     setupLabel(spectrumLabel, "SPECTRUM", 13.0f, true);
     spectrumLabel.setColour(juce::Label::textColourId, ElementsColors::dim);
@@ -3273,6 +3317,7 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
 ElementsAudioProcessorEditor::~ElementsAudioProcessorEditor()
 {
     stopTimer();
+    transposeCombo.setLookAndFeel(nullptr);
     setLookAndFeel(nullptr);
 }
 
@@ -3357,8 +3402,11 @@ void ElementsAudioProcessorEditor::resized()
     auto bounds = getLocalBounds();
     int pad = 8;
 
-    // === BOTTOM: Piano Roll (full width) ===
+    // === BOTTOM: Piano Roll + Transpose (left edge) ===
     auto pianoArea = bounds.removeFromBottom(52);
+    auto transposeArea = pianoArea.removeFromLeft(76).reduced(4, 4);
+    transposeLabel.setBounds(transposeArea.removeFromTop(20));
+    transposeCombo.setBounds(transposeArea);
     pianoRoll.setBounds(pianoArea);
 
     // === Header: Logo + subtitle + Help button ===
@@ -3669,8 +3717,24 @@ void ElementsAudioProcessorEditor::comboBoxChanged(juce::ComboBox* combo)
         audioProcessor.setBlendModeUI(mode);
         updateDepthEnabled(mode);
     }
+    else if (combo == &transposeCombo)
+    {
+        // Items are id 1..5 for -2/-1/0/+1/+2 octaves — 12 semitones apart.
+        int semitones = (transposeCombo.getSelectedId() - 3) * 12;
+        auto* param = audioProcessor.apvts.getParameter("transpose");
+        param->beginChangeGesture();
+        param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(semitones)));
+        param->endChangeGesture();
+    }
     // Filter type and mix amount are handled by APVTS attachments
     // Preset loading is handled via presetCombo.onChange lambda
+}
+
+void ElementsAudioProcessorEditor::refreshTransposeCombo()
+{
+    int semitones = static_cast<int>(audioProcessor.apvts.getRawParameterValue("transpose")->load());
+    int octaveIndex = juce::jlimit(-2, 2, semitones / 12);
+    transposeCombo.setSelectedId(octaveIndex + 3, juce::dontSendNotification);
 }
 
 void ElementsAudioProcessorEditor::updateDepthEnabled(int blendMode)
@@ -3718,10 +3782,40 @@ juce::File ElementsAudioProcessorEditor::getPresetsDir() const
     return dir;
 }
 
+juce::File ElementsAudioProcessorEditor::getFactoryPresetsDir() const
+{
+    juce::File dir = getPresetsDir().getChildFile("Factory");
+    dir.createDirectory();
+    return dir;
+}
+
+void ElementsAudioProcessorEditor::writeFactoryPresets() const
+{
+    // Always overwrite: Factory/ mirrors whatever's embedded in this build's
+    // BinaryData exactly. Nothing is meant to be hand-edited in there — the
+    // user's own saves live one level up, in getPresetsDir() itself.
+    auto dir = getFactoryPresetsDir();
+
+    for (int i = 0; i < BinaryData::namedResourceListSize; ++i)
+    {
+        juce::String originalName(BinaryData::originalFilenames[i]);
+        if (! originalName.endsWithIgnoreCase(".preset"))
+            continue;
+
+        int size = 0;
+        const char* data = BinaryData::getNamedResource(BinaryData::namedResourceList[i], size);
+        if (data == nullptr || size <= 0)
+            continue;
+
+        dir.getChildFile(originalName).replaceWithData(data, static_cast<size_t>(size));
+    }
+}
+
 void ElementsAudioProcessorEditor::refreshPresetList()
 {
     // clear() resets selectedId to 0 and clears the label.
     presetCombo.clear(juce::dontSendNotification);
+    presetFilesInDisplayOrder.clear();
 
     // Set display text BEFORE adding items so setText() finds no match,
     // leaving selectedId=0. This is the key: id=0 means any subsequent click
@@ -3731,11 +3825,55 @@ void ElementsAudioProcessorEditor::refreshPresetList()
                             juce::dontSendNotification);
 
     juce::Array<juce::File> files;
-    getPresetsDir().findChildFiles(files, juce::File::findFiles, false, "*.preset");
+    getFactoryPresetsDir().findChildFiles(files, juce::File::findFiles, false, "*.preset");
+    getPresetsDir().findChildFiles(files, juce::File::findFiles, false, "*.preset");  // non-recursive: won't re-descend into Factory/
     files.sort();
 
+    // Read each file's declared category up front (files stays alphabetical
+    // within a category since `files` was already sorted).
+    juce::StringArray fileCategories;
+    for (auto& f : files)
+    {
+        auto xml = juce::XmlDocument::parse(f);
+        fileCategories.add(xml != nullptr ? xml->getStringAttribute("category", "") : juce::String());
+    }
+
+    static const juce::StringArray categoryOrder { "Bass", "Lead", "Pad", "Drone", "Choir" };
+
+    // presetFilesInDisplayOrder is filled in the exact order items are added
+    // to the combo (section headings consume no id), so onChange can index
+    // straight into it instead of re-scanning/re-sorting the directory.
+    int nextId = 2;
+    for (auto& category : categoryOrder)
+    {
+        bool headingAdded = false;
+        for (int i = 0; i < files.size(); ++i)
+        {
+            if (fileCategories[i] != category)
+                continue;
+            if (!headingAdded)
+            {
+                presetCombo.addSectionHeading(category.toUpperCase());
+                headingAdded = true;
+            }
+            presetCombo.addItem(files[i].getFileNameWithoutExtension(), nextId++);
+            presetFilesInDisplayOrder.add(files[i]);
+        }
+    }
+
+    bool userHeadingAdded = false;
     for (int i = 0; i < files.size(); ++i)
-        presetCombo.addItem(files[i].getFileNameWithoutExtension(), i + 2);
+    {
+        if (categoryOrder.contains(fileCategories[i]))
+            continue;
+        if (!userHeadingAdded)
+        {
+            presetCombo.addSectionHeading("USER PRESETS");
+            userHeadingAdded = true;
+        }
+        presetCombo.addItem(files[i].getFileNameWithoutExtension(), nextId++);
+        presetFilesInDisplayOrder.add(files[i]);
+    }
 }
 
 void ElementsAudioProcessorEditor::savePreset()
@@ -3753,6 +3891,7 @@ void ElementsAudioProcessorEditor::savePreset()
     if (xml != nullptr && xml->writeToFile(file, {}))
     {
         currentPresetFile = file;
+        deletePresetButton.setEnabled(true);  // savePreset() always writes to the user folder, never Factory/
         refreshPresetList(); // shows name with id=0 so it stays re-selectable
     }
 }
@@ -3762,8 +3901,14 @@ void ElementsAudioProcessorEditor::deletePreset()
     // Only delete if a saved preset is currently selected
     if (!currentPresetFile.existsAsFile()) return;
 
+    // Factory presets live in Factory/ and are rewritten from BinaryData on every
+    // launch anyway — deleting one would just be undone on next restart, so refuse
+    // outright rather than let it silently disappear mid-session.
+    if (isFactoryPreset(currentPresetFile)) return;
+
     currentPresetFile.deleteFile();
     currentPresetFile = juce::File{};
+    deletePresetButton.setEnabled(true);
     refreshPresetList();
     presetCombo.setText("", juce::dontSendNotification);
 }
@@ -3780,6 +3925,7 @@ void ElementsAudioProcessorEditor::loadPreset(const juce::File& file)
     audioProcessor.setStateInformation(data.getData(), (int)data.getSize());
 
     currentPresetFile = file;
+    deletePresetButton.setEnabled(! isFactoryPreset(currentPresetFile));
     refreshPresetList(); // sets display text + id=0 so the same preset is re-selectable
 
     // Refresh UI combos to reflect loaded state
@@ -3790,6 +3936,7 @@ void ElementsAudioProcessorEditor::loadPreset(const juce::File& file)
     geoCombo.setSelectedId(static_cast<int>(audioProcessor.getGeometry()) + 1, juce::dontSendNotification);
     blendModeCombo.setSelectedId(audioProcessor.getBlendMode() + 1, juce::dontSendNotification);
     updateDepthEnabled(audioProcessor.getBlendMode());
+    refreshTransposeCombo();
 
     auto accent = MaterialAccents::getAccentForMaterial(matA);
     lookAndFeel.setAccent(accent);

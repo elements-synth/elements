@@ -287,22 +287,31 @@ const std::array<LightSource, NUM_LIGHT_SOURCES>& getLightSources()
         auto wavelengths = generateWavelengths();
         std::array<LightSource, NUM_LIGHT_SOURCES> s;
 
+        // Light source curves widened in contrast (lower base / tighter sigma) so each
+        // light's own spectral color can compete with the material transmission and
+        // Fresnel curves in the multiplicative pipeline (output = material*fresnel*light).
+        // At the old base=0.3-0.5 (only ~2-3x dynamic range), light choice barely changed
+        // the resulting spectrum shape (measured correlation 0.75-0.995 across materials,
+        // i.e. nearly identical) because material/Fresnel curves vary far more sharply and
+        // dominate the product. base=0.15-0.2 (~4-6.6x range) verified via standalone probe
+        // to produce meaningfully distinct, sometimes anti-correlated shapes instead.
+
         // Sunset
         std::array<float, NUM_WAVELENGTHS> sunsetIntensity;
         for (int i = 0; i < NUM_WAVELENGTHS; ++i)
-            sunsetIntensity[i] = gaussianIntensity(wavelengths[i], 650.0f, 80.0f, 0.3f, 0.7f);
+            sunsetIntensity[i] = gaussianIntensity(wavelengths[i], 650.0f, 70.0f, 0.15f, 0.85f);
         s[0] = LightSource("Sunset", wavelengths, sunsetIntensity, "#FF6B35");
 
         // Daylight
         std::array<float, NUM_WAVELENGTHS> daylightIntensity;
         for (int i = 0; i < NUM_WAVELENGTHS; ++i)
-            daylightIntensity[i] = gaussianIntensity(wavelengths[i], 550.0f, 120.0f, 0.5f, 0.5f);
+            daylightIntensity[i] = gaussianIntensity(wavelengths[i], 550.0f, 100.0f, 0.20f, 0.80f);
         s[1] = LightSource("Daylight", wavelengths, daylightIntensity, "#FFD93D");
 
         // LED Cool
         std::array<float, NUM_WAVELENGTHS> ledIntensity;
         for (int i = 0; i < NUM_WAVELENGTHS; ++i)
-            ledIntensity[i] = gaussianIntensity(wavelengths[i], 470.0f, 90.0f, 0.4f, 0.6f);
+            ledIntensity[i] = gaussianIntensity(wavelengths[i], 470.0f, 75.0f, 0.15f, 0.85f);
         s[2] = LightSource("LED Cool", wavelengths, ledIntensity, "#6BCF7F");
 
         return s;
@@ -1167,6 +1176,13 @@ void calculateSpectrumMultiFace(const Material& material,
         std::array<float, NUM_WAVELENGTHS> fresnelCurve;
         float totalWeight = 0.0f;
 
+        // Bennett-Porteus specular reflectance of a rough surface:
+        //   R_spec / R_smooth = exp(-(4π·σ·cosθ / λ)²)    [Bennett & Porteus, JOSA 51, 1961]
+        // σ = RMS roughness, driven by deformAmount. Short (blue) wavelengths are
+        // scattered out of the specular path first, so roughness darkens the
+        // spectrum toward red — deform gains a monotonic spectral signature.
+        const float sigmaRms = deformAmount * DEFORM_ROUGHNESS_MAX_NM;  // nm
+
         for (int face = 0; face < NUM_DIRS; ++face)
         {
             Vec3 rotatedNormal = rotMatrix.apply(deformedNormals[face]);
@@ -1179,8 +1195,14 @@ void calculateSpectrumMultiFace(const Material& material,
 
             calculateFresnelSpectral(angleDeg, light.wavelengths, fresnelCurve, material.refractiveIndex);
 
+            const float pathTerm = 4.0f * 3.14159265359f * sigmaRms * cosAngle;
+
             for (int w = 0; w < NUM_WAVELENGTHS; ++w)
-                deformedOutput[w] += weight * light.intensity[w] * materialCurve[w] * fresnelCurve[w];
+            {
+                float ratio = pathTerm / light.wavelengths[w];
+                float roughFactor = std::exp(-ratio * ratio);
+                deformedOutput[w] += weight * light.intensity[w] * materialCurve[w] * fresnelCurve[w] * roughFactor;
+            }
 
             totalWeight += weight;
         }

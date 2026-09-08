@@ -1145,6 +1145,7 @@ private:
     int startOctave = 2;
     int numOctaves = 5;
     int currentNote = -1;
+    int lastKnownTranspose = 0;  // detects transpose changes so the octave labels stay live
 
     int getNoteFromPosition(juce::Point<int> pos);
     juce::Rectangle<int> getKeyBounds(int note, bool isBlack);
@@ -1217,6 +1218,14 @@ public:
     // Color lookup for popup menu items
     juce::Colour getColourForItemText(const juce::String& text) const;
 
+protected:
+    // Inset applied to the selected-item tick dot in drawPopupMenuItem. A
+    // subclass (see CompactTickLookAndFeel below) can shrink just its own
+    // dropdown's dot without affecting every other combo box in the app.
+    virtual float getPopupTickInset() const { return 6.0f; }
+
+public:
+
     // Force JetBrains Mono for all fonts
     juce::Typeface::Ptr getTypefaceForFont(const juce::Font& font) override;
 
@@ -1233,6 +1242,14 @@ private:
     // Filmstrip knob frames (loaded from disk for testing)
     std::vector<juce::Image> knobFramesOriginal;  // untinted source
     std::vector<juce::Image> knobFrames;           // tinted for current accent
+};
+
+// Used only by transposeCombo — same look as ElementsLookAndFeel everywhere else,
+// just a smaller selected-item tick dot in that one dropdown's popup list.
+class CompactTickLookAndFeel : public ElementsLookAndFeel
+{
+protected:
+    float getPopupTickInset() const override { return 9.0f; }
 };
 
 // ==============================================================================
@@ -1280,7 +1297,11 @@ private:
     void refreshPresetList();
     void updateDepthEnabled(int blendMode);  // gray out DEPTH when not AM/FM
     juce::File getPresetsDir() const;
+    juce::File getFactoryPresetsDir() const;
+    void writeFactoryPresets() const;   // (re)writes the 15 factory presets from BinaryData, always overwriting
+    bool isFactoryPreset(const juce::File& file) const { return file.getParentDirectory() == getFactoryPresetsDir(); }
     juce::File currentPresetFile;
+    juce::Array<juce::File> presetFilesInDisplayOrder;
     juce::ComboBox geoCombo, matCombo, matBCombo, blendModeCombo;
     juce::Label geoLabel, matLabel, matBLabel, blendModeLabel;
 
@@ -1317,6 +1338,10 @@ private:
 
     // === BOTTOM: Piano ===
     PianoRoll pianoRoll;
+    juce::Label transposeLabel;
+    juce::ComboBox transposeCombo;  // octave-stepped view of the "transpose" APVTS param (-24..+24 semitones)
+    CompactTickLookAndFeel transposeLookAndFeel;  // smaller selected-item dot, scoped to this one combo
+    void refreshTransposeCombo();   // resyncs transposeCombo's selected item from the current param value
 
     // === RIGHT COLUMN: Visualizers + Controls ===
     juce::Label spectrumLabel, oscilloscopeLabel, oscilloscopeBLabel;

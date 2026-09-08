@@ -24,6 +24,11 @@ constexpr int NUM_WAVELENGTHS = 50;
 constexpr float WAVELENGTH_MIN = 380.0f;
 constexpr float WAVELENGTH_MAX = 780.0f;
 
+// RMS surface roughness (nm) at deformAmount = 1. Shared by the Bennett-Porteus
+// specular scattering factor (Physics.cpp) and the interference phase offsets
+// (SynthEngine.cpp) so both effects are driven by the same physical roughness.
+constexpr float DEFORM_ROUGHNESS_MAX_NM = 50.0f;
+
 // Number of materials and light sources
 constexpr int NUM_MATERIALS = 13;
 constexpr int NUM_LIGHT_SOURCES = 3;

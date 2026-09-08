@@ -268,6 +268,23 @@ ElementsAudioProcessor::createParameterLayout()
         [](float v, int) { return juce::String(v, 1) + " cents"; },
         nullptr));
 
+    // =====================================================================
+    // 5. NOTE / PITCH PARAMETERS
+    // =====================================================================
+
+    // Transpose: -24 to +24 semitones, default 0. Applied once at noteOn
+    // (not per-block) — a preset's register is a design choice, not a
+    // physics-derived quantity, so it stays a plain semitone offset rather
+    // than being tied to any material/geometry parameter.
+    layout.add(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{"transpose", 1},
+        "Transpose",
+        -24, 24,
+        0,
+        juce::String(),
+        [](int v, int) { return (v == 0) ? juce::String("0 st")
+                                          : juce::String(v > 0 ? "+" : "") + juce::String(v) + " st"; }));
+
     return layout;
 }
 
@@ -434,6 +451,8 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // =========================================================================
     // SYNC AUTOMATABLE PARAMETERS → SYNTH ENGINE
     // =========================================================================
+
+    synth.setTranspose(static_cast<int>(apvts.getRawParameterValue("transpose")->load()));
 
     synth.setFilterCutoff(apvts.getRawParameterValue("filterCutoff")->load());
     synth.setFilterResonance(apvts.getRawParameterValue("filterResonance")->load());

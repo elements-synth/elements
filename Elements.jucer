@@ -45,6 +45,23 @@
             resource="1" file="Source/swap_arrows.png"/>
       <FILE id="env_hdr" name="studio_kontrast_03_2k.hdr" compile="0"
             resource="1" file="studio_kontrast_03_2k.hdr"/>
+      <GROUP id="factorypresetsgroup" name="FactoryPresets">
+        <FILE id="fp_diamondlead" name="Diamond Lead.preset" compile="0" resource="1" file="Source/FactoryPresets/Diamond Lead.preset"/>
+        <FILE id="fp_goldspike" name="Gold Spike.preset" compile="0" resource="1" file="Source/FactoryPresets/Gold Spike.preset"/>
+        <FILE id="fp_hollowlead" name="Hollow Lead.preset" compile="0" resource="1" file="Source/FactoryPresets/Hollow Lead.preset"/>
+        <FILE id="fp_amberpad" name="Amber Pad.preset" compile="0" resource="1" file="Source/FactoryPresets/Amber Pad.preset"/>
+        <FILE id="fp_amethystveil" name="Amethyst Veil.preset" compile="0" resource="1" file="Source/FactoryPresets/Amethyst Veil.preset"/>
+        <FILE id="fp_copperbloom" name="Copper Bloom.preset" compile="0" resource="1" file="Source/FactoryPresets/Copper Bloom.preset"/>
+        <FILE id="fp_obsidiandrone" name="Obsidian Drone.preset" compile="0" resource="1" file="Source/FactoryPresets/Obsidian Drone.preset"/>
+        <FILE id="fp_alexandritehum" name="Alexandrite Hum.preset" compile="0" resource="1" file="Source/FactoryPresets/Alexandrite Hum.preset"/>
+        <FILE id="fp_teapotvoid" name="Teapot Void.preset" compile="0" resource="1" file="Source/FactoryPresets/Teapot Void.preset"/>
+        <FILE id="fp_waterchoir" name="Water Choir.preset" compile="0" resource="1" file="Source/FactoryPresets/Water Choir.preset"/>
+        <FILE id="fp_moltenchoir" name="Molten Choir.preset" compile="0" resource="1" file="Source/FactoryPresets/Molten Choir.preset"/>
+        <FILE id="fp_crystalchoir" name="Crystal Choir.preset" compile="0" resource="1" file="Source/FactoryPresets/Crystal Choir.preset"/>
+        <FILE id="fp_subwomb" name="Sub Womb.preset" compile="0" resource="1" file="Source/FactoryPresets/Sub Womb.preset"/>
+        <FILE id="fp_deepcurrent" name="Deep Current.preset" compile="0" resource="1" file="Source/FactoryPresets/Deep Current.preset"/>
+        <FILE id="fp_resonantfang" name="Resonant Fang.preset" compile="0" resource="1" file="Source/FactoryPresets/Resonant Fang.preset"/>
+      </GROUP>
       <GROUP id="knobsgroup" name="Knobs">
         <FILE id="knob_00" name="knob_00000.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00000.png"/>
         <FILE id="knob_01" name="knob_00001.png" compile="0" resource="1" file="custom_knob_render/knob/knob_00001.png"/>

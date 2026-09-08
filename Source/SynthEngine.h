@@ -226,14 +226,21 @@ public:
                               float fundamentalFreq,
                               float sampleRate,
                               int maxHarmonics,
-                              std::array<float, WAVETABLE_SIZE>& output);
+                              std::array<float, WAVETABLE_SIZE>& output,
+                              const std::array<float, NUM_WAVELENGTHS>* harmonicPhases = nullptr);
 
     /**
      * Generate a complete set of band-limited wavetables.
+     *
+     * harmonicPhases (optional): per-wavelength phase offsets in radians,
+     * interpolated per harmonic exactly like amplitude. Models interference
+     * path differences from surface roughness (deform) — shorter wavelengths
+     * (higher harmonics) swing more, so the waveform shape morphs over time.
      */
     void generateBandLimitedSet(const std::array<float, NUM_WAVELENGTHS>& spectrum,
                                 float sampleRate,
-                                WavetableSet& output);
+                                WavetableSet& output,
+                                const std::array<float, NUM_WAVELENGTHS>* harmonicPhases = nullptr);
 
 private:
     /**
@@ -431,6 +438,11 @@ public:
     void setThickness(float t);
     float getThickness() const { return thickness; }
 
+    // --- Transpose (semitones, applied once at noteOn — not physics-derived) ---
+
+    void setTranspose(int semitones) { transposeSemitones = semitones; }
+    int getTranspose() const { return transposeSemitones; }
+
     // --- Volume ---
 
     void setVolume(float vol) { volume = clamp(vol, 0.0f, 1.0f); }
@@ -479,6 +491,10 @@ private:
 
     // Thickness (Beer-Lambert)
     float thickness = 1.0f;  // 0.1 = thin/bright, 1.0 = reference, 3.0 = thick/dark
+
+    // Transpose (semitones, -24..24). Applied once per noteOn, not per-block —
+    // does not touch the physics/spectrum pipeline at all.
+    int transposeSemitones = 0;
 
     // Material and lighting
     int currentMaterialIndexA = 0;          // Diamond by default (Oscillator A)

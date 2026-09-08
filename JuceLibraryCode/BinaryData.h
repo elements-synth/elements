@@ -26,6 +26,51 @@ namespace BinaryData
     extern const char*   studio_kontrast_03_2k_hdr;
     const int            studio_kontrast_03_2k_hdrSize = 5909219;
 
+    extern const char*   Diamond_Lead_preset;
+    const int            Diamond_Lead_presetSize = 1590;
+
+    extern const char*   Gold_Spike_preset;
+    const int            Gold_Spike_presetSize = 1588;
+
+    extern const char*   Hollow_Lead_preset;
+    const int            Hollow_Lead_presetSize = 1592;
+
+    extern const char*   Amber_Pad_preset;
+    const int            Amber_Pad_presetSize = 1586;
+
+    extern const char*   Amethyst_Veil_preset;
+    const int            Amethyst_Veil_presetSize = 1584;
+
+    extern const char*   Copper_Bloom_preset;
+    const int            Copper_Bloom_presetSize = 1587;
+
+    extern const char*   Obsidian_Drone_preset;
+    const int            Obsidian_Drone_presetSize = 1582;
+
+    extern const char*   Alexandrite_Hum_preset;
+    const int            Alexandrite_Hum_presetSize = 1589;
+
+    extern const char*   Teapot_Void_preset;
+    const int            Teapot_Void_presetSize = 1581;
+
+    extern const char*   Water_Choir_preset;
+    const int            Water_Choir_presetSize = 1590;
+
+    extern const char*   Molten_Choir_preset;
+    const int            Molten_Choir_presetSize = 1588;
+
+    extern const char*   Crystal_Choir_preset;
+    const int            Crystal_Choir_presetSize = 1589;
+
+    extern const char*   Sub_Womb_preset;
+    const int            Sub_Womb_presetSize = 1587;
+
+    extern const char*   Deep_Current_preset;
+    const int            Deep_Current_presetSize = 1588;
+
+    extern const char*   Resonant_Fang_preset;
+    const int            Resonant_Fang_presetSize = 1589;
+
     extern const char*   knob_00000_png;
     const int            knob_00000_pngSize = 114110;
 
@@ -219,7 +264,7 @@ namespace BinaryData
     const int            knob_00063_pngSize = 112179;
 
     // Number of elements in the namedResourceList and originalFileNames arrays.
-    const int namedResourceListSize = 70;
+    const int namedResourceListSize = 85;
 
     // Points to the start of a list of resource names.
     extern const char* namedResourceList[];

@@ -84,6 +84,7 @@
 
 /* Begin PBXFileReference section */
 		0029357751EDC604FB2E4856 /* Accelerate.framework */ /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		0381B5F556F9644599A02518 /* Hollow Lead.preset */ /* Hollow Lead.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Hollow Lead.preset"; path = "../../Source/FactoryPresets/Hollow Lead.preset"; sourceTree = SOURCE_ROOT; };
 		0455061BF6CD3F3561C90B5E /* knob_00032.png */ /* knob_00032.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00032.png; path = ../../custom_knob_render/knob/knob_00032.png; sourceTree = SOURCE_ROOT; };
 		059274F7B961B0BE5DC15274 /* studio_kontrast_03_2k.hdr */ /* studio_kontrast_03_2k.hdr */ = {isa = PBXFileReference; lastKnownFileType = file.hdr; name = studio_kontrast_03_2k.hdr; path = ../../studio_kontrast_03_2k.hdr; sourceTree = SOURCE_ROOT; };
 		05BE1BE0CD8B1D3E752234E6 /* knob_00005.png */ /* knob_00005.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00005.png; path = ../../custom_knob_render/knob/knob_00005.png; sourceTree = SOURCE_ROOT; };
@@ -91,15 +92,18 @@
 		080D890514148A53D5D0C8B3 /* knob_00017.png */ /* knob_00017.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00017.png; path = ../../custom_knob_render/knob/knob_00017.png; sourceTree = SOURCE_ROOT; };
 		08873726C1B23C0282F78825 /* knob_00036.png */ /* knob_00036.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00036.png; path = ../../custom_knob_render/knob/knob_00036.png; sourceTree = SOURCE_ROOT; };
 		0AB79B15E0F23A964ABE81F8 /* RecentFilesMenuTemplate.nib */ /* RecentFilesMenuTemplate.nib */ = {isa = PBXFileReference; lastKnownFileType = file.nib; name = RecentFilesMenuTemplate.nib; path = RecentFilesMenuTemplate.nib; sourceTree = SOURCE_ROOT; };
+		0B5E2570E7EE361D8BB39831 /* Teapot Void.preset */ /* Teapot Void.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Teapot Void.preset"; path = "../../Source/FactoryPresets/Teapot Void.preset"; sourceTree = SOURCE_ROOT; };
 		0BC4EC2577DC706CC7E951CF /* knob_00031.png */ /* knob_00031.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00031.png; path = ../../custom_knob_render/knob/knob_00031.png; sourceTree = SOURCE_ROOT; };
 		0CD78FDFBBF3D1FFC1301E49 /* knob_00059.png */ /* knob_00059.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00059.png; path = ../../custom_knob_render/knob/knob_00059.png; sourceTree = SOURCE_ROOT; };
 		0CD9452B3EEDE6CE0FA10666 /* knob_00023.png */ /* knob_00023.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00023.png; path = ../../custom_knob_render/knob/knob_00023.png; sourceTree = SOURCE_ROOT; };
 		0DA760C802E2FA93685F2A12 /* knob_00007.png */ /* knob_00007.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00007.png; path = ../../custom_knob_render/knob/knob_00007.png; sourceTree = SOURCE_ROOT; };
 		0F62C70A057D9E074651458F /* Metal.framework */ /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		11BC5F6ABC5B0B6CDDCC8216 /* Deep Current.preset */ /* Deep Current.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Deep Current.preset"; path = "../../Source/FactoryPresets/Deep Current.preset"; sourceTree = SOURCE_ROOT; };
 		138275776A906CF6972A41B0 /* knob_00024.png */ /* knob_00024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00024.png; path = ../../custom_knob_render/knob/knob_00024.png; sourceTree = SOURCE_ROOT; };
 		13E15ECD56142229C6A96F5F /* knob_00053.png */ /* knob_00053.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00053.png; path = ../../custom_knob_render/knob/knob_00053.png; sourceTree = SOURCE_ROOT; };
 		140FE5CE653079B593EEEE8F /* knob_00050.png */ /* knob_00050.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00050.png; path = ../../custom_knob_render/knob/knob_00050.png; sourceTree = SOURCE_ROOT; };
 		17A4F05BAC874E85878A210C /* knob_00006.png */ /* knob_00006.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00006.png; path = ../../custom_knob_render/knob/knob_00006.png; sourceTree = SOURCE_ROOT; };
+		17F760F5927C25DF9080C151 /* Diamond Lead.preset */ /* Diamond Lead.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Diamond Lead.preset"; path = "../../Source/FactoryPresets/Diamond Lead.preset"; sourceTree = SOURCE_ROOT; };
 		18A4177B2E1168EE84C10235 /* Standalone Plugin */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Elements.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		191D05C1BFF2049CBBA30A46 /* juce_graphics */ /* juce_graphics */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_graphics; path = "~/JUCE/modules/juce_graphics"; sourceTree = "<absolute>"; };
 		1ACBD662D3BD233E81181B45 /* PluginEditor.cpp */ /* PluginEditor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PluginEditor.cpp; path = ../../Source/PluginEditor.cpp; sourceTree = SOURCE_ROOT; };
@@ -114,14 +118,17 @@
 		2674B2C5F57B12AE5067F344 /* knob_00057.png */ /* knob_00057.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00057.png; path = ../../custom_knob_render/knob/knob_00057.png; sourceTree = SOURCE_ROOT; };
 		26FDE9AE578D1EC8C6052E1E /* knob_00062.png */ /* knob_00062.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00062.png; path = ../../custom_knob_render/knob/knob_00062.png; sourceTree = SOURCE_ROOT; };
 		2755F8A0FA15D7753BA6EEA8 /* knob_00015.png */ /* knob_00015.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00015.png; path = ../../custom_knob_render/knob/knob_00015.png; sourceTree = SOURCE_ROOT; };
+		27A7C125AC3287CE9933F4F5 /* Alexandrite Hum.preset */ /* Alexandrite Hum.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Alexandrite Hum.preset"; path = "../../Source/FactoryPresets/Alexandrite Hum.preset"; sourceTree = SOURCE_ROOT; };
 		29A2BB6D5AD16EE8045109F4 /* knob_00046.png */ /* knob_00046.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00046.png; path = ../../custom_knob_render/knob/knob_00046.png; sourceTree = SOURCE_ROOT; };
 		2B2A05961AADF23FBF34C629 /* knob_00012.png */ /* knob_00012.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00012.png; path = ../../custom_knob_render/knob/knob_00012.png; sourceTree = SOURCE_ROOT; };
+		2B660A3B2A5C8AA16CAF469D /* Amber Pad.preset */ /* Amber Pad.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Amber Pad.preset"; path = "../../Source/FactoryPresets/Amber Pad.preset"; sourceTree = SOURCE_ROOT; };
 		2BF649D14D00ABB500455B75 /* knob_00027.png */ /* knob_00027.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00027.png; path = ../../custom_knob_render/knob/knob_00027.png; sourceTree = SOURCE_ROOT; };
 		316E0730940571D76B6E6E07 /* include_juce_gui_basics.mm */ /* include_juce_gui_basics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_gui_basics.mm; path = ../../JuceLibraryCode/include_juce_gui_basics.mm; sourceTree = SOURCE_ROOT; };
 		32DFCE4EF4CA1395C134EB97 /* knob_00011.png */ /* knob_00011.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00011.png; path = ../../custom_knob_render/knob/knob_00011.png; sourceTree = SOURCE_ROOT; };
 		3522098D69E561191EEFEB78 /* knob_00048.png */ /* knob_00048.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00048.png; path = ../../custom_knob_render/knob/knob_00048.png; sourceTree = SOURCE_ROOT; };
 		35A13AD60F01E0B7E5FB5C13 /* knob_00018.png */ /* knob_00018.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00018.png; path = ../../custom_knob_render/knob/knob_00018.png; sourceTree = SOURCE_ROOT; };
 		47B32D904A1D7117797DCE0D /* include_juce_audio_plugin_client_VST3.mm */ /* include_juce_audio_plugin_client_VST3.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_plugin_client_VST3.mm; path = ../../JuceLibraryCode/include_juce_audio_plugin_client_VST3.mm; sourceTree = SOURCE_ROOT; };
+		48551E468269C7B608431CE8 /* Amethyst Veil.preset */ /* Amethyst Veil.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Amethyst Veil.preset"; path = "../../Source/FactoryPresets/Amethyst Veil.preset"; sourceTree = SOURCE_ROOT; };
 		48F7E1E257E587A16DC9455B /* OpenGL.framework */ /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
 		48F9D013B64AF25B60685321 /* SynthEngine.h */ /* SynthEngine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SynthEngine.h; path = ../../Source/SynthEngine.h; sourceTree = SOURCE_ROOT; };
 		4904DF577A1363F819D4144F /* knob_00056.png */ /* knob_00056.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00056.png; path = ../../custom_knob_render/knob/knob_00056.png; sourceTree = SOURCE_ROOT; };
@@ -133,6 +140,7 @@
 		4D064680D895E42375915DEB /* juce_audio_formats */ /* juce_audio_formats */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_formats; path = "~/JUCE/modules/juce_audio_formats"; sourceTree = "<absolute>"; };
 		4FD86977965E7512E4FC253F /* VST3 */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Elements.vst3; sourceTree = BUILT_PRODUCTS_DIR; };
 		50D1776FB07829307A090A59 /* BinaryData3.cpp */ /* BinaryData3.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = BinaryData3.cpp; path = ../../JuceLibraryCode/BinaryData3.cpp; sourceTree = SOURCE_ROOT; };
+		55E1F9606549DF7606F4F7CB /* Obsidian Drone.preset */ /* Obsidian Drone.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Obsidian Drone.preset"; path = "../../Source/FactoryPresets/Obsidian Drone.preset"; sourceTree = SOURCE_ROOT; };
 		5663BB9655226BE90B1A2037 /* knob_00060.png */ /* knob_00060.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00060.png; path = ../../custom_knob_render/knob/knob_00060.png; sourceTree = SOURCE_ROOT; };
 		575F4CFB5C49EAC5726D041A /* knob_00000.png */ /* knob_00000.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00000.png; path = ../../custom_knob_render/knob/knob_00000.png; sourceTree = SOURCE_ROOT; };
 		5C5314151486AFCCDA384C99 /* Physics.h */ /* Physics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Physics.h; path = ../../Source/Physics.h; sourceTree = SOURCE_ROOT; };
@@ -150,6 +158,7 @@
 		6FFACB6898AB8A2025A58199 /* include_juce_audio_formats.mm */ /* include_juce_audio_formats.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_formats.mm; path = ../../JuceLibraryCode/include_juce_audio_formats.mm; sourceTree = SOURCE_ROOT; };
 		7549B68833B6E23490EA0E14 /* knob_00033.png */ /* knob_00033.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00033.png; path = ../../custom_knob_render/knob/knob_00033.png; sourceTree = SOURCE_ROOT; };
 		75BA38B6642F8F9C64589BB9 /* AudioToolbox.framework */ /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		76BAF6AFACC19977E3B26639 /* Crystal Choir.preset */ /* Crystal Choir.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Crystal Choir.preset"; path = "../../Source/FactoryPresets/Crystal Choir.preset"; sourceTree = SOURCE_ROOT; };
 		778B14E4F051215FEF938E1F /* knob_00063.png */ /* knob_00063.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00063.png; path = ../../custom_knob_render/knob/knob_00063.png; sourceTree = SOURCE_ROOT; };
 		7874B441A2ACE69DA3E83018 /* knob_00051.png */ /* knob_00051.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00051.png; path = ../../custom_knob_render/knob/knob_00051.png; sourceTree = SOURCE_ROOT; };
 		78DE93C63227308B23015A0A /* knob_00028.png */ /* knob_00028.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00028.png; path = ../../custom_knob_render/knob/knob_00028.png; sourceTree = SOURCE_ROOT; };
@@ -163,12 +172,14 @@
 		8456EB64F1B40D4C7CC5E358 /* juce_core */ /* juce_core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_core; path = "~/JUCE/modules/juce_core"; sourceTree = "<absolute>"; };
 		86345DF096A39A8F20D1471E /* DiscRecording.framework */ /* DiscRecording.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DiscRecording.framework; path = System/Library/Frameworks/DiscRecording.framework; sourceTree = SDKROOT; };
 		871FD7878198346CEE5FA0A5 /* SynthEngine.cpp */ /* SynthEngine.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SynthEngine.cpp; path = ../../Source/SynthEngine.cpp; sourceTree = SOURCE_ROOT; };
+		88E7637A8E9907F69CB801F2 /* Copper Bloom.preset */ /* Copper Bloom.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Copper Bloom.preset"; path = "../../Source/FactoryPresets/Copper Bloom.preset"; sourceTree = SOURCE_ROOT; };
 		896CC27134FC8B0BA8931F9C /* knob_00029.png */ /* knob_00029.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00029.png; path = ../../custom_knob_render/knob/knob_00029.png; sourceTree = SOURCE_ROOT; };
 		89EB3B308C26CE9EDFBA309A /* swap_arrows.png */ /* swap_arrows.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = swap_arrows.png; path = ../../Source/swap_arrows.png; sourceTree = SOURCE_ROOT; };
 		8F2B64D90F89DA4A17C18495 /* knob_00038.png */ /* knob_00038.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00038.png; path = ../../custom_knob_render/knob/knob_00038.png; sourceTree = SOURCE_ROOT; };
 		8FC6656C0D623E40DE42B172 /* include_juce_audio_plugin_client_AU_1.mm */ /* include_juce_audio_plugin_client_AU_1.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_plugin_client_AU_1.mm; path = ../../JuceLibraryCode/include_juce_audio_plugin_client_AU_1.mm; sourceTree = SOURCE_ROOT; };
 		94CE86C9A359F1C00E1C270F /* knob_00041.png */ /* knob_00041.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00041.png; path = ../../custom_knob_render/knob/knob_00041.png; sourceTree = SOURCE_ROOT; };
 		9AD34CE43B4832407659CA60 /* BinaryData.cpp */ /* BinaryData.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = BinaryData.cpp; path = ../../JuceLibraryCode/BinaryData.cpp; sourceTree = SOURCE_ROOT; };
+		9B2BE4FF41DE73A983B6DD27 /* Sub Womb.preset */ /* Sub Womb.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Sub Womb.preset"; path = "../../Source/FactoryPresets/Sub Womb.preset"; sourceTree = SOURCE_ROOT; };
 		9B82B2DFB0E5B894F9F84806 /* knob_00044.png */ /* knob_00044.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00044.png; path = ../../custom_knob_render/knob/knob_00044.png; sourceTree = SOURCE_ROOT; };
 		9BD6186D44A6C9DE29763724 /* juce_audio_plugin_client */ /* juce_audio_plugin_client */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_plugin_client; path = "~/JUCE/modules/juce_audio_plugin_client"; sourceTree = "<absolute>"; };
 		9E17C6DF23A3DDB03A3ACC67 /* juce_audio_processors_headless */ /* juce_audio_processors_headless */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_processors_headless; path = "~/JUCE/modules/juce_audio_processors_headless"; sourceTree = "<absolute>"; };
@@ -176,6 +187,7 @@
 		9F2B0B6CF1164E4EE1B74C1D /* PluginProcessor.h */ /* PluginProcessor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PluginProcessor.h; path = ../../Source/PluginProcessor.h; sourceTree = SOURCE_ROOT; };
 		9FB2F23D1C758154A3ADC3DF /* AU */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Elements.component; sourceTree = BUILT_PRODUCTS_DIR; };
 		A4F1F0B5CE79628731C51DD0 /* knob_00049.png */ /* knob_00049.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00049.png; path = ../../custom_knob_render/knob/knob_00049.png; sourceTree = SOURCE_ROOT; };
+		A7ACE4B6A85C536E67A01AEE /* Gold Spike.preset */ /* Gold Spike.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Gold Spike.preset"; path = "../../Source/FactoryPresets/Gold Spike.preset"; sourceTree = SOURCE_ROOT; };
 		A8A457253843C0489028CA8F /* knob_00058.png */ /* knob_00058.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00058.png; path = ../../custom_knob_render/knob/knob_00058.png; sourceTree = SOURCE_ROOT; };
 		A951F6B28B5DE94719522695 /* PluginProcessor.cpp */ /* PluginProcessor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PluginProcessor.cpp; path = ../../Source/PluginProcessor.cpp; sourceTree = SOURCE_ROOT; };
 		AA7783D1370536C28A43E536 /* knob_00022.png */ /* knob_00022.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00022.png; path = ../../custom_knob_render/knob/knob_00022.png; sourceTree = SOURCE_ROOT; };
@@ -195,6 +207,7 @@
 		C25DDFFF55B3E4CCCA9A631B /* knob_00034.png */ /* knob_00034.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00034.png; path = ../../custom_knob_render/knob/knob_00034.png; sourceTree = SOURCE_ROOT; };
 		C2E5E5CD3CB304FADF08095B /* include_juce_audio_processors_headless_ara.cpp */ /* include_juce_audio_processors_headless_ara.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_audio_processors_headless_ara.cpp; path = ../../JuceLibraryCode/include_juce_audio_processors_headless_ara.cpp; sourceTree = SOURCE_ROOT; };
 		C2F524FE1DCE8AB37401A8B2 /* Security.framework */ /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		C374468C9E9B6B197B3F19EA /* Resonant Fang.preset */ /* Resonant Fang.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Resonant Fang.preset"; path = "../../Source/FactoryPresets/Resonant Fang.preset"; sourceTree = SOURCE_ROOT; };
 		C4D2EFF8610CF7C21BED12FF /* Shaders.h */ /* Shaders.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Shaders.h; path = ../../Source/Shaders.h; sourceTree = SOURCE_ROOT; };
 		C6661A5F2132B3256D36086A /* include_juce_graphics.mm */ /* include_juce_graphics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_graphics.mm; path = ../../JuceLibraryCode/include_juce_graphics.mm; sourceTree = SOURCE_ROOT; };
 		CB0BEDB84DFF88984B9EF719 /* knob_00052.png */ /* knob_00052.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00052.png; path = ../../custom_knob_render/knob/knob_00052.png; sourceTree = SOURCE_ROOT; };
@@ -210,6 +223,7 @@
 		D8A050939678C46099DFA81D /* include_juce_audio_processors.mm */ /* include_juce_audio_processors.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_processors.mm; path = ../../JuceLibraryCode/include_juce_audio_processors.mm; sourceTree = SOURCE_ROOT; };
 		D985667E9BF2D0247F2ADD04 /* include_juce_graphics_Sheenbidi.c */ /* include_juce_graphics_Sheenbidi.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_graphics_Sheenbidi.c; path = ../../JuceLibraryCode/include_juce_graphics_Sheenbidi.c; sourceTree = SOURCE_ROOT; };
 		DBEB8844D722516C5981CC73 /* knob_00001.png */ /* knob_00001.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00001.png; path = ../../custom_knob_render/knob/knob_00001.png; sourceTree = SOURCE_ROOT; };
+		DDD06696191F8B6A292BE7D0 /* Water Choir.preset */ /* Water Choir.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Water Choir.preset"; path = "../../Source/FactoryPresets/Water Choir.preset"; sourceTree = SOURCE_ROOT; };
 		E009FFBFC23DE2A33D9044EA /* juce_gui_extra */ /* juce_gui_extra */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_gui_extra; path = "~/JUCE/modules/juce_gui_extra"; sourceTree = "<absolute>"; };
 		E36495C105473A26340E6CE8 /* knob_00016.png */ /* knob_00016.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00016.png; path = ../../custom_knob_render/knob/knob_00016.png; sourceTree = SOURCE_ROOT; };
 		E39C1BB995EDE4E88BD13971 /* include_juce_data_structures.mm */ /* include_juce_data_structures.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_data_structures.mm; path = ../../JuceLibraryCode/include_juce_data_structures.mm; sourceTree = SOURCE_ROOT; };
@@ -219,6 +233,7 @@
 		E710D197CFD8A0DDBE0F6259 /* knob_00004.png */ /* knob_00004.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = knob_00004.png; path = ../../custom_knob_render/knob/knob_00004.png; sourceTree = SOURCE_ROOT; };
 		EA3387257EB375CA7D5B7B6C /* Physics.cpp */ /* Physics.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Physics.cpp; path = ../../Source/Physics.cpp; sourceTree = SOURCE_ROOT; };
 		EAF01BC36A3264BB4954ECEC /* AudioUnit.framework */ /* AudioUnit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioUnit.framework; path = System/Library/Frameworks/AudioUnit.framework; sourceTree = SDKROOT; };
+		EBDCE0565D6E95C6B62AC297 /* Molten Choir.preset */ /* Molten Choir.preset */ = {isa = PBXFileReference; lastKnownFileType = file.preset; name = "Molten Choir.preset"; path = "../../Source/FactoryPresets/Molten Choir.preset"; sourceTree = SOURCE_ROOT; };
 		ECDDD8C03D0F5451E57966CB /* include_juce_audio_processors_headless.mm */ /* include_juce_audio_processors_headless.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_processors_headless.mm; path = ../../JuceLibraryCode/include_juce_audio_processors_headless.mm; sourceTree = SOURCE_ROOT; };
 		EF5F2B80E123038BD7A5E185 /* JetBrainsMono-Bold.ttf */ /* JetBrainsMono-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file.ttf; name = "JetBrainsMono-Bold.ttf"; path = "../../Source/JetBrainsMono-Bold.ttf"; sourceTree = SOURCE_ROOT; };
 		EF851B08C5290742A57DB9EC /* juce_audio_processors */ /* juce_audio_processors */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_processors; path = "~/JUCE/modules/juce_audio_processors"; sourceTree = "<absolute>"; };
@@ -331,6 +346,28 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2F2AFA4A5C8B57D48FFDFBCB /* FactoryPresets */ = {
+			isa = PBXGroup;
+			children = (
+				17F760F5927C25DF9080C151,
+				A7ACE4B6A85C536E67A01AEE,
+				0381B5F556F9644599A02518,
+				2B660A3B2A5C8AA16CAF469D,
+				48551E468269C7B608431CE8,
+				88E7637A8E9907F69CB801F2,
+				55E1F9606549DF7606F4F7CB,
+				27A7C125AC3287CE9933F4F5,
+				0B5E2570E7EE361D8BB39831,
+				DDD06696191F8B6A292BE7D0,
+				EBDCE0565D6E95C6B62AC297,
+				76BAF6AFACC19977E3B26639,
+				9B2BE4FF41DE73A983B6DD27,
+				11BC5F6ABC5B0B6CDDCC8216,
+				C374468C9E9B6B197B3F19EA,
+			);
+			name = FactoryPresets;
+			sourceTree = "<group>";
+		};
 		37E4B6A8D6B855DBA4A48DC4 /* Source */ = {
 			isa = PBXGroup;
 			children = (
@@ -350,6 +387,7 @@
 				25D4D4BB92B30A1958D4FDD6,
 				89EB3B308C26CE9EDFBA309A,
 				059274F7B961B0BE5DC15274,
+				2F2AFA4A5C8B57D48FFDFBCB,
 				70F70E7FF75CBA28BDE94D54,
 			);
 			name = Source;
