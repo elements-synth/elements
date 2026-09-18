@@ -84,7 +84,6 @@ public:
 
     // Thickness — APVTS is the source of truth (automatable from DAW)
     float getThickness() const { return apvts.getRawParameterValue("thickness")->load(); }
-    juce::RangedAudioParameter* getThicknessParam() { return apvts.getParameter("thickness"); }
 
     // Rotation — APVTS is the source of truth (automatable from DAW)
     float getRotationX() const { return apvts.getRawParameterValue("rotationX")->load(); }

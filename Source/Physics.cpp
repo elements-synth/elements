@@ -48,65 +48,6 @@ float calculateAverageTransmission(const Material& material)
     return sum / static_cast<float>(material.numSamples);
 }
 
-/**
- * Inicializa las fuentes de luz.
- *
- * Esta función se llama una vez para crear los datos estáticos.
- * Usamos una función porque necesitamos calcular las intensidades.
- */
-static std::array<LightSource, NUM_LIGHT_SOURCES> createLightSources()
-{
-    auto wavelengths = generateWavelengths();
-    std::array<LightSource, NUM_LIGHT_SOURCES> sources;
-
-    // Sunset - Peak at 650nm (warm orange-red)
-    {
-        std::array<float, NUM_WAVELENGTHS> intensity;
-        for (int i = 0; i < NUM_WAVELENGTHS; ++i)
-        {
-            intensity[i] = gaussianIntensity(wavelengths[i], 650.0f, 80.0f, 0.3f, 0.7f);
-        }
-        sources[0] = LightSource("Sunset", wavelengths, intensity, "#FF6B35");
-    }
-
-    // Daylight - Peak at 550nm (neutral white-yellow)
-    {
-        std::array<float, NUM_WAVELENGTHS> intensity;
-        for (int i = 0; i < NUM_WAVELENGTHS; ++i)
-        {
-            intensity[i] = gaussianIntensity(wavelengths[i], 550.0f, 120.0f, 0.5f, 0.5f);
-        }
-        sources[1] = LightSource("Daylight", wavelengths, intensity, "#FFD93D");
-    }
-
-    // LED Cool - Peak at 470nm (cool blue-white)
-    {
-        std::array<float, NUM_WAVELENGTHS> intensity;
-        for (int i = 0; i < NUM_WAVELENGTHS; ++i)
-        {
-            intensity[i] = gaussianIntensity(wavelengths[i], 470.0f, 90.0f, 0.4f, 0.6f);
-        }
-        sources[2] = LightSource("LED Cool", wavelengths, intensity, "#6BCF7F");
-    }
-
-    return sources;
-}
-
-static std::array<LightSource, NUM_LIGHT_SOURCES> s_lightSources = createLightSources();
-
-// ==============================================================================
-// STATIC DATA - Light Positions (3-Point Lighting)
-// ==============================================================================
-
-static std::array<LightPosition, 3> s_lightPositions = {{
-    // Key Light - Front-right, above (primary)
-    LightPosition("Key Light", Vec3(0.5f, 0.7f, 0.5f), 1.0f),
-    // Fill Light - Left side, slightly above (secondary, softer)
-    LightPosition("Fill Light", Vec3(-0.6f, 0.3f, 0.4f), 0.5f),
-    // Rim Light - Behind and slightly above (back light for edge definition)
-    LightPosition("Rim Light", Vec3(0.0f, 0.2f, -0.8f), 0.7f)
-}};
-
 // ==============================================================================
 // DATA ACCESS FUNCTIONS
 // ==============================================================================
@@ -334,51 +275,6 @@ const LightPosition& getLightPosition(int index)
 // ROTATION & LIGHT ANGLE
 // ==============================================================================
 
-/**
- * Aplica rotación 3D a un vector usando matrices de rotación.
- *
- * En Python usabas matrices numpy. En C++ lo hacemos manualmente
- * para evitar dependencias y mantener el código ligero.
- * Orden de rotación: X -> Y -> Z (igual que en Python).
- */
-Vec3 applyRotation(const Vec3& v, const Rotation3D& rotation)
-{
-    // Convert to radians
-    float rx = degToRad(rotation.x);
-    float ry = degToRad(rotation.y);
-    float rz = degToRad(rotation.z);
-
-    // Precompute sin/cos
-    float cx = std::cos(rx), sx = std::sin(rx);
-    float cy = std::cos(ry), sy = std::sin(ry);
-    float cz = std::cos(rz), sz = std::sin(rz);
-
-    // Apply X rotation
-    float y1 = cx * v.y - sx * v.z;
-    float z1 = sx * v.y + cx * v.z;
-
-    // Apply Y rotation
-    float x2 = cy * v.x + sy * z1;
-    float z2 = -sy * v.x + cy * z1;
-
-    // Apply Z rotation
-    float x3 = cz * x2 - sz * y1;
-    float y3 = sz * x2 + cz * y1;
-
-    return Vec3(x3, y3, z2);
-}
-
-float calculateLightAngle(const Vec3& lightPosition, const Rotation3D& objectRotation)
-{
-    // DEPRECATED: This function uses Euler angles which have gimbal lock.
-    // Use calculateLightAngleFromMatrix instead.
-    Vec3 normal(0.0f, 0.0f, 1.0f);
-    Vec3 rotatedNormal = applyRotation(normal, objectRotation);
-    float cosAngle = clamp(lightPosition.dot(rotatedNormal), -1.0f, 1.0f);
-    float angleRad = std::acos(cosAngle);
-    return angleRad * 180.0f / 3.14159265359f;
-}
-
 float calculateLightAngleFromMatrix(const Vec3& lightPosition, const RotationMatrix& rotMatrix)
 {
     // Default implementation for cube - finds best facing face
@@ -591,66 +487,6 @@ float calculateLightAngleForGeometryFromMatrix(const Vec3& lightPosition,
     // CUBE: Discrete faces, jumpy transitions (physically correct)
     // Find the face that best sees the light and use its angle.
     return calculateLightAngleFromMatrix(lightPosition, rotMatrix);
-}
-
-float calculateLightAngleForGeometry(const Vec3& lightPosition,
-                                      const Rotation3D& objectRotation,
-                                      Geometry geometry)
-{
-    // For cube: single front-facing normal
-    if (geometry == Geometry::Cube)
-    {
-        return calculateLightAngle(lightPosition, objectRotation);
-    }
-
-    // For sphere and torus: sample multiple normals to capture Z rotation
-    // We use 6 face normals (like a cube's faces) and weight-average them
-    static const Vec3 sampleNormals[6] = {
-        Vec3( 0.0f,  0.0f,  1.0f),  // Front  (+Z)
-        Vec3( 0.0f,  0.0f, -1.0f),  // Back   (-Z)
-        Vec3( 1.0f,  0.0f,  0.0f),  // Right  (+X)
-        Vec3(-1.0f,  0.0f,  0.0f),  // Left   (-X)
-        Vec3( 0.0f,  1.0f,  0.0f),  // Top    (+Y)
-        Vec3( 0.0f, -1.0f,  0.0f)   // Bottom (-Y)
-    };
-
-    float totalAngle = 0.0f;
-    float totalWeight = 0.0f;
-
-    for (int i = 0; i < 6; ++i)
-    {
-        Vec3 rotatedNormal = applyRotation(sampleNormals[i], objectRotation);
-        float cosAngle = lightPosition.dot(rotatedNormal);
-        cosAngle = clamp(cosAngle, -1.0f, 1.0f);
-
-        // Weight by how much this face "sees" the light (positive cos = facing light)
-        // Only consider faces that face toward the light
-        if (cosAngle > 0.0f)
-        {
-            float angleRad = std::acos(cosAngle);
-            float angleDeg = angleRad * 180.0f / 3.14159265359f;
-
-            // Weight by cosAngle (faces more directly facing light contribute more)
-            float weight = cosAngle;
-
-            // For torus, give more weight to side faces (X axis) to capture Z rotation
-            if (geometry == Geometry::Torus && (i == 2 || i == 3))
-            {
-                weight *= 1.5f;
-            }
-
-            totalAngle += angleDeg * weight;
-            totalWeight += weight;
-        }
-    }
-
-    if (totalWeight > 0.0f)
-    {
-        return totalAngle / totalWeight;
-    }
-
-    // All faces facing away from light → return 90° (grazing angle)
-    return 90.0f;
 }
 
 // ==============================================================================
@@ -917,34 +753,6 @@ void calculateFresnelTorus(float angleDeg,
         {
             output[j] = clamp(output[j] / totalWeight, 0.0f, 1.0f);
         }
-    }
-}
-
-void calculateGeometryFresnel(Geometry geometry,
-                              float angleDeg,
-                              const std::array<float, NUM_WAVELENGTHS>& wavelengths,
-                              std::array<float, NUM_WAVELENGTHS>& output,
-                              float baseIndex)
-{
-    switch (geometry)
-    {
-        case Geometry::Sphere:
-            calculateFresnelSphere(angleDeg, wavelengths, output, baseIndex);
-            break;
-        case Geometry::Torus:
-            calculateFresnelTorus(angleDeg, wavelengths, output, baseIndex);
-            break;
-        case Geometry::Dodecahedron:
-            calculateFresnelCube(angleDeg, wavelengths, output, baseIndex);
-            break;
-        case Geometry::Teapot:
-            // Curved surface like sphere — use sphere Fresnel (rim boost)
-            calculateFresnelSphere(angleDeg, wavelengths, output, baseIndex);
-            break;
-        case Geometry::Cube:
-        default:
-            calculateFresnelCube(angleDeg, wavelengths, output, baseIndex);
-            break;
     }
 }
 

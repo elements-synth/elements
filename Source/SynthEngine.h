@@ -21,7 +21,6 @@
 
 constexpr int WAVETABLE_SIZE = 2048;
 constexpr int MAX_POLYPHONY = 8;
-constexpr int NUM_FREQUENCY_BANDS = 5;
 
 // ==============================================================================
 // ENUMS
@@ -35,19 +34,6 @@ enum class FilterType
     Lowpass,
     Highpass,
     Bandpass
-};
-
-/**
- * Frequency bands for band-limited wavetables.
- * Cada banda tiene un wavetable optimizado para evitar aliasing.
- */
-enum class FrequencyBand
-{
-    Low,        // < 200 Hz - full harmonics
-    MidLow,     // 200-400 Hz
-    Mid,        // 400-800 Hz
-    MidHigh,    // 800-1600 Hz
-    High        // > 1600 Hz - minimal harmonics
 };
 
 // ==============================================================================
@@ -396,16 +382,12 @@ public:
 
     // Envelope mode: 0=Classic ADSR, 1=Physical (derived from optics)
     void setEnvelopeMode(int mode);
-    int getEnvelopeMode() const { return envelopeMode; }
 
     // ADSR getters — return active envelope values (Classic or Physical)
     float getAttack() const { return getActiveEnvelope().attack; }
     float getDecay() const { return getActiveEnvelope().decay; }
     float getSustain() const { return getActiveEnvelope().sustain; }
     float getRelease() const { return getActiveEnvelope().release; }
-
-    // Pitch offset from light intensity (for UI display)
-    float getPitchOffsetSemitones() const { return pitchOffsetSemitones; }
 
     // --- Filter Envelope ---
 
@@ -452,9 +434,6 @@ public:
 
     const std::array<float, NUM_WAVELENGTHS>& getSpectrumA() const { return spectrumA; }
     const std::array<float, NUM_WAVELENGTHS>& getSpectrumB() const { return spectrumB; }
-
-    // Legacy support (returns spectrumA for backward compatibility)
-    const std::array<float, NUM_WAVELENGTHS>& getCurrentSpectrum() const { return spectrumA; }
 
     // --- Oscilloscope Access (for visualization) ---
 

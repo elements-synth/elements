@@ -189,6 +189,17 @@ static constexpr const char* pbrFragmentShader = R"(
             }
         }
 
+        // With every light disabled (or all enabled lights at zero intensity),
+        // the scene has no light source at all — ambient, environment reflection,
+        // and refraction all sample the studio HDRI regardless of u_lightEnabled,
+        // so without this gate the material still visibly "looks lit" even though
+        // Lo/sssAccum (computed inside the loop above) are already correctly zero.
+        float totalLightPresence = 0.0;
+        for (int i = 0; i < 3; ++i)
+            if (u_lightEnabled[i] != 0)
+                totalLightPresence += u_lightIntensity[i];
+        float envGate = clamp(totalLightPresence, 0.0, 1.0);
+
         // =====================================================================
         // (b) Environment reflection from cubemap
         // =====================================================================
@@ -202,7 +213,7 @@ static constexpr const char* pbrFragmentShader = R"(
 
         // Fresnel-weighted environment reflection
         vec3 F_env = fresnelSchlickRoughness(NdotV, F0, u_roughness);
-        vec3 envSpec = envReflection * F_env;
+        vec3 envSpec = envReflection * F_env * envGate;
 
         // =====================================================================
         // (c) Refraction (only if transparent)
@@ -223,7 +234,7 @@ static constexpr const char* pbrFragmentShader = R"(
             // Beer's law absorption using dynamic thickness parameter.
             // +0.7 offset ensures vivid material colors even at minimum thickness setting.
             vec3 absorption = exp(-(u_thickness + 0.7) * (vec3(1.0) - u_absorptionColor) * 2.0);
-            refractionColor = refractSample * absorption;
+            refractionColor = refractSample * absorption * envGate;
         }
 
         // =====================================================================
@@ -231,7 +242,7 @@ static constexpr const char* pbrFragmentShader = R"(
         // =====================================================================
 
         // Ambient
-        vec3 ambient = vec3(0.03) * albedo;
+        vec3 ambient = vec3(0.03) * albedo * envGate;
 
         // Environment reflection strength: reduced for opaque metals, stronger for transparent/glossy
         float envStrength = mix(0.15, 0.4, u_transparency) * mix(1.0, 0.5, u_metallic);

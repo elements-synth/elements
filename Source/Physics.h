@@ -145,18 +145,6 @@ struct LightPosition
 };
 
 /**
- * Object rotation in 3D space (Euler angles in degrees).
- * DEPRECATED: Use RotationMatrix for gimbal-lock-free rotation.
- */
-struct Rotation3D
-{
-    float x, y, z;  // Rotación en grados
-
-    Rotation3D() : x(0), y(0), z(0) {}
-    Rotation3D(float rx, float ry, float rz) : x(rx), y(ry), z(rz) {}
-};
-
-/**
  * 3x3 Rotation matrix for gimbal-lock-free rotation.
  * Stored in row-major order: m[row][col] = data[row*3 + col]
  */
@@ -215,19 +203,6 @@ enum class Geometry
 // --- Rotation & Light Angle ---
 
 /**
- * Calculate rotation matrix and apply to a vector.
- * Returns the rotated vector.
- */
-Vec3 applyRotation(const Vec3& v, const Rotation3D& rotation);
-
-/**
- * Calculate the angle of incidence for a light on a rotated object.
- * Returns angle in degrees (0 = perpendicular, 90 = grazing).
- * DEPRECATED: Use calculateLightAngleFromMatrix for gimbal-lock-free calculation.
- */
-float calculateLightAngle(const Vec3& lightPosition, const Rotation3D& objectRotation);
-
-/**
  * Calculate light angle using rotation matrix directly (no gimbal lock).
  * Returns angle in degrees (0 = perpendicular to light, 180 = facing away).
  */
@@ -241,15 +216,6 @@ float calculateLightAngleFromMatrix(const Vec3& lightPosition, const RotationMat
 float calculateLightAngleForGeometryFromMatrix(const Vec3& lightPosition,
                                                 const RotationMatrix& rotMatrix,
                                                 Geometry geometry);
-
-/**
- * Calculate geometry-aware light angle using multiple surface normals.
- * For curved geometries, this samples multiple normals and averages.
- * DEPRECATED: Use calculateLightAngleForGeometryFromMatrix instead.
- */
-float calculateLightAngleForGeometry(const Vec3& lightPosition,
-                                      const Rotation3D& objectRotation,
-                                      Geometry geometry);
 
 // --- Fresnel Calculations ---
 
@@ -286,15 +252,6 @@ void calculateFresnelTorus(float angleDeg,
                            std::array<float, NUM_WAVELENGTHS>& output,
                            float baseIndex = 1.5f,
                            int numSamples = 16);
-
-/**
- * Dispatch Fresnel calculation based on geometry type.
- */
-void calculateGeometryFresnel(Geometry geometry,
-                              float angleDeg,
-                              const std::array<float, NUM_WAVELENGTHS>& wavelengths,
-                              std::array<float, NUM_WAVELENGTHS>& output,
-                              float baseIndex = 1.5f);
 
 // --- Spectrum Calculation ---
 

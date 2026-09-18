@@ -2419,18 +2419,6 @@ int PianoRoll::getNoteFromPosition(juce::Point<int> pos)
     return (startOctave + octave) * 12 + noteInOctave[keyInOctave];
 }
 
-bool PianoRoll::isBlackKey(int note)
-{
-    int n = note % 12;
-    return n == 1 || n == 3 || n == 6 || n == 8 || n == 10;
-}
-
-juce::Rectangle<int> PianoRoll::getKeyBounds(int note, bool isBlack)
-{
-    juce::ignoreUnused(note, isBlack);
-    return {};
-}
-
 // ==============================================================================
 // LIGHT PANEL
 // ==============================================================================
@@ -2517,6 +2505,13 @@ void LightPanel::comboBoxChanged(juce::ComboBox*)
 void LightPanel::setEnabled(bool enabled)
 {
     enableButton.setToggleState(enabled, juce::dontSendNotification);
+}
+
+void LightPanel::setSource(int sourceIndex)
+{
+    int sourceId = sourceIndex + 1;  // sourceIndex is 0-based, combo IDs are 1-based
+    sourceCombo.setSelectedId(sourceId, juce::dontSendNotification);
+    sourceCombo.setColour(juce::ComboBox::textColourId, getLightSourceColour(sourceId));
 }
 
 // ==============================================================================
@@ -3243,6 +3238,10 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     setupLabel(filterResonanceLabel, "Reso", 10.0f);
     setupRotarySlider(filterCutoffSlider, 20, 20000, 2000);
     setupRotarySlider(filterResonanceSlider, 0.5, 10, 1);
+    setupLabel(filterCutoffValueLabel, "2.0 kHz", 9.0f);
+    filterCutoffValueLabel.setColour(juce::Label::textColourId, ElementsColors::mid);
+    setupLabel(filterResonanceValueLabel, "Q:1.0", 9.0f);
+    filterResonanceValueLabel.setColour(juce::Label::textColourId, ElementsColors::mid);
     filterTypeCombo.addItem("Lowpass", 1);
     filterTypeCombo.addItem("Highpass", 2);
     filterTypeCombo.addItem("Bandpass", 3);
@@ -3358,6 +3357,16 @@ void ElementsAudioProcessorEditor::timerCallback()
     rotXValue.setText(fmt(audioProcessor.getRotationX()), juce::dontSendNotification);
     rotYValue.setText(fmt(audioProcessor.getRotationY()), juce::dontSendNotification);
     rotZValue.setText(fmt(audioProcessor.getRotationZ()), juce::dontSendNotification);
+
+    // Sync filter value readouts ("2.5 kHz" / "Q:1.5")
+    float cutoff = audioProcessor.apvts.getRawParameterValue("filterCutoff")->load();
+    juce::String cutoffText = (cutoff >= 1000.0f)
+        ? juce::String(cutoff / 1000.0f, 1) + " kHz"
+        : juce::String(static_cast<int>(cutoff)) + " Hz";
+    filterCutoffValueLabel.setText(cutoffText, juce::dontSendNotification);
+
+    float resonance = audioProcessor.apvts.getRawParameterValue("filterResonance")->load();
+    filterResonanceValueLabel.setText("Q:" + juce::String(resonance, 1), juce::dontSendNotification);
 }
 
 void ElementsAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, double min, double max, double def)
@@ -3386,8 +3395,9 @@ void ElementsAudioProcessorEditor::paint(juce::Graphics& g)
     // Subtitle below logo
     g.setColour(lookAndFeel.getAccent());
     g.setFont(juce::Font(11.0f));
-    g.drawText("Spectral Synthesizer", elementsLogo.getX(), elementsLogo.getBottom() - 2,
-               200, 14, juce::Justification::centredLeft);
+    g.drawText("Spectral Synthesizer v" + juce::String(JucePlugin_VersionString),
+               elementsLogo.getX(), elementsLogo.getBottom() - 2,
+               260, 14, juce::Justification::centredLeft);
 
     // Section frames (Microfreak-style rounded borders)
     for (auto& frame : sectionFrames)
@@ -3455,8 +3465,10 @@ void ElementsAudioProcessorEditor::resized()
     auto filterCut = filterRow.removeFromLeft(filterKnobW);
     auto filterRes = filterRow;
     filterCutoffLabel.setBounds(filterCut.removeFromTop(14));
+    filterCutoffValueLabel.setBounds(filterCut.removeFromBottom(10));
     filterCutoffSlider.setBounds(filterCut);
     filterResonanceLabel.setBounds(filterRes.removeFromTop(14));
+    filterResonanceValueLabel.setBounds(filterRes.removeFromBottom(10));
     filterResonanceSlider.setBounds(filterRes);
 
     // Filter Envelope (inside the FILTER frame)
@@ -3937,6 +3949,16 @@ void ElementsAudioProcessorEditor::loadPreset(const juce::File& file)
     blendModeCombo.setSelectedId(audioProcessor.getBlendMode() + 1, juce::dontSendNotification);
     updateDepthEnabled(audioProcessor.getBlendMode());
     refreshTransposeCombo();
+
+    // Refresh light panels: enable checkbox + source combo never got resynced after
+    // a preset load, so lights would come back on (audio/visual both correct) while
+    // the checkbox still showed unchecked from before the preset was loaded.
+    keyLightPanel->setEnabled(audioProcessor.isLightEnabled(0));
+    fillLightPanel->setEnabled(audioProcessor.isLightEnabled(1));
+    rimLightPanel->setEnabled(audioProcessor.isLightEnabled(2));
+    keyLightPanel->setSource(audioProcessor.getLightSource(0));
+    fillLightPanel->setSource(audioProcessor.getLightSource(1));
+    rimLightPanel->setSource(audioProcessor.getLightSource(2));
 
     auto accent = MaterialAccents::getAccentForMaterial(matA);
     lookAndFeel.setAccent(accent);

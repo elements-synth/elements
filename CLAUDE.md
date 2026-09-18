@@ -17,7 +17,7 @@ Audio plugin (VST3/AU/Standalone) — a spectral synthesizer where materials (di
 ## Version
 
 > **RULE**: Never assume or infer the plugin version. Always read it from `Elements.jucer` (the `version="..."` attribute on the `<JUCERPROJECT>` line) before referencing or modifying it anywhere in the code or documentation.
-> Current version: **0.9.4**
+> Current version: **1.0.0** (bumped from 0.9.4 — Sep 2026, user-directed). Splash screen and Help > About both read this dynamically via `JucePlugin_VersionString`, so they update automatically on any future version change — no hardcoded literal to maintain there. **Not yet released**: this is the local/`main` version only; the last actually-published GitHub Release is still `v0.9.4-beta` (see Project Status below) — README/docs "Download" links and badges intentionally were NOT changed to say 1.0.0, since that would misrepresent what's actually downloadable right now.
 
 ## Build Commands
 
@@ -59,7 +59,7 @@ open Builds/MacOSX/build/Debug/Elements.app
 ### GUI Layout (PluginEditor)
 Three-column layout:
 - **Left**: Material buttons (10), Geometry selector (Cube/Sphere/Torus/Dodeca), Rotation fields (editable X/Y/Z), 3 light panels (Key/Fill/Rim)
-- **Center**: OpenGL 3D Viewport with accordion overlay (top), Piano Roll (bottom)
+- **Center**: OpenGL 3D Viewport with accordion overlay (top), Piano Roll + OCT transpose combo (bottom, see "Transpose" in Preset Bank section)
 - **Right**: Spectrum display, Oscilloscope, Filter (LP/HP/BP + cutoff + resonance), ADSR envelope, Volume
 
 ### 3D Viewport Overlay (accordion)
@@ -141,15 +141,18 @@ Each `Material` struct now carries:
 - Soft clipper (tanh) on master output
 - Audio buffer exposed for oscilloscope display
 
-## Project Status (as of June 11, 2026)
+## Project Status (as of Sep 18, 2026)
+
+**v1.0.0 is code-complete — user-declared wrap ("this is a wrap! v1.0 is ready to be shipped!"), committed to local `main` and pushed to `origin/main`.** Still not made public (see Releases below) — a push to `main` is not a release.
 
 ### Repository
-- **Local version**: 0.9.4 — `Elements.jucer`, `JucePluginDefines.h`, About tab all updated
-- **Remote (`origin/main`)**: 0.9.4 — fully in sync
+- **Local version**: **1.0.0** (bumped from 0.9.4 — Sep 2026, user-directed; `Elements.jucer` updated + `Projucer --resave`, confirmed via built VST3's `Info.plist` `CFBundleShortVersionString`).
+- **Remote (`origin/main`)**: synced with local as of this commit — includes the completed 15-preset factory bank + BinaryData packaging, the `transpose` parameter, the gradient viewport background, the Node.js-deprecation CI fix, the deform Rate=0 fix, the light-panel preset-resync fix, the all-lights-off visual fix, the 1.0.0 version bump, BETA badge/label removal, the splash-screen + About feedback message, and the full Help section rewrite (Phase 1 above).
+- **Not yet released**: local/remote `main` is now a full version ahead (1.0.0) of the last published release (`v0.9.4-beta`, see below) — per explicit user instruction, none of this is to be cut into a new GitHub Release or made public yet. Pushing to `main` keeps the source current; it does not publish anything downloadable.
 
 ### Releases
-- **v0.9.4-beta on GitHub Releases** — macOS Universal (arm64+x86_64) + Windows x64 VST3 uploaded
-- Download links in README/docs point to `/releases` (latest = v0.9.4-beta)
+- **v0.9.4-beta on GitHub Releases** (last published) — macOS Universal (arm64+x86_64) + Windows x64 VST3 uploaded. Predates all of this session's work (presets, packaging, transpose, the 1.0.0 bump) — **the published beta does not have any factory presets bundled**, since packaging was only just finished. Revisit before cutting a new release.
+- **Download links in README/docs intentionally NOT updated to 1.0.0** — they describe what's actually downloadable right now, which is still `v0.9.4-beta`. Changing them before an actual 1.0.0 release is cut would be inaccurate. Update them as part of the actual 1.0.0 release process, not before.
 
 ### Online Documentation (`docs/` → GitHub Pages)
 - `docs/index.md` and `docs/installation.md` updated to v0.9.4
@@ -158,11 +161,69 @@ Each `Material` struct now carries:
 
 ### GitHub Actions
 - **Windows VST3 build**: passing — fixed missing PNG assets (`elements_spectra_panel.png`, `swap_arrows.png`) in CMakeLists.txt
-- **Node.js deprecation**: `actions/cache@v4` and `actions/checkout@v4` still use deprecated Node.js 20 — upgrade to Node.js 24-compatible versions ASAP (deadline was June 2)
+- **Node.js deprecation (RESOLVED — Sep 2026)**: `actions/checkout@v4`→`v6`, `actions/cache@v4`→`v5`, `actions/upload-artifact@v4`→`v6` in `build-windows-vst3.yml` and `update-docs.yml`. Committed and pushed to `main`; not yet verified by an actual CI run (no push/PR has triggered the workflow since this landed).
+
+## Release & Outreach Prep (Phase 1 COMPLETE — Sep 2026; Phase 2 still pending)
+
+Four tasks, sequenced by the user into two phases. **Phase 1 (done) — everything that needed a new plugin build**: splash screen text, Help > About text, full Help section audit/update. **Phase 2 (not started) — no plugin build needed**: documentation sweep, GitHub Pages restyle.
+
+### Phase 1a. Splash Screen — DONE
+`SplashOverlay` (`PluginEditor.h`): "BETA" badge removed, fade delay extended 2s→4s to give the feedback message room to be read, logo width increased 220→264 (+20%), vertical anchor moved from dead-center to 40% down (`anchorY`) so the block doesn't read as centered. Final feedback message (user-approved):
+```
+Elements is and will always be free - use it for whatever
+you want, personal or commercial.
+
+All I ask in return is some feedback, especially if you
+find it useful. Critique, comments, and bug reports are
+always welcome.
+```
+Version string reads dynamically via `JucePlugin_VersionString` (no hardcoded literal).
+
+### Phase 1b. Help > About — DONE
+Same message + contact info (`GitHub: github.com/elements-synth/elements`, `Email: elements.synth@gmail.com`) appended to `HelpContent::about()` in `PluginEditor.h`, below a separator line. "(Beta)" label removed from the version line; version is dynamic via `JucePlugin_VersionString`.
+
+### Phase 1c. Help section audit — DONE
+Full audit of `HelpContent` (`PluginEditor.h`) found and fixed:
+- `geometry()`: added a TEAPOT section (was undocumented — 28 Bezier patches, asymmetric spectrum).
+- `viewport()`: removed the THICKNESS entry (it's a GEOMETRIES-accordion material property, not a viewport element per user's call). Accordion UI itself deliberately left undocumented in-app per user ("pretty self explanatory") — candidate for the online docs instead (Phase 2a).
+- `controls()`: fixed misleading "Low-pass filter frequency" wording for Cutoff — filter actually has 3 types (Lowpass/Highpass/Bandpass), now just says "Filter frequency". Preset Bank documentation deliberately deferred to the online docs (Phase 2a), not added in-app.
+- `materials()`, `science()`, `lights()`, `about()` verified accurate against current code (4 blend modes, 13-material grouping, ±2-semitone pitch mod range, Physical envelope formulas fact-checked against `SynthEngine.cpp`) — no changes needed.
+
+Also fixed 3 related `HelpOverlay` UI mechanics bugs the user found while reviewing:
+- Close button ("X") was visually colliding with the last tab label, reading as "<Tab>X" — `tabBarBounds` used to span the full panel width (same width the close button sits within); now stops 12px short of `closeBounds` in `recalcLayout()`.
+- Scrollbar was visual-only (`mouseWheelMove` was the only working input) — added `mouseDown`/`mouseDrag`/`mouseUp` handling with click-to-jump-on-track + drag-the-thumb behavior. Scrollbar geometry is now cached as member state (`scrollBarTrackBounds`, `scrollThumbH`, `currentMaxScroll`) inside `drawFormattedContent()` so the mouse handlers can hit-test against exactly what's drawn.
+- Main plugin header subtitle ("Spectral Synthesizer" below the logo, `ElementsAudioProcessorEditor::paint()`) now reads "Spectral Synthesizer v1.0.0" — appended dynamically via `JucePlugin_VersionString`, box widened 200→260px to avoid clipping.
+
+Follow-up refinements after the initial audit pass (same session, still Sep 2026):
+- **Sapphire/Sunset factual error fixed**: `materials()` claimed Sapphire "produces no sound" under Sunset light. Verified against code and found false — every light source has a non-zero intensity floor at all wavelengths (`Physics.cpp`'s `gaussianIntensity`, base=0.15), and the wavetable is renormalized to a fixed peak after synthesis (`SynthEngine.cpp:212-221`), so it can't go silent — it just gets duller. Text now says "Sounds noticeably duller under Sunset light."
+- **About tab**: version line moved from after the two intro paragraphs to directly under "Spectral Wavetable Synthesizer"; hyphen → comma in "Elements is and will always be free, use it for whatever..." (same wording fixed in the splash screen); added a pointer line after the physics bullets: "This Help covers the essentials. For deeper technical detail and advanced techniques, visit the online docs: elements-synth.github.io/elements".
+- **Envelope tab removed entirely** (tab label + `HelpContent::controls()`, renamed then deleted) — user judged the Physical-envelope explanation too niche to earn its own tab; that content is deferred to the online docs (Phase 2a) instead, not preserved in-app anywhere.
+- **Deformation content relocated twice**: first added to the `controls()`/Envelope tab, then moved into `geometry()` nested under SPHERE (it's sphere-only), then re-styled after user feedback that it read as a 6th geometry type. Added a new `{sub}TEXT` tag to `drawFormattedContent()`'s parser (alongside the existing `{#AARRGGBB}TEXT` color-tag convention) rendering at 12.5pt bold in `ElementsColors::mid` — a visual tier between the 15pt bold colored geometry titles and 13pt plain body text — so "Deformation" reads as a sub-topic of Sphere, not a peer heading.
+
+VST3 + Standalone both rebuilt and verified (`BUILD SUCCEEDED`) after every edit in this pass. `ElementsTests` not re-run since none of this touched `Physics.cpp`'s numerical logic or `SynthEngine.cpp`.
+
+### Phase 2a. Documentation sweep — outdated info + v1.0 physics model changes
+Go through all docs and search/replace outdated info: `docs/index.md`, `docs/installation.md`, `docs/known-issues.md`, `docs/materials-and-geometry.md`, `docs/parameters.md`, `docs/science.md`, plus the root `science.md` they're supposed to mirror. `docs/science.md` being out of sync with root `science.md` is already a standing TODO (see Online Documentation above) — this task subsumes and broadens it into a full pass, not just that one file.
+
+Also add information that changed due to the physics model changes reflected in the code as "version 1.0" (the user's words) — most concretely the two-path dielectric-vs-metallic Fresnel pipeline (see "Physics — Two-Path Pipeline" above): dielectrics use real-valued Fresnel + Beer-Lambert thickness, metals use complex Fresnel (from n+ik) with reflectance instead of transmission and no Beer-Lambert. This architecture is already documented in this file but may predate what's in the public docs.
+
+**RESOLVED (Sep 2026)**: confirmed — an actual version bump was intended, not informal shorthand. `Elements.jucer` is now `version="1.0.0"` (was 0.9.4). This was a real bump, not just docs framing, so Phase 2a's public-facing physics-model documentation should describe the current (1.0.0) calculation model as the current one, not a change relative to some other named version.
+
+### Phase 2b. GitHub Pages restyle — match Elements' color palette
+Target: https://elements-synth.github.io/elements/index. Source lives in `docs/` (Jekyll site, `docs/_config.yml` currently sets `theme: jekyll-theme-midnight`, no custom CSS override exists yet — pages are plain Markdown relying entirely on the stock theme's styling).
+
+Goal: reskin to match Elements' actual in-plugin color palette, not the stock theme. Concrete source of truth already exists in `Source/ElementsUI.h`:
+- Backgrounds: `bg0` `#0d1117`, `bg1` `#111820`, `bg2` `#151e2a`, `bg3` `#1c2534`
+- Border/text: `border` `#1f2d3d`, `mid` `#4a6075`, `dim` `#2a3d50`, `text` `#d0e4f0`
+- Material accent colors also defined there (`MaterialAccents::*`) if accent/highlight colors are wanted beyond the base dark palette.
+
+Standard Jekyll approach for overriding a stock GitHub Pages theme: add `docs/assets/css/style.scss` that `@import`s the theme's base stylesheet then overrides the relevant Sass variables/selectors — no need to fork the whole theme.
 
 ---
 
 ## Current State (as of June 11, 2026) — v0.9.4 Beta
+
+> **This section is a historical snapshot from June 2026, not the latest state.** Everything from Aug–Sep 2026 (the complete 15-preset factory bank + BinaryData packaging, the `transpose` parameter, several audio-quality fixes) is documented in the **Preset Bank** and **Known Issues** sections instead of being folded into the bullet list below — check those first for anything preset/packaging/transpose-related.
 
 - Full working prototype with **PBR shader rendering** (Cook-Torrance BRDF)
 - All features functional: materials, geometries, 3-point lighting, Fresnel physics, synth, MIDI
@@ -229,9 +290,6 @@ Comprehensive anti-click system in `SynthEngine.cpp`:
 ### Occasional Saturation/Clipping (LOW PRIORITY)
 Soft clipper (tanh) implemented, but with very strong spectra and multiple voices, some distortion can still occur. Hard clamp at ±1.0 is final safety.
 
-### Timbre Movement Too Subtle (ACTIVE)
-Rotation affects timbre via multi-face Fresnel calculations, but spectral changes lack dramatic movement. Current mitigation: emphasis curve (`^3.0`) exaggerates differences, but more exploration needed.
-
 ### Deform Wobble/Shimmer Too Subtle (RESOLVED — Aug 25, 2026)
 `deformFrequency` (low=wobbly, high=shimmery) was previously almost inaudible: the shimmer noise source itself only advanced at <1Hz regardless of `deformFrequency` (it only tuned a tracking-filter cutoff, not the source's own rate), so there was nothing fast to track at high settings. Fixed in `SynthEngine.cpp` `processBlock`:
 - `deformFrequency` now scales the shimmer noise's own time-advance rate (0.3x–4x), not just the tracking filter.
@@ -256,7 +314,23 @@ Fixed in `Physics.cpp` `getLightSources()`: lowered `base` / tightened `sigma` o
 
 A more dramatic tuning (`base=0.03-0.1`, tested and available if the moderate version still feels too subtle) produces stronger, more sign-flipping differentiation but makes each light go nearly dark at wavelengths far from its peak — a bigger change to the instrument's baseline character. User chose the moderate version for 1.0.
 
-Unrelated dead code noticed while here, not yet removed: `createLightSources()` and the `s_lightSources` static (`Physics.cpp` ~line 57-95) duplicate `getLightSources()`'s data and are never called from anywhere — safe to delete if cleaning up.
+### Deform Rate=0 Didn't Actually Freeze the Shimmer (RESOLVED — Sep 2026)
+With Deform on and Rate=0, the spectrogram kept moving instead of holding static. Root cause: `SynthEngine.cpp`'s deform-advance line used `std::exp(deformRateSmooth * 1.0f)` as the speed multiplier — `exp(0) = 1`, not `0`, so Rate=0 still advanced the noise clock at a 1x baseline speed. Fixed by gating the whole advancement behind `if (deformRateSmooth > 0.001f)` rather than reshaping the exponential curve, so every already-tuned nonzero-Rate preset (Obsidian Drone at 0.6, Alexandrite Hum at 0.35, etc.) keeps its exact existing feel — only `Rate=0` changed, to true freeze. Pre-existing bug, unrelated to any recent session's changes; the downstream per-wavelength shimmer smoothing naturally settles once the clock stops, so no other code needed touching.
+
+### Dead Code Cleanup (RESOLVED — Sep 2026)
+A full audit of every file compiled into the plugin (`PluginProcessor`, `PluginEditor`, `SynthEngine`, `Physics`, `ElementsUI.h`, `Shaders.h`, `TeapotData.h`) found and removed 15 genuinely dead symbols, cross-checked against `ElementsTests` so nothing test-only got deleted: in `Physics.cpp`, the `createLightSources()`/`s_lightSources` duplicate (previously noted here, now actually removed) plus a matching `s_lightPositions` duplicate, the whole deprecated Euler-angle rotation cluster (`Rotation3D`, `applyRotation`, `calculateLightAngle`, `calculateLightAngleForGeometry` — superseded by the matrix-based versions actually in use), and `calculateGeometryFresnel`; in `SynthEngine`, a leftover `debugPhase` static, the unused `FrequencyBand` enum/`NUM_FREQUENCY_BANDS`, and three unwired getters (`getPitchOffsetSemitones`, `getCurrentSpectrum`, `getEnvelopeMode`); in `PluginProcessor.h`, `getThicknessParam()`; in `PluginEditor`, `PianoRoll::getKeyBounds`/`isBlackKey`, `Viewport3D::setGeometry`/`setMaterialColour`, and an unused `materialColours[]` array. Verified via `ElementsTests` (14/14 pass) and clean VST3/Standalone rebuilds after removal.
+
+### Material Dropdown Sometimes Doesn't Register a Click (OPEN — Sep 2026, unconfirmed root cause)
+User report: clicking a different material in the MAT A dropdown most of the time doesn't change the material — closing the dropdown and clicking again usually works. Investigated this session; ruled out two candidate causes by reading the code (not by reproducing live):
+- The DSP/material-application path (`comboBoxChanged` → `audioProcessor.setMaterial()`) is intact.
+- `matCombo`'s item IDs directly encode the true material index (`Diamond=1, Ruby=4, Emerald=6...`, not positional), so unlike the old `presetCombo` bug this can't desync from display order.
+- The accordion's custom `hitTest()` (`matCombo` lives inside `accordion.matPanel`, which has manual click-passthrough logic for the gaps around it, to let clicks reach the OpenGL viewport/gizmo) looked correct on inspection but was **not verified live** — this is the most likely remaining suspect, since an off-by-a-few-pixels edge case wouldn't show up just from reading the bounds math.
+- Asked the user whether this happens only with MAT A or also MAT B/BLEND/GEO, and whether it correlates with the panel having just been opened — **no answer received**; user moved on to other work before this was resolved. Needs a live repro (with Accessibility/Screen Recording permissions granted, since this session's shell couldn't drive/screenshot the app) to actually confirm the hit-test theory before attempting a fix.
+- **Deferred by user (Sep 2026): pinned as a future dev task, likely v1.1.** Not being worked further for now.
+
+### Session-Duration "Everything Sounds the Same" Report (DEFERRED — Sep 2026, likely stale-VST3-binary, not confirmed)
+User reported that partway through a long Bitwig session, changing material/settings stopped having any audible effect at all (not just Deform — described as global), until recreating the instrument track fixed it. Investigated the regen/crossfade code (`updateSpectrum`, `regenerateWavetables`, the deform pipeline) and found nothing that looks capable of getting stuck over time — no obvious overflow or stuck-flag path. Leading theory: the VST3 was rebuilt **six times** in the session this was reported in (transpose feature, two OCT-label-size passes, LookAndFeel dot scoping, gradient background), and per the already-known Bitwig VST3 caching behavior, auditioning presets across multiple rebuilds without recreating the track each time would produce exactly this symptom from a stale/mismatched binary — not a real engine bug. **Not proven either way** — no reproduction was captured tying the symptom to a specific build. If this recurs after a single rebuild + track recreation, that would rule out the stale-binary theory and point at something real in the regen pipeline.
+- **Deferred by user (Sep 2026): pinned as a future dev task, likely v1.1.** Not being worked further for now.
 
 ### Pending Spectrum Race Condition (KNOWN, NO AUDIBLE ISSUE)
 `pendingSpectrum[]` array can race between GUI thread (Physics update) and audio thread (wavetable generation). Not causing clicks or artifacts currently, but theoretically unsafe.
@@ -356,14 +430,6 @@ All parameters exposed to DAW automation:
 - `volume` (0.0 - 1.0) — **Added Apr 5, 2026**
 - `transpose` (-24 to +24 semitones, `AudioParameterInt`) — **Added Sep 2026**. Applied once at `noteOn`, not physics-derived. See "Transpose" section above.
 
-## Stashed Work
-
-**`stash@{0}`** — **Fog/Environment Feature** (on hold)
-- Volumetric fog with ray-marched simplex noise
-- Parameters: `envType`, `fogDensity`
-- Fullscreen fog shader + on-geometry fog blending
-- Time-based noise animation for dynamic fog movement
-
 ## Pending Work / Future Features
 
 ### Dual-Oscillator Material Mixing (COMPLETE — merged to main May 2026)
@@ -375,7 +441,7 @@ All parameters exposed to DAW automation:
 #### Implementation Plan — 6 Points
 
 **[DONE] Point 1 — APVTS Parameters**
-- `materialA` (0-9), `materialB` (0-9), `blendMode` (0-5), `mixAmount` (0.0-1.0)
+- `materialA` (0-12), `materialB` (0-12), `blendMode` (0-3), `mixAmount` (0.0-1.0)
 - `amDepth` (0.0-1.0) — modulation depth for AM and FM modes
 - `oscBDetune` (±100 cents) — detune Oscillator B relative to A
 
@@ -434,7 +500,7 @@ Bottom: 3 light panels (Key / Fill / Rim) spanning full width
 
 **State save/load pattern**: materialB and blendMode combos call synth setters directly (bypassing APVTS). They are therefore saved/loaded as manual XML attributes in `getStateInformation`/`setStateInformation`, same as materialA and geometry. Do NOT rely on APVTS for these values.
 
-**blendMode APVTS**: Fixed — `AudioParameterChoice` now has all 6 items (0=Ring Mod, 1=Max, 2=AM, 3=Difference, 4=Crossfade, 5=FM). FM is fully automatable.
+**blendMode APVTS**: `AudioParameterChoice` with 4 items (0=Ring Mod, 1=AM, 2=XOR, 3=FM) — Spectral Max and Crossfade were removed from the original 6-mode design (see "Current State" bullet list above). FM is fully automatable.
 
 ### Preset Combo — Key Pattern
 `setText(name)` in JUCE ComboBox matches items by name and calls `setSelectedId(itemId)`, leaving the combo unable to re-fire for that item. Fix: call `setText(name)` BEFORE `addItem()` in `refreshPresetList()` so no match exists → `selectedId` stays 0 → any subsequent click fires `onChange`.
@@ -449,23 +515,14 @@ These are NOT APVTS parameters. They are saved as manual XML attributes and read
 - `deformFrequency` — exposed as APVTS parameter: **implemented**
 - `deformRate` — exposed as APVTS parameter: **implemented**
 
-**Filter B Bypass**
-Allow Material B to bypass the global filter (currently both A and B pass through the same filter). In FM mode the modulator (B) gets filtered alongside the carrier. Architectural split of the filter path required (~1 day).
+**Filter B Bypass** — confirmed still accurate (verified against current code, Sep 2026). **Deferred by user: pinned for v1.1, not v1.0.**
+Allow Material B to bypass the global filter. Currently there is exactly one filter instance, applied once per sample to the already-mixed A+B signal (`filter.process(sample)`, `SynthEngine.cpp` ~757) — no per-oscillator filter path exists. In FM mode the modulator (B) gets filtered alongside the carrier. Architectural split of the filter path required (~1 day).
 
-**ADSR Envelope Graph**
-Visual curve display of the current ADSR shape, updating in real time. ADSRDisplay component exists but shows fill only — a proper curve overlay would improve legibility.
+**UI Feedback — Filter value labels (DONE — Sep 2026)**
+Added `filterCutoffValueLabel`/`filterResonanceValueLabel` (`PluginEditor.h`/`.cpp`) — small read-only labels under the Cutoff/Reso knobs showing `"2.5 kHz"`/`"Q:1.5"`-style live values, updated every `timerCallback()` tick using the same formatting logic as the APVTS parameter's string formatter. Fits inside the existing 55px knob-row height by trading 10px off the rotary slider itself; consistent with the existing `rotXValue`-style live-readout pattern already used for rotation.
 
-**Enhance Timbre Movement from Rotation**
-Wider spectral variation per rotation degree; more distinct timbral signatures per geometry; non-linear harmonic mapping for more dramatic timbre shifts.
-
-**UI Feedback**
-Filter value labels showing readable values (e.g. "2.5kHz", "Q:1.5") under the knobs.
-
-**PBR Spectral Accuracy — Alexandrite, Malachite, Neodymium**
-Current spectral curves are qualitatively correct but estimated. Sourcing USGS/literature data for these three would improve audio accuracy.
-
-**Fog / Environment Feature** (on hold)
-`stash@{0}` contains volumetric fog with ray-marched simplex noise, `envType`/`fogDensity` parameters, fullscreen fog shader. On hold — not a current priority.
+**PBR Spectral Accuracy — Alexandrite, Malachite, Neodymium** — confirmed still accurate (verified against current code, Sep 2026). **Deferred by user: pinned for v1.1, not v1.0.**
+Current spectral curves are qualitatively correct but estimated. Sourcing USGS/literature data for these three would improve audio accuracy. See Material Accuracy Summary table below — all three still show ⚠️ estimated/qualitative.
 
 ## Materials: Scientific Data Policy
 
@@ -587,29 +644,18 @@ Diamond, Water, Amber, Ruby, Gold, Emerald, Amethyst, Sapphire, Copper, Obsidian
 | 1 | pluginval strictness-10 | ✅ Done — 0 assertions |
 | 2 | Manual state round-trip (materialA/B, blendMode, geometry) | ⏭ Skipped |
 | 3 | Automated unit test harness (ElementsTests) | ✅ Done — 14/14 pass |
-| 4 | Manual regression + coverage matrix | 🔲 Pending |
+| 4 | Manual regression + coverage matrix | ⏭ Not needed — superseded, see below |
 
 ### Step 1 — pluginval
 Fixed 3 UTF-8 encoding bugs that caused JUCE `String(const char*)` ASCII assertion failures at strictness 10:
 - `HelpContent::materials()` and `HelpContent::science()` in `PluginEditor.h` — wrapped in `juce::String(juce::CharPointer_UTF8(...))`
 - Two `DBG()` strings with unicode arrows/dashes — replaced with ASCII equivalents
 
-### Step 4 — Manual regression + coverage matrix (PENDING)
+### Step 4 — Manual regression + coverage matrix (NOT NEEDED — decided by user, Sep 2026)
+User decided this dedicated pass isn't needed: the extensive by-ear listening/tuning done while building and revising the 15-preset factory bank (multiple rounds across all 5 categories, all materials, all geometries, all 4 blend modes, both ADSR modes, all 3 deform noise types) already exercised effectively the same coverage this step was meant to provide. Original scope kept below for reference only, in case a future session wants a more formal pass:
 
-**Targeted regression** — listen specifically for:
-- `mixAmount=0`: any audible bleed from MAT B
-- Voice stealing >8 simultaneous notes: glitches, stuck voices
-- Filter toggle mid-note: click or amplitude spike
-- Same-note retrigger: doubling artifact
-- Rapid note on/off sequence: zipper noise
-
-**Coverage matrix** — play through every combination:
-- 13 materials × 5 geometries × 4 blend modes
-- Filter: LP/HP/BP at extreme cutoff and resonance
-- ADSR mode: Classic vs Physical
-- Deform noise type: Simplex / Alligator / Worley
-- Lighting: toggle each of 3 lights, change sources
-- Automation: automate MIX and DETUNE in Bitwig — check for zipper noise or jumps
+- Targeted regression: `mixAmount=0` bleed, voice stealing >8 notes, filter toggle mid-note, same-note retrigger, rapid on/off, zipper noise on automated MIX/DETUNE
+- Coverage matrix: 13 materials × 5 geometries × 4 blend modes, filter extremes, ADSR mode, deform noise type, lighting toggles
 
 ---
 

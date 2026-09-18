@@ -272,9 +272,6 @@ void ElementsSynth::prepareToPlay(double newSampleRate, int samplesPerBlock)
     regenerateWavetables();
 }
 
-// Static phase for continuous tone test
-static float debugPhase = 0.0f;
-
 void ElementsSynth::processBlock(float* buffer, int numSamples)
 {
     // Clear buffer to start fresh
@@ -343,7 +340,12 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             // there was nothing fast to track. 0.3x..4.0x spans slow drift to fast twinkle.
             float freqNorm = (deformFrequency - 0.5f) / 9.5f;  // 0..1
             float timeRateScale = 0.3f + freqNorm * 3.7f;
-            deformNoiseTimeOffset += 0.002f * std::exp(deformRateSmooth * 1.0f) * timeRateScale;
+            // exp(0) = 1, not 0 — so without this gate, Rate=0 still advanced the
+            // noise clock at a 1x baseline speed instead of freezing it. Gating the
+            // whole term by rate (rather than reshaping the exp() curve) keeps every
+            // already-tuned nonzero-Rate preset's feel bit-for-bit unchanged.
+            if (deformRateSmooth > 0.001f)
+                deformNoiseTimeOffset += 0.002f * std::exp(deformRateSmooth * 1.0f) * timeRateScale;
 
             // Update per-wavelength shimmer state.
             // Per-harmonic decorrelation also scales with deformFrequency: a small step

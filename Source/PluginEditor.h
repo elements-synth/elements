@@ -39,8 +39,6 @@ public:
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
 
-    void setGeometry(Geometry geom) { currentGeometry = geom; }
-    void setMaterialColour(juce::Colour c) { materialColour = c; }
     void resetRotation();
     void setRotationFromEuler(float x, float y, float z);
 
@@ -296,6 +294,7 @@ namespace HelpContent
         return
             "ELEMENTS\n"
             "Spectral Wavetable Synthesizer\n"
+            "Version " + juce::String(JucePlugin_VersionString) + "\n"
             "\n"
             "Elements generates audio by simulating how light interacts\n"
             "with physical materials. Each material has unique optical\n"
@@ -306,7 +305,21 @@ namespace HelpContent
             "  - Light absorption curves shape the frequency spectrum\n"
             "  - Material thickness controls spectral filtering\n"
             "\n"
-            "Version 0.9.4 (Beta)";
+            "This Help covers the essentials. For deeper technical\n"
+            "detail and advanced techniques, visit the online docs:\n"
+            "elements-synth.github.io/elements\n"
+            "\n"
+            "------------------------------------------\n"
+            "\n"
+            "Elements is and will always be free, use it for whatever\n"
+            "you want, personal or commercial.\n"
+            "\n"
+            "All I ask in return is some feedback, especially if you\n"
+            "find it useful. Critique, comments, and bug reports are\n"
+            "always welcome.\n"
+            "\n"
+            "GitHub: github.com/elements-synth/elements\n"
+            "Email: elements.synth@gmail.com";
     }
 
     inline juce::String materials()
@@ -380,8 +393,8 @@ namespace HelpContent
             "\n"
             "{#ff5b9ef5}SAPPHIRE\n"
             "Fe\u00b2\u207a-Ti\u2074\u207a charge transfer: broad absorption at 570nm.\n"
-            "Transmits blue only. Note: produces no sound under\n"
-            "Sunset light — use Daylight or LED Cool.\n"
+            "Transmits blue only. Sounds noticeably duller under\n"
+            "Sunset light - pairs best with Daylight or LED Cool.\n"
             "\n"
             "{#ff5b8a64}ALEXANDRITE\n"
             "Cr\u00b3\u207a dual-peak: green (490-570nm) + red (640-780nm)\n"
@@ -515,13 +528,31 @@ namespace HelpContent
             "Smooth surface produces gradual spectral changes.\n"
             "Even light diffusion. Softer, rounder timbre.\n"
             "\n"
+            "{sub}Deformation\n"
+            "Displaces the sphere's surface using animated noise\n"
+            "(Sphere only). Amount sets how far the surface\n"
+            "displaces, Freq sets the spatial density of the noise\n"
+            "bumps, and Rate sets the animation speed over time\n"
+            "(0 = static).\n"
+            "\n"
+            "Three noise types shape the bumps differently: Simplex\n"
+            "is smooth and organic, Alligator produces rounded,\n"
+            "blob-like cells with no sharp edges, and Worley creates\n"
+            "sharp, cellular, Voronoi-like ridges.\n"
+            "\n"
             "TORUS\n"
             "Complex internal reflections. Variable harmonic\n"
             "emphasis. Rich, evolving spectrum.\n"
             "\n"
             "DODECAHEDRON\n"
             "Multiple facets create complex interactions.\n"
-            "Dense harmonic content. Intricate spectral texture.";
+            "Dense harmonic content. Intricate spectral texture.\n"
+            "\n"
+            "TEAPOT\n"
+            "28 Bezier patches sample normals from the spout,\n"
+            "handle, body, and lid. Asymmetric, highly detailed\n"
+            "spectrum - richer and less regular than the\n"
+            "symmetric solids above.";
     }
 
     inline juce::String lights()
@@ -584,55 +615,9 @@ namespace HelpContent
             "LIGHT INDICATORS\n"
             "  The 3 light bulbs show position and color of\n"
             "  each active light. Bulb brightness reflects the\n"
-            "  intensity slider value.\n"
-            "\n"
-            "THICKNESS\n"
-            "  Top-right slider. Controls material depth in\n"
-            "  the light path (Beer-Lambert absorption).";
+            "  intensity slider value.";
     }
 
-    inline juce::String controls()
-    {
-        return
-            "CONTROLS REFERENCE\n"
-            "\n"
-            "FILTER\n"
-            "  Cutoff: Low-pass filter frequency (20Hz - 20kHz)\n"
-            "  Reso: Filter resonance (emphasis at cutoff)\n"
-            "  Env Amt: Modulation depth from Filter Envelope\n"
-            "\n"
-            "FILTER ENVELOPE\n"
-            "  Attack: Time to reach peak brightness\n"
-            "  Decay: Time to decay to sustain level\n"
-            "  Sustain: Held brightness level\n"
-            "  Release: Fade-out time after note off\n"
-            "\n"
-            "AMP ENVELOPE\n"
-            "  Attack: Volume fade-in time\n"
-            "  Decay: Time to reach sustain level\n"
-            "  Sustain: Held volume level\n"
-            "  Release: Volume fade-out time\n"
-            "\n"
-            "  Mode selector (Classic / Physical):\n"
-            "\n"
-            "  Classic: Standard ADSR controlled by knobs.\n"
-            "\n"
-            "  Physical: ADSR values are derived from optics.\n"
-            "  The envelope shape changes automatically based\n"
-            "  on material, thickness, and light intensity:\n"
-            "    Attack  = light intensity (brighter = faster)\n"
-            "    Decay   = thickness x absorption (thick = slow)\n"
-            "    Sustain = refractive index (Diamond high, Water low)\n"
-            "    Release = IOR x thickness (dense = long release)\n"
-            "  In Physical mode the ADSR knobs are overridden.\n"
-            "\n"
-            "OUTPUT\n"
-            "  Volume: Master output level\n"
-            "\n"
-            "THICKNESS\n"
-            "  Material depth in the light path.\n"
-            "  Affects spectral filtering and absorption.";
-    }
 }
 
 class HelpOverlay : public juce::Component
@@ -645,15 +630,14 @@ public:
         setInterceptsMouseClicks(true, true);
         setWantsKeyboardFocus(true);
 
-        tabs = { "About", "Materials", "Science", "Geometry", "Lights", "Viewport", "Controls" };
+        tabs = { "About", "Materials", "Science", "Geometry", "Lights", "Viewport" };
         content = {
             HelpContent::about(),
             HelpContent::materials(),
             HelpContent::science(),
             HelpContent::geometry(),
             HelpContent::lights(),
-            HelpContent::viewport(),
-            HelpContent::controls()
+            HelpContent::viewport()
         };
 
         spectraImage = juce::ImageFileFormat::loadFrom(
@@ -765,9 +749,57 @@ public:
             return;
         }
 
+        // Scrollbar: click on the thumb starts a drag, click elsewhere on the
+        // track jumps to that position (standard scrollbar behaviour) — this
+        // was previously purely visual, only mouseWheelMove could scroll.
+        if (!scrollBarTrackBounds.isEmpty() && scrollBarTrackBounds.expanded(4.0f, 0.0f).contains(pos.toFloat()))
+        {
+            float scrollRange = scrollBarTrackBounds.getHeight() - scrollThumbH;
+            float thumbY = scrollBarTrackBounds.getY()
+                           + (currentMaxScroll > 0 && scrollRange > 0.0f
+                              ? scrollRange * (static_cast<float>(scrollOffset) / currentMaxScroll)
+                              : 0.0f);
+
+            if (pos.y < thumbY || pos.y > thumbY + scrollThumbH)
+            {
+                float clickRatio = scrollRange > 0.0f
+                                  ? juce::jlimit(0.0f, 1.0f,
+                                        (static_cast<float>(pos.y) - scrollBarTrackBounds.getY() - scrollThumbH * 0.5f) / scrollRange)
+                                  : 0.0f;
+                scrollOffset = static_cast<int>(clickRatio * currentMaxScroll);
+            }
+
+            draggingScrollbar = true;
+            dragStartMouseY = pos.y;
+            dragStartScrollOffset = scrollOffset;
+            repaint();
+            return;
+        }
+
         // Click outside panel = close
         if (!fullPanelBounds.contains(pos))
             dismiss();
+    }
+
+    void mouseDrag(const juce::MouseEvent& e) override
+    {
+        if (!draggingScrollbar || currentMaxScroll <= 0)
+            return;
+
+        float scrollRange = scrollBarTrackBounds.getHeight() - scrollThumbH;
+        if (scrollRange <= 0.0f)
+            return;
+
+        int deltaY = e.getPosition().y - dragStartMouseY;
+        float deltaScroll = (static_cast<float>(deltaY) / scrollRange) * static_cast<float>(currentMaxScroll);
+        scrollOffset = juce::jlimit(0, currentMaxScroll,
+                                     dragStartScrollOffset + static_cast<int>(deltaScroll));
+        repaint();
+    }
+
+    void mouseUp(const juce::MouseEvent&) override
+    {
+        draggingScrollbar = false;
     }
 
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) override
@@ -819,10 +851,11 @@ private:
         {
             if (y + lineH > area.getY() - lineH && y < area.getBottom() + lineH)
             {
-                // Check for color tag: {#AARRGGBB}TEXT
+                // Check for color tag: {#AARRGGBB}TEXT, or subtitle tag: {sub}TEXT
                 juce::String displayLine = line;
                 juce::Colour titleColour(0xFFa8d8f0);
                 bool hasColorTag = line.startsWith("{#") && line.indexOf("}") == 10;
+                bool isSubtitle = line.startsWith("{sub}");
 
                 if (hasColorTag)
                 {
@@ -830,8 +863,13 @@ private:
                     titleColour = juce::Colour(static_cast<juce::uint32>(hex.getHexValue64()));
                     displayLine = line.substring(11);
                 }
+                else if (isSubtitle)
+                {
+                    displayLine = line.substring(5);
+                }
 
-                bool isTitle = displayLine.isNotEmpty()
+                bool isTitle = !isSubtitle
+                               && displayLine.isNotEmpty()
                                && displayLine == displayLine.toUpperCase()
                                && !displayLine.startsWith(" ");
 
@@ -839,6 +877,13 @@ private:
                 {
                     g.setFont(juce::Font(15.0f, juce::Font::bold));
                     g.setColour(titleColour);
+                    g.drawText(displayLine, static_cast<int>(x), static_cast<int>(y), static_cast<int>(w),
+                               static_cast<int>(lineH), juce::Justification::centredLeft);
+                }
+                else if (isSubtitle)
+                {
+                    g.setFont(juce::Font(12.5f, juce::Font::bold));
+                    g.setColour(ElementsColors::mid);
                     g.drawText(displayLine, static_cast<int>(x), static_cast<int>(y), static_cast<int>(w),
                                static_cast<int>(lineH), juce::Justification::centredLeft);
                 }
@@ -872,6 +917,17 @@ private:
 
             g.setColour(ElementsColors::mid.withAlpha(0.6f));
             g.fillRoundedRectangle(trackX, thumbY, static_cast<float>(scrollBarW), thumbH, 3.0f);
+
+            // Cache geometry so mouseDown/mouseDrag can hit-test the same track/thumb.
+            scrollBarTrackBounds = juce::Rectangle<float>(trackX, trackY, static_cast<float>(scrollBarW), trackH);
+            scrollThumbH = thumbH;
+            currentMaxScroll = maxScroll;
+        }
+        else
+        {
+            scrollBarTrackBounds = {};
+            scrollThumbH = 0.0f;
+            currentMaxScroll = 0;
         }
 
         g.restoreState();
@@ -883,10 +939,13 @@ private:
         int panelW = juce::jmin(680, area.getWidth() - 40);
         int panelH = juce::jmin(520, area.getHeight() - 40);
         fullPanelBounds = juce::Rectangle<int>(0, 0, panelW, panelH).withCentre(area.getCentre());
-        tabBarBounds = juce::Rectangle<int>(fullPanelBounds.getX(), fullPanelBounds.getY(),
-                                             fullPanelBounds.getWidth(), 36);
         closeBounds = juce::Rectangle<int>(fullPanelBounds.getRight() - 34,
                                             fullPanelBounds.getY() + 2, 32, 32);
+        // Stop the tab bar short of the close button so the last tab's label
+        // doesn't butt up against the X (previously read as "ControlsX").
+        int tabBarW = closeBounds.getX() - 12 - fullPanelBounds.getX();
+        tabBarBounds = juce::Rectangle<int>(fullPanelBounds.getX(), fullPanelBounds.getY(),
+                                             tabBarW, 36);
     }
 
     std::vector<juce::String> tabs;
@@ -897,6 +956,13 @@ private:
     juce::Rectangle<int> fullPanelBounds;
     juce::Rectangle<int> tabBarBounds;
     juce::Rectangle<int> closeBounds;
+
+    juce::Rectangle<float> scrollBarTrackBounds;
+    float scrollThumbH = 0.0f;
+    int currentMaxScroll = 0;
+    bool draggingScrollbar = false;
+    int dragStartMouseY = 0;
+    int dragStartScrollOffset = 0;
 };
 
 // ==============================================================================
@@ -1028,8 +1094,9 @@ public:
             BinaryData::elementslogo_png,
             static_cast<size_t>(BinaryData::elementslogo_pngSize));
 
-        // Start 2-second delay before fade begins
-        startTimer(2000);
+        // Start delay before fade begins (extended from 2s to give the
+        // feedback message below room to actually be read)
+        startTimer(4000);
     }
 
     void paint(juce::Graphics& g) override
@@ -1042,15 +1109,18 @@ public:
 
         auto area = getLocalBounds();
         auto cx = area.getCentreX();
-        auto cy = area.getCentreY();
+        // Anchor the whole block higher than dead-center (40% down instead of
+        // 50%) so there's less empty space above the logo and the composition
+        // doesn't read as simply centered in the window.
+        auto anchorY = area.getY() + static_cast<int>(area.getHeight() * 0.4f);
 
-        // Logo (centered)
+        // Logo (centered horizontally, anchored above anchorY)
         if (logoImage.isValid())
         {
-            int logoW = 220;
+            int logoW = 264;  // was 220, +20%
             int logoH = static_cast<int>(logoW * (static_cast<float>(logoImage.getHeight()) / logoImage.getWidth()));
             g.drawImage(logoImage,
-                        cx - logoW / 2, cy - logoH / 2 - 20, logoW, logoH,
+                        cx - logoW / 2, anchorY - logoH / 2 - 20, logoW, logoH,
                         0, 0, logoImage.getWidth(), logoImage.getHeight());
         }
 
@@ -1059,35 +1129,22 @@ public:
         g.setFont(juce::Font(14.0f));
         g.setColour(ElementsColors::mid.withAlpha(currentAlpha));
         int versionW = g.getCurrentFont().getStringWidth(versionStr);
+        int textY = anchorY + 24;
 
-        // BETA badge
-        juce::String betaStr = "BETA";
-        auto boldFont = juce::Font(11.0f, juce::Font::bold);
-        int betaW = boldFont.getStringWidth(betaStr);
-        int badgePad = 8;
-        int badgeH = 18;
-        int gap = 8;
+        g.drawText(versionStr, cx - versionW / 2, textY, versionW, 20, juce::Justification::centredLeft);
 
-        int totalW = versionW + gap + betaW + badgePad * 2;
-        int startX = cx - totalW / 2;
-        int textY = cy + 24;
-
-        // Draw version
-        g.setFont(juce::Font(14.0f));
+        // Feedback message
+        juce::String message =
+            "Elements is and will always be free, use it for whatever\n"
+            "you want, personal or commercial.\n"
+            "\n"
+            "All I ask in return is some feedback, especially if you\n"
+            "find it useful. Critique, comments, and bug reports are\n"
+            "always welcome.";
+        g.setFont(juce::Font(12.5f));
         g.setColour(ElementsColors::mid.withAlpha(currentAlpha));
-        g.drawText(versionStr, startX, textY, versionW, 20, juce::Justification::centredLeft);
-
-        // Draw BETA badge
-        int badgeX = startX + versionW + gap;
-        auto badgeColour = MaterialAccents::diamond;
-        g.setColour(badgeColour.withAlpha(currentAlpha * 0.15f));
-        g.fillRoundedRectangle(static_cast<float>(badgeX), static_cast<float>(textY + 1),
-                                static_cast<float>(betaW + badgePad * 2), static_cast<float>(badgeH), 4.0f);
-        g.setColour(badgeColour.withAlpha(currentAlpha));
-        g.drawRoundedRectangle(static_cast<float>(badgeX), static_cast<float>(textY + 1),
-                                static_cast<float>(betaW + badgePad * 2), static_cast<float>(badgeH), 4.0f, 1.0f);
-        g.setFont(boldFont);
-        g.drawText(betaStr, badgeX + badgePad, textY + 1, betaW, badgeH, juce::Justification::centred);
+        g.drawMultiLineText(message, cx - 210, textY + 40, 420,
+                            juce::Justification::centred, 6.0f);
     }
 
 private:
@@ -1148,8 +1205,6 @@ private:
     int lastKnownTranspose = 0;  // detects transpose changes so the octave labels stay live
 
     int getNoteFromPosition(juce::Point<int> pos);
-    juce::Rectangle<int> getKeyBounds(int note, bool isBlack);
-    bool isBlackKey(int note);
 
     std::array<bool, 128> activeNotes{};
     juce::Colour highlightColour { 0xFF4A90E2 };
@@ -1174,6 +1229,7 @@ public:
     void comboBoxChanged(juce::ComboBox* combo) override;
 
     void setEnabled(bool enabled);
+    void setSource(int sourceIndex);
     bool isLightEnabled() const { return enableButton.getToggleState(); }
 
     juce::Slider& getIntensitySlider() { return intensitySlider; }
@@ -1366,6 +1422,7 @@ private:
     juce::ToggleButton filterBypassButton{"ON"};
     juce::Slider filterCutoffSlider, filterResonanceSlider;
     juce::Label filterCutoffLabel, filterResonanceLabel;
+    juce::Label filterCutoffValueLabel, filterResonanceValueLabel;  // live "2.5 kHz" / "Q:1.5" readouts
     juce::ComboBox filterTypeCombo;
 
     // Filter Envelope
@@ -1426,14 +1483,6 @@ private:
         "Diamond", "Water", "Amber", "Ruby", "Gold", "Emerald", "Amethyst", "Sapphire",
         "Copper", "Obsidian", "Alexandrite", "Malachite", "Neodymium"
     };
-    const juce::Colour materialColours[NUM_MATERIALS] = {
-        juce::Colour(0xFFE8F4FF), juce::Colour(0xFF50C8E8), juce::Colour(0xFFFFBF00),
-        juce::Colour(0xFFE0115F), juce::Colour(0xFFFFD700), juce::Colour(0xFF50C878),
-        juce::Colour(0xFF9966CC), juce::Colour(0xFF0F52BA),
-        juce::Colour(0xFFB87333), juce::Colour(0xFF1C1C1C),
-        juce::Colour(0xFF5B8A64), juce::Colour(0xFF2E7D52), juce::Colour(0xFF9070C8)
-    };
-
     // Section frame rectangles (right column, for paint())
     std::vector<juce::Rectangle<int>> sectionFrames;
 
