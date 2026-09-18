@@ -1,6 +1,9 @@
 # Secrets - never commit
 github-recovery-codes.txt
 
+# Private project notes
+CLAUDE.md
+
 # Build artifacts
 Builds/MacOSX/build/
 Builds/MacOSX/DerivedData/
