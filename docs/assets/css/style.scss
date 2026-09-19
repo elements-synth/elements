@@ -1,0 +1,142 @@
+---
+---
+
+@import "{{ site.theme }}";
+
+// ==============================================================================
+// Elements color palette override — matches Source/ElementsUI.h exactly.
+// jekyll-theme-midnight ships an olive-green/tan palette; this reskins it to
+// the plugin's actual dark blue-gray UI without forking the theme.
+// ==============================================================================
+
+$bg0:     #0d1117; // deepest background
+$bg1:     #111820; // panels
+$bg2:     #151e2a; // elevated elements
+$bg3:     #1c2534; // buttons / controls
+$border:  #1f2d3d;
+$mid:     #4a6075;
+$dim:     #2a3d50;
+$text:    #d0e4f0;
+$accent:  #a8d8f0; // MaterialAccents::diamond — the app's default accent
+
+body {
+  color: $text;
+  background: $bg0;
+  background-attachment: fixed !important;
+  background: linear-gradient(180deg, $bg1, $bg0);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: $text;
+  font-family: "JetBrains Mono", Monaco, "Bitstream Vera Sans Mono", "Lucida Console", Terminal, monospace;
+}
+
+h3 {
+  color: $mid;
+}
+
+h4, h5, h6 {
+  color: $text;
+}
+
+a {
+  color: $accent;
+
+  &:hover {
+    color: lighten($accent, 12%);
+  }
+}
+
+a small {
+  color: $mid;
+}
+
+strong {
+  color: $text;
+}
+
+blockquote {
+  border-left: 3px solid $accent;
+  color: $mid;
+}
+
+code {
+  background: $bg2;
+  border: 1px solid $border;
+  color: $text;
+}
+
+pre {
+  background: $bg1;
+  border: 1px solid $border;
+  box-shadow: none;
+
+  code {
+    background: none;
+    border: none;
+    color: $text;
+    text-shadow: none;
+  }
+}
+
+table {
+  th {
+    border-bottom: 1px solid $border;
+    color: $mid;
+  }
+
+  td {
+    border-bottom: 1px solid $border;
+    color: $text;
+  }
+}
+
+hr {
+  background: none;
+  border: 0;
+  border-top: 1px solid $border;
+  height: 1px;
+}
+
+dt {
+  color: $text;
+}
+
+#header {
+  background: $bg1;
+  border-bottom: 1px solid $border;
+  box-shadow: none;
+
+  nav {
+    background: none;
+
+    ul li {
+      color: $mid;
+
+      a {
+        color: $text;
+        background: $bg3;
+        border: 1px solid $border;
+        box-shadow: none;
+
+        &:hover {
+          background: $dim;
+          border: 1px solid $mid;
+          box-shadow: none;
+        }
+      }
+    }
+  }
+}
+
+section {
+  #title {
+    p {
+      color: $mid;
+    }
+
+    .credits {
+      color: $dim;
+    }
+  }
+}
