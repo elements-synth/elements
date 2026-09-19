@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Known Issues & Limitations — Elements
+title: Known Issues & Limitations · Elements
 ---
 
 [← Back to Elements](index)
@@ -13,13 +13,13 @@ Elements Beta 1.0 is functional and stable, but there are known limitations to b
 
 ## Presets
 
-There is no preset system in Beta 1.0. The plugin reports a single program placeholder as required by JUCE, but there is no preset save/load and no factory presets. Your DAW will show an empty preset list — this is expected. Preset support is planned for a future release.
+There is no preset system in Beta 1.0. The plugin reports a single program placeholder as required by JUCE, but there is no preset save/load and no factory presets. Your DAW will show an empty preset list. This is expected. Preset support is planned for a future release.
 
 ---
 
 ## Polyphony
 
-Elements has a fixed limit of **8 voices**. When all 8 are active, soft voice stealing kicks in — the oldest voice fades out over 256 samples (~5.8ms) and is reassigned. If all 8 voices are simultaneously fading out, new notes are discarded silently with no click or artifact. This can occur in fast passages with long sustain times.
+Elements has a fixed limit of **8 voices**. When all 8 are active, soft voice stealing kicks in: the oldest voice fades out over 256 samples (~5.8ms) and is reassigned. If all 8 voices are simultaneously fading out, new notes are discarded silently with no click or artifact. This can occur in fast passages with long sustain times.
 
 ---
 
@@ -44,21 +44,21 @@ This means you will need to reassign your light sources after reloading a projec
 
 Elements uses JUCE's generic VST3 and AU implementation with no host-specific workarounds.
 
-**Bitwig Studio** — Bitwig aggressively caches VST3 parameter layouts. If you update Elements to a version that adds new parameters, you will need to recreate the instrument track (rescanning plugins is not enough) for Bitwig to recognize the new parameters.
+**Bitwig Studio**: Bitwig aggressively caches VST3 parameter layouts. If you update Elements to a version that adds new parameters, you will need to recreate the instrument track (rescanning plugins is not enough) for Bitwig to recognize the new parameters.
 
-**Logic Pro (AU)** — Not extensively tested. The AU wrapper is JUCE's generic implementation with no Logic-specific adaptations. No issues are known, but full compatibility cannot be guaranteed.
+**Logic Pro (AU)**: Not extensively tested. The AU wrapper is JUCE's generic implementation with no Logic-specific adaptations. No issues are known, but full compatibility cannot be guaranteed.
 
-**Other DAWs** — Not tested. Elements declares mono and stereo support, accepts standard MIDI, and reports a 5-second tail length for release.
+**Other DAWs**: Not tested. Elements declares mono and stereo support, accepts standard MIDI, and reports a 5-second tail length for release.
 
 ---
 
 ## Other limitations
 
-**Occasional saturation** — With spectrally dense materials and high polyphony, the output signal can clip. A soft clipper (tanh) is in place but there is no full limiter. If you experience saturation, reduce the light intensities or the number of simultaneous voices.
+**Occasional saturation**: With spectrally dense materials and high polyphony, the output signal can clip. A soft clipper (tanh) is in place but there is no full limiter. If you experience saturation, reduce the light intensities or the number of simultaneous voices.
 
-**Apple Silicon + Intel** — Beta 1.0 is a Universal Binary, running natively on both Apple Silicon and Intel Macs. Windows builds are planned for a future release.
+**Apple Silicon + Intel**: Beta 1.0 is a Universal Binary, running natively on both Apple Silicon and Intel Macs. Windows builds are planned for a future release.
 
-**Deformer is Sphere-only** — The Geometric Deformer is currently implemented for the Sphere geometry only. Support for other geometries is planned.
+**Deformer is Sphere-only**: The Geometric Deformer is currently implemented for the Sphere geometry only. Support for other geometries is planned.
 
 ---
 

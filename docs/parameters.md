@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Parameters — Elements
+title: Parameters · Elements
 ---
 
 [← Back to Elements](index)
@@ -13,7 +13,7 @@ Elements has 22 automatable parameters exposed to your DAW, plus 5 manual parame
 
 ## Scene
 
-These parameters define the physical scene — the core of how Elements generates sound.
+These parameters define the physical scene: the core of how Elements generates sound.
 
 **Material**
 The optical material applied to the geometry. Determines the spectral transmission curve and index of refraction (IOR), which together define which harmonics are produced and how the Fresnel response behaves. See [Materials & Geometry](materials-and-geometry) for a detailed breakdown of each material's character.
@@ -41,7 +41,7 @@ The thickness of the material along the light path, modeled using Beer-Lambert a
 ---
 
 **Rotation X / Y / Z** · `0° – 360°` · Default: `0°`
-Rotates the geometry on each axis. Rotation changes the angle at which the light hits each surface normal, modifying the Fresnel response and therefore the harmonic content. The effect of rotation varies significantly between geometries — the Cube produces abrupt timbral jumps, while the Dodecahedron and Torus respond smoothly and continuously.
+Rotates the geometry on each axis. Rotation changes the angle at which the light hits each surface normal, modifying the Fresnel response and therefore the harmonic content. The effect of rotation varies significantly between geometries: the Cube produces abrupt timbral jumps, while the Dodecahedron and Torus respond smoothly and continuously.
 
 - *Automatable · Automate for continuous timbral movement*
 
@@ -61,7 +61,7 @@ Activates or deactivates each light slot. All three lights off produces silence.
 ---
 
 **Light Source (Key / Fill / Rim)**
-Selects the spectral emission type for each light slot. The emission curve of the light must overlap with the transmission curve of the active material to produce sound — no overlap means near-silence.
+Selects the spectral emission type for each light slot. The emission curve of the light must overlap with the transmission curve of the active material to produce sound. No overlap means near-silence.
 
 - Options: Sunset (650nm peak), Daylight (550nm peak), LED Cool (470nm peak)
 - *Not automatable · Not saved with project*
@@ -73,7 +73,7 @@ Selects the spectral emission type for each light slot. The emission curve of th
 **Key Intensity / Fill Intensity / Rim Intensity** · `0.0 – 1.0` · Default: `0.5`
 Controls the intensity of each light source. Intensity has a direct bidirectional relationship with pitch: at 0.5 the pitch is neutral, above 0.5 it rises, below 0.5 it falls. This makes light intensity one of the most expressive performance parameters in Elements.
 
-In Physical Envelope mode, Key Intensity also drives the Attack time — higher intensity produces a faster attack.
+In Physical Envelope mode, Key Intensity also drives the Attack time: higher intensity produces a faster attack.
 
 - *Automatable*
 
@@ -84,8 +84,8 @@ In Physical Envelope mode, Key Intensity also drives the Attack time — higher 
 **Envelope Mode**
 Switches between two envelope behaviors.
 
-- **Classic** — Standard ADSR with fully manual control over all four stages.
-- **Physical** — Attack, Decay, Sustain, and Release are derived automatically from the optical properties of the active material, its thickness, and the light intensity. The manual ADSR knobs are ignored in this mode.
+- **Classic**: standard ADSR with fully manual control over all four stages.
+- **Physical**: Attack, Decay, Sustain, and Release are derived automatically from the optical properties of the active material, its thickness, and the light intensity. The manual ADSR knobs are ignored in this mode.
 
 - Default: Classic
 - *Automatable*
@@ -185,7 +185,7 @@ Release time of the filter envelope.
 The Deformer is currently available for the **Sphere geometry only**. It applies a 3D Simplex Noise field to the surface, affecting both the spectral path and the audio path simultaneously. See the [concept page](index#the-physics-behind-the-sound) for a full technical explanation.
 
 **Deform Amount** · `0.0 – 1.0` · Default: `0.0`
-Controls the intensity of the deformation. At 0.0 the sphere is undeformed and rotation has no timbral effect. As the value increases, the displaced normals introduce Fresnel variation across the surface, timbral drift sets in, and the sinusoidal wavefolder drives increases from 1 to 15 — adding progressively denser harmonic content.
+Controls the intensity of the deformation. At 0.0 the sphere is undeformed and rotation has no timbral effect. As the value increases, the displaced normals introduce Fresnel variation across the surface, timbral drift sets in, and the sinusoidal wavefolder drive increases from 1 to 15, adding progressively denser harmonic content.
 
 - *Automatable*
 
@@ -201,7 +201,7 @@ Spatial frequency of the Simplex Noise field. Lower values produce broad, smooth
 ## Output
 
 **Volume** · `0.0 – 1.0` · Default: `0.95`
-Master output volume. A soft clipper (tanh) is applied to the output — if you experience saturation at high polyphony, reduce this value or lower the light intensities.
+Master output volume. A soft clipper (tanh) is applied to the output. If you experience saturation at high polyphony, reduce this value or lower the light intensities.
 
 - *Not automatable · Saved with project*
 

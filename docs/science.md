@@ -1,15 +1,15 @@
 ---
 layout: default
-title: The Science — Elements
+title: The Science · Elements
 ---
 
 [← Back to Elements](index)
 
 # The Science
 
-Elements is built on real physics. This page documents the mathematical and optical foundations behind the synthesis engine — from the Fresnel equations that govern light transmission to the spectral-to-harmonic mapping that turns optics into sound.
+Elements is built on real physics. This page documents the mathematical and optical foundations behind the synthesis engine: from the Fresnel equations that govern light transmission to the spectral-to-harmonic mapping that turns optics into sound.
 
-> The optical physics in Elements is exact. The sonification — mapping wavelengths to harmonics, Fresnel response to timbre, Beer-Lambert attenuation to brightness — is an artistic interpretation informed by that science, not a direct acoustic simulation.
+> The optical physics in Elements is exact. The sonification (mapping wavelengths to harmonics, Fresnel response to timbre, Beer-Lambert attenuation to brightness) is an artistic interpretation informed by that science, not a direct acoustic simulation.
 
 ---
 
@@ -39,7 +39,7 @@ R = ½(rs² + rp²)
 T = 1 - R
 ```
 
-**Special case — Total Internal Reflection (TIR):** When `sin(θt) ≥ 1` (occurs with low-IOR metals like Gold = 0.47 and Copper = 0.46), Elements uses the Schlick (1994) approximation — the standard in physically based rendering:
+**Special case: Total Internal Reflection (TIR):** When `sin(θt) ≥ 1` (occurs with low-IOR metals like Gold = 0.47 and Copper = 0.46), Elements uses the Schlick (1994) approximation, the standard in physically based rendering:
 
 ```
 F₀ = ((1 - n) / (1 + n))²
@@ -55,8 +55,8 @@ Beyond the base Fresnel response, Elements applies a wavelength-dependent expone
 
 ```
 angleFactor = θ / 90°
-wlPos       = (λ - 380) / (780 - 380)       — 0 = violet, 1 = red
-decayRate   = 1 + 5·(1 - wlPos)             — blue = 6, red = 1
+wlPos       = (λ - 380) / (780 - 380)       // 0 = violet, 1 = red
+decayRate   = 1 + 5·(1 - wlPos)             // blue = 6, red = 1
 spectralMod = (1 - angleFactor)^decayRate
 T_final(λ) = T_fresnel · spectralMod
 ```
@@ -92,9 +92,9 @@ T^thickness = e^(-α·d₀·thickness) = e^(-α·d)
 ```
 
 The effect on sound:
-- **thickness < 1.0** — thinner material, more transmission, brighter sound
-- **thickness = 1.0** — nominal material transmission, no modification
-- **thickness > 1.0** — thicker material, more absorption, darker and heavier sound
+- **thickness < 1.0**: thinner material, more transmission, brighter sound
+- **thickness = 1.0**: nominal material transmission, no modification
+- **thickness > 1.0**: thicker material, more absorption, darker and heavier sound
 
 Materials with low transmission in certain bands become practically opaque in those bands at high thickness values. For example, Ruby's blue transmission of 0.02 at thickness 2.0: `0.02² = 0.0004`.
 
@@ -139,8 +139,8 @@ Amplitude is obtained by interpolating the 50-point spectrum and applying:
 
 ```
 A_raw      = lerp(spectrum[i₀], spectrum[i₁], frac)
-A_emphasis = A_raw³                         — spectral contrast
-rolloff    = 1 / (1 + (h-1) · 0.05)        — natural per-harmonic rolloff
+A_emphasis = A_raw³                         // spectral contrast
+rolloff    = 1 / (1 + (h-1) · 0.05)        // natural per-harmonic rolloff
 A_final(h) = A_emphasis · rolloff
 ```
 
@@ -170,16 +170,16 @@ The wavefolder applies a periodic non-linear function directly to the audio sign
 
 ```
 y = sin(drive · x)
-drive = 1 + deformAmount · 14       — range: 1 to 15
+drive = 1 + deformAmount · 14       // range: 1 to 15
 ```
 
 Properties:
-- **drive = 1** — `sin(x) ≈ x` for small amplitudes (Taylor series). Transparent.
-- **drive > 1** — the signal folds each time it crosses `±π/drive`. At drive 15, a full-amplitude signal folds ~4.8 times per cycle.
-- **Natural bounding** — `sin()` always outputs within [-1, 1] with no clipper needed.
-- **Harmonic spectrum** — each fold generates both even and odd harmonics. Density grows with drive.
+- **drive = 1**: `sin(x) ≈ x` for small amplitudes (Taylor series). Transparent.
+- **drive > 1**: the signal folds each time it crosses `±π/drive`. At drive 15, a full-amplitude signal folds ~4.8 times per cycle.
+- **Natural bounding**: `sin()` always outputs within [-1, 1] with no clipper needed.
+- **Harmonic spectrum**: each fold generates both even and odd harmonics. Density grows with drive.
 
-Unlike saturation (`tanh`), which compresses dynamic range, wavefolding is periodic — producing a denser, more musically complex harmonic spectrum.
+Unlike saturation (`tanh`), which compresses dynamic range, wavefolding is periodic, producing a denser, more musically complex harmonic spectrum.
 
 ---
 
@@ -195,7 +195,7 @@ The Deformer displaces the sphere's surface normals using the gradient of a 3D S
 
 With `ε = 0.01`. Full gradient: `∇N = (∂N/∂x, ∂N/∂y, ∂N/∂z)`.
 
-**Tangential projection** — to ensure displacement only tilts the normal without changing its radial magnitude:
+**Tangential projection**: ensures displacement only tilts the normal without changing its radial magnitude.
 
 ```
 grad_radial     = ∇N · p̂
@@ -204,7 +204,7 @@ n_displaced     = normalize(p̂ - grad_tangential · scale)
 scale           = deformAmount · 0.3
 ```
 
-The 3D Simplex Noise (Perlin 2001) evaluates the scalar field on a tetrahedral lattice using skew constant `F₃ = 1/3` and unskew `G₃ = 1/6`, with a 256-entry permutation table and 12 gradient vectors. It produces C¹ continuous values in [-1, 1] with isotropic distribution — no axis-alignment artifacts.
+The 3D Simplex Noise (Perlin 2001) evaluates the scalar field on a tetrahedral lattice using skew constant `F₃ = 1/3` and unskew `G₃ = 1/6`, with a 256-entry permutation table and 12 gradient vectors. It produces C¹ continuous values in [-1, 1] with isotropic distribution and no axis-alignment artifacts.
 
 ---
 
@@ -212,25 +212,25 @@ The 3D Simplex Noise (Perlin 2001) evaluates the scalar field on a tetrahedral l
 
 In Physical mode, the four ADSR stages are derived directly from optical properties:
 
-**Attack** — photonic energy (light intensity):
+**Attack**: photonic energy (light intensity).
 ```
 attack = lerp(0.5, 0.005, avgIntensity)
 ```
 Higher light intensity = more energy = faster transient.
 
-**Decay** — material absorption × thickness:
+**Decay**: material absorption × thickness.
 ```
 decay = thickness · (1 - avgTransmission) · 1.5
 ```
 A thick, opaque material absorbs more light and produces a longer decay.
 
-**Sustain** — internal reflections (IOR):
+**Sustain**: internal reflections (IOR).
 ```
 sustain = IOR / 2.42
 ```
-Normalized against Diamond (maximum IOR = 2.42). Higher IOR means a lower critical angle for total internal reflection (`θ_critical = arcsin(1/n)`), trapping more light inside the material — higher sustain. Diamond ≈ 0.95, Water ≈ 0.55.
+Normalized against Diamond (maximum IOR = 2.42). Higher IOR means a lower critical angle for total internal reflection (`θ_critical = arcsin(1/n)`), trapping more light inside the material, resulting in higher sustain. Diamond ≈ 0.95, Water ≈ 0.55.
 
-**Release** — trapped light (IOR × thickness):
+**Release**: trapped light (IOR × thickness).
 ```
 release = IOR · 0.2 · thickness
 ```
@@ -240,7 +240,7 @@ A dense, thick material releases light more slowly.
 
 ## 9. Light spectral distributions
 
-Each light source has a spectral power distribution modeled as a Gaussian — a standard approximation of blackbody (Planck) distributions used in colorimetry and CG lighting:
+Each light source has a spectral power distribution modeled as a Gaussian, a standard approximation of blackbody (Planck) distributions used in colorimetry and CG lighting:
 
 ```
 I(λ) = base + peak · e^(-(λ - center)² / 2σ²)
@@ -279,7 +279,7 @@ The transmission curves of the 10 materials are based on real optical data:
 | Material | Optical basis |
 |---|---|
 | Diamond | Uniform ~95% transmission (colorless, IOR 2.42) |
-| Ruby | Cr³⁺ in Al₂O₃ — d-d transitions absorb below 600nm |
+| Ruby | Cr³⁺ in Al₂O₃, d-d transitions absorb below 600nm |
 | Sapphire | Fe²⁺/Ti⁴⁺ charge transfer in Al₂O₃ |
 | Emerald | Cr³⁺ transmission window in Be₃Al₂Si₆O₁₈ |
 | Amethyst | Fe⁴⁺ charge transfer in SiO₂ (bimodal) |
@@ -294,21 +294,21 @@ The transmission curves of the 10 materials are based on real optical data:
 ## Further reading
 
 **Fresnel equations**
-- [Fresnel equations — Wikipedia](https://en.wikipedia.org/wiki/Fresnel_equations) — comprehensive reference with derivations
-- [Fresnel equations — HyperPhysics](http://hyperphysics.phy-astr.gsu.edu/hbase/phyopt/freseq.html) — concise, accessible explainer
-- [Fresnel equations — RP Photonics](https://www.rp-photonics.com/fresnel_equations.html) — technical reference with FAQ
-- [Reflection and Transmission — Physics LibreTexts](https://phys.libretexts.org/Bookshelves/Optics/Physical_Optics_(Tatum)/02:_Reflection_and_Transmission_at_Boundaries_and_the_Fresnel_Equations) — university-level treatment
+- [Fresnel equations (Wikipedia)](https://en.wikipedia.org/wiki/Fresnel_equations): comprehensive reference with derivations
+- [Fresnel equations (HyperPhysics)](http://hyperphysics.phy-astr.gsu.edu/hbase/phyopt/freseq.html): concise, accessible explainer
+- [Fresnel equations (RP Photonics)](https://www.rp-photonics.com/fresnel_equations.html): technical reference with FAQ
+- [Reflection and Transmission (Physics LibreTexts)](https://phys.libretexts.org/Bookshelves/Optics/Physical_Optics_(Tatum)/02:_Reflection_and_Transmission_at_Boundaries_and_the_Fresnel_Equations): university-level treatment
 
 **Beer-Lambert law**
-- [Beer-Lambert law — Wikipedia](https://en.wikipedia.org/wiki/Beer%E2%80%93Lambert_law) — full reference
-- [The Beer-Lambert Law — Chemistry LibreTexts](https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Spectroscopy/Electronic_Spectroscopy/Electronic_Spectroscopy_Basics/The_Beer-Lambert_Law) — clear, accessible explanation
-- [Beer-Lambert law — RP Photonics](https://www.rp-photonics.com/beer_lambert_law.html) — technical reference
+- [Beer-Lambert law (Wikipedia)](https://en.wikipedia.org/wiki/Beer%E2%80%93Lambert_law): full reference
+- [The Beer-Lambert Law (Chemistry LibreTexts)](https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Spectroscopy/Electronic_Spectroscopy/Electronic_Spectroscopy_Basics/The_Beer-Lambert_Law): clear, accessible explanation
+- [Beer-Lambert law (RP Photonics)](https://www.rp-photonics.com/beer_lambert_law.html): technical reference
 
 **Schlick approximation**
-- Schlick, C. (1994). *An Inexpensive BDRF Model for Physically-based Rendering*. Computer Graphics Forum, 13(3), 233–246. — original paper describing the Fresnel approximation used for metals in Elements
+- Schlick, C. (1994). *An Inexpensive BDRF Model for Physically-based Rendering*. Computer Graphics Forum, 13(3), 233–246. Original paper describing the Fresnel approximation used for metals in Elements.
 
 **Simplex noise**
-- Perlin, K. (2001). *Noise hardware*. Real-Time Shading SIGGRAPH Course Notes. — original description of Simplex Noise
+- Perlin, K. (2001). *Noise hardware*. Real-Time Shading SIGGRAPH Course Notes. Original description of Simplex Noise.
 
 ---
 

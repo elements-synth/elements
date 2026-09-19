@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Installation — Elements
+title: Installation · Elements
 ---
 
 [← Back to Elements](index)
@@ -26,8 +26,8 @@ title: Installation — Elements
 
 Download the latest release from the [Elements releases page](https://github.com/elements-synth/elements/releases).
 
-- `Elements-VST3-macOS-Universal.zip` — macOS (Apple Silicon + Intel)
-- `Elements-VST3-Windows-x64.zip` — Windows 64-bit
+- `Elements-VST3-macOS-Universal.zip`: macOS (Apple Silicon + Intel)
+- `Elements-VST3-Windows-x64.zip`: Windows 64-bit
 
 ---
 
@@ -42,7 +42,7 @@ Unzip the downloaded file and copy the plugin to its standard macOS location:
 
 You can navigate to this folder in Finder by opening a new Finder window, pressing `Cmd + Shift + G`, and pasting the path.
 
-### Gatekeeper — Important
+### Gatekeeper (Important)
 
 Because Elements is not notarized with an Apple Developer certificate, macOS will block it on first launch. This is expected and safe to bypass.
 
@@ -86,8 +86,8 @@ If your DAW does not find the plugin after scanning, verify that the files are i
 | Host | macOS VST3 | Windows VST3 |
 |------|------------|--------------|
 | Ableton Live 11+ | ✓ | ✓ |
-| Bitwig Studio | ✓ | — |
-| Reaper | — | ✓ |
+| Bitwig Studio | ✓ | N/A |
+| Reaper | N/A | ✓ |
 
 *If you test Elements in a host not listed here, please [open an issue](https://github.com/elements-synth/elements/issues) and let us know.*
 
