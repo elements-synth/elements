@@ -47,19 +47,33 @@ Elements runs two independent oscillators, A and B, each shaped by its own mater
 
 ## The physics behind the sound
 
-Every material in Elements corresponds to a specific set of optical properties: index of refraction, Fresnel response, spectral behavior. These aren't just names or presets. They define how light interacts with the surface, and through that interaction, what harmonics the oscillator produces.
+Every material in Elements corresponds to a specific set of optical properties: index of refraction, Fresnel response, spectral transmission curve. These aren't invented presets: the data is drawn from real spectroscopy, including Sellmeier dispersion equations, GIA and peer-reviewed gemological papers, the USGS spectral library, and Pope & Fry's water-absorption measurements. Every sound Elements produces is the output of one formula, evaluated per wavelength:
 
-The **Geometric Deformer** is currently exclusive to the Sphere geometry, and it works on two levels simultaneously, both affecting how the sound is generated and how it evolves over time.
+```
+sound = light emission × material transmission × Fresnel response
+```
 
-At the spectral level, it applies a 3D Simplex Noise field to the sphere's surface normals. Rather than sampling a single point, Elements samples 12 directions distributed across the sphere (the vertices of an icosahedron) and calculates the noise gradient at each one. Those displaced normals are then run through a full Fresnel calculation per wavelength, weighted by their angle to the light source. The result is that rotation now modulates the timbre in ways a perfect sphere never could, because each displaced normal presents a different Fresnel angle to the light.
+Change the light, the material, or the angle between them, and every harmonic in the spectrum shifts accordingly. There's no separate "timbre" parameter; timbre *is* this calculation.
 
-What makes this genuinely unusual is the **timbral drift**: when the Deformer is active, the noise field moves continuously across the surface at a slow, organic rate. The spectrum is recalculated at roughly 8Hz, producing a subtle, living movement in the sound that no static wavetable can replicate.
+---
 
-At the audio level, the same Deform parameter drives a **sinusoidal wavefolder** directly on the output signal. The drive scales from 1 to 15 as you increase the parameter. At low values the signal passes nearly unchanged; at high values it folds back on itself repeatedly, generating dense harmonic content with a metallic, complex character. Unlike clipping or saturation, wavefolding is periodic and always stays within bounds, producing a more musical harmonic distribution.
+## The Deformer
 
-Both effects, spectral and audio, are controlled by a single **Deform** slider, and both respond to it simultaneously.
+The **Deformer** is currently exclusive to the Sphere geometry, and it works in three coordinated layers, spectral, timbral, and audio, all scaled by a single **Deform** slider, with **Freq**, **Rate**, and **Noise** shaping how the underlying noise field behaves.
 
-The **Physical Envelope** extends this logic into the amplitude domain. In Physical mode, the four ADSR stages are no longer manual knobs: they are derived automatically from the optical properties of the active material:
+At the spectral layer, noise displaces the sphere's surface normals. Rather than sampling a single point, Elements samples 32 uniformly-distributed directions across the sphere, placed via a golden-ratio (Fibonacci) mapping, and calculates the noise gradient at each one. Those displaced normals are run through a full Fresnel calculation per wavelength, weighted by their angle to the light source. Rotation now modulates the timbre in ways a perfect sphere never could, because each displaced normal presents a different Fresnel angle to the light. The **Noise** selector picks the character of that field: **Simplex** (smooth, organic), **Alligator** (rounded, cellular bumps), or **Worley** (sharp, Voronoi-like ridges).
+
+The second layer is timbral drift. Each wavelength in the material's spectrum tracks the noise field independently and slightly decorrelated from its neighbors, so harmonics shimmer rather than move in lockstep. **Freq** controls how far apart neighboring harmonics sample the field: tight and coherent at low values, twinkling and independent at high values. **Rate** controls how fast the underlying noise field itself evolves over time; at Rate=0 the shimmer freezes completely.
+
+At the audio layer, the same shimmer state that drives the timbral drift also drives a **sinusoidal wavefolder** on the output signal. The fold amount breathes in sync with the spectral movement instead of following a fixed curve, so the audio layer's harmonic complexity rises and falls with the same noise shaping the timbre. Unlike clipping or saturation, wavefolding is periodic and always stays within bounds, producing a more musical harmonic distribution.
+
+All three layers respond to **Deform** simultaneously, colored by Freq, Rate, and Noise type.
+
+---
+
+## Physical Envelope
+
+The **Physical Envelope** extends the same optical logic into the amplitude domain. In Physical mode, the four ADSR stages are no longer manual knobs: they are derived automatically from the optical properties of the active material.
 
 - **Attack** is driven by light intensity. More light means more photonic energy, which means a faster attack: interpolating from 0.5s at minimum intensity down to 0.005s at maximum.
 - **Decay** is a function of material thickness and absorption. A thick, opaque material absorbs more light and produces a longer decay.
