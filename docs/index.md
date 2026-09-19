@@ -24,11 +24,24 @@ description: A synthesizer where light meets sound.
 
 Elements is a spectral wavetable synthesizer built around a simple but unusual idea: what if a synthesizer was a physical scene — and sound was what happened when light hit matter?
 
-In traditional synthesis, you start with a waveform and shape it — filter it, envelope it, modulate it. Elements takes a different approach. You begin by choosing a **material** and a **geometry**. A cube of diamond. A sphere of water. A torus of amber. A dodecahedron of obsidian. Then you shine a **light** on it.
+In traditional synthesis, you start with a waveform and shape it — filter it, envelope it, modulate it. Elements takes a different approach. You begin by choosing a **material** and a **geometry**. A cube of diamond. A sphere of water. A torus of amber. A dodecahedron of obsidian. Then you shine a **light** on it — and optionally introduce a second material entirely, blending two independent optical scenes into one voice.
 
 The sound you hear is the result of that interaction — the specific combination of light intensity, geometry, and material properties. Change any one of them and the sound changes, the way a render changes when you move a light or swap a shader. The synthesizer is not a signal chain. It's a physical scene.
 
 This makes Elements feel different from anything else you've used. Sound design stops being a matter of turning the right knobs in the right order, and starts feeling more like setting up a shot — placing objects, adjusting light, watching (and hearing) how everything responds to each other.
+
+---
+
+## Two materials, one voice
+
+Elements runs two independent oscillators, A and B, each shaped by its own material and geometry. A **BLEND** mode decides how their spectra combine at the sample level:
+
+- **Ring Mod** — multiplies A and B sample-by-sample, producing sum/difference sidebands that exist in neither source spectrum. Inharmonic and metallic, strongest with contrasting materials.
+- **AM** — B modulates the amplitude of A. At low depth you hear A enriched with new harmonics; the original timbre stays recognizable.
+- **XOR** — takes the absolute difference between A and B, highlighting where their spectra disagree most. Subtractive and hollow.
+- **FM** — B modulates the phase of A before wavetable readout, from subtle pitch drift at low depth to dense, DX-style inharmonic spectra at high depth.
+
+**MIX** crossfades between pure A and the blended result, **DETUNE** offsets oscillator B's pitch (±100 cents), and **DEPTH** controls modulation intensity for AM and FM. Mute A to audition B in isolation. The result is a genuinely two-voice instrument — two separate optical scenes, combined in real time.
 
 ---
 
