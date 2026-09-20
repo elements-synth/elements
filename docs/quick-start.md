@@ -9,8 +9,6 @@ title: Quick Start · Elements
 
 Your first sound in five steps.
 
-*Elements is free. If you find it useful, [buy me a coffee](https://ko-fi.com/matiasderose).*
-
 ---
 
 ## 1. Load Elements in your DAW
@@ -49,77 +47,25 @@ While holding a note, move the **Key Intensity** slider. Notice that the pitch r
 
 ## 5. Activate the Deformer (Sphere only)
 
-If you have Sphere selected, slowly raise the **Deform** slider. The surface of the sphere begins to deform under a Simplex Noise field. Displaced normals introduce timbral variation, a continuous harmonic drift sets in, and the sinusoidal wavefolder starts adding harmonic density. Push it to around 0.4 for a rich, living texture. Pull it back to 0 for a clean, stable tone.
+If you have Sphere selected, slowly raise the **Deform** slider. The surface of the sphere begins to deform under an animated noise field (Simplex by default; try Alligator or Worley from the **Noise** selector for a different character). Displaced normals introduce timbral variation, a continuous harmonic drift sets in, and the sinusoidal wavefolder starts adding harmonic density. Push it to around 0.4 for a rich, living texture. Pull it back to 0 for a clean, stable tone.
 
 This is Elements at its most expressive.
 
 ---
 
-## Starting points
+## Factory presets
 
-Three ready-to-use combinations to explore different musical roles.
+Elements ships with 15 factory presets across five categories: fully-tuned starting points, not blank-slate examples. They're available immediately after installation and can't be deleted or overwritten from the UI, so there's always a known-good state to return to.
 
----
+Open the **PRESET** dropdown at the top of the interface to browse them, grouped by category:
 
-### Bass
+- **Bass**: Sub Womb, Deep Current, Resonant Fang
+- **Lead**: Diamond Lead, Gold Spike, Hollow Lead
+- **Pad**: Amber Pad, Amethyst Veil, Copper Bloom
+- **Drone**: Obsidian Drone, Alexandrite Hum, Teapot Void
+- **Choir**: Water Choir, Molten Choir, Crystal Choir
 
-![Elements Bass patch: Dodecahedron + Obsidian](screenshots/bass.png)
-
-| | |
-|---|---|
-| **Geometry** | Dodecahedron |
-| **Material** | Obsidian |
-| **Key light** | Sunset · 0.25 |
-| **Fill light** | Daylight · 1.00 |
-| **Rim light** | LED Cool · 0.50 |
-| **Envelope** | Classic |
-| **Filter** | Lowpass ON |
-| **Thickness** | Low |
-| **Rotation Z** | ~54° |
-
-Obsidian is the darkest material in Elements: nearly opaque, transmitting only deep red light. Combined with the Dodecahedron's twelve uniformly distributed faces and a low Thickness, it produces a focused, sub-heavy tone with minimal harmonic content. The three-light setup with varied intensities adds subtle spectral complexity without losing the low-end character. Rotate Z to find the sweet spot for your key.
-
----
-
-### Lead
-
-![Elements Lead patch: Sphere + Ruby](screenshots/lead.png)
-
-| | |
-|---|---|
-| **Geometry** | Sphere |
-| **Material** | Ruby |
-| **Key light** | LED Cool · 1.00 |
-| **Fill light** | LED Cool · 1.00 |
-| **Rim light** | Off |
-| **Envelope** | Physical |
-| **Filter** | Lowpass ON · Env Amt ~0.17 |
-| **Thickness** | ~0.80 |
-| **Deform** | 0 |
-
-Ruby transmits almost exclusively in the red range, pairing it with cool blue LED lights to create an interesting spectral tension where only the overlap zone between emission and transmission contributes to the sound. Physical Envelope mode derives the ADSR automatically from Ruby's optical properties, producing a fast, punchy attack driven by the high light intensity. The filter envelope adds a subtle brightness contour on each note.
-
----
-
-### Pad
-
-![Elements Pad patch: Sphere + Amethyst](screenshots/pad.png)
-
-| | |
-|---|---|
-| **Geometry** | Sphere |
-| **Material** | Amethyst |
-| **Key light** | Sunset · 0.50 |
-| **Fill light** | Sunset · 0.50 |
-| **Rim light** | Sunset · 0.75 |
-| **Envelope** | Classic · A 0.018 · D 0.1 |
-| **Filter** | Lowpass ON · Filter Env active |
-| **Thickness** | Low |
-| **Deform** | 0.38 |
-
-Amethyst has a bimodal transmission curve: it passes both violet and red light while absorbing the midrange. Three Sunset lights at different intensities activate both poles of that curve unevenly, producing a complex, shifting harmonic character. With the Deformer at 0.38 the sphere surface is in continuous motion, generating slow timbral drift that evolves naturally over time. The result is a pad that breathes on its own.
-
-**Recommended:** add [Valhalla Supermassive](https://valhalladsp.com/shop/reverb/valhalla-supermassive/) (free) as a send effect for massive spatial depth.
+Load one, play a few notes, then open the panels and see how MAT/GEO, lights, and envelope mode combine to produce it. This is the fastest way to hear Elements at its full expressive range without dialing in a scene from scratch. Once you start tweaking, save your own variations with the SAVE button; the factory presets themselves stay untouched no matter what you change.
 
 ---
 
