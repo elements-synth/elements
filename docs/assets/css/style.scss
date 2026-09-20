@@ -17,7 +17,8 @@ $border:  #1f2d3d;
 $mid:     #4a6075;
 $dim:     #2a3d50;
 $text:    #d0e4f0;
-$accent:  #a8d8f0; // MaterialAccents::diamond — the app's default accent
+$accent:  #a8d8f0; // MaterialAccents::diamond, the app's default accent
+$amethyst: #b57bee; // MaterialAccents::amethyst, used for section subtitles
 
 body {
   color: $text;
@@ -29,6 +30,10 @@ body {
 h1, h2, h3, h4, h5, h6 {
   color: $text;
   font-family: "JetBrains Mono", Monaco, "Bitstream Vera Sans Mono", "Lucida Console", Terminal, monospace;
+}
+
+h2 {
+  color: $amethyst;
 }
 
 h3 {
@@ -131,6 +136,17 @@ dt {
 
 section {
   #title {
+    h1 {
+      line-height: 0;
+    }
+
+    .site-logo {
+      display: inline-block;
+      width: 100%;
+      max-width: 360px;
+      height: auto;
+    }
+
     p {
       color: $mid;
     }
