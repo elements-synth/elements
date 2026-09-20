@@ -57,34 +57,7 @@ Change the light, the material, or the angle between them, and every harmonic in
 
 ---
 
-## The Deformer
-
-The **Deformer** is currently exclusive to the Sphere geometry, and it works in three coordinated layers, spectral, timbral, and audio, all scaled by a single **Deform** slider, with **Freq**, **Rate**, and **Noise** shaping how the underlying noise field behaves.
-
-At the spectral layer, noise displaces the sphere's surface normals. Rather than sampling a single point, Elements samples 32 uniformly-distributed directions across the sphere, placed via a golden-ratio (Fibonacci) mapping, and calculates the noise gradient at each one. Those displaced normals are run through a full Fresnel calculation per wavelength, weighted by their angle to the light source. Rotation now modulates the timbre in ways a perfect sphere never could, because each displaced normal presents a different Fresnel angle to the light. The **Noise** selector picks the character of that field: **Simplex** (smooth, organic), **Alligator** (rounded, cellular bumps), or **Worley** (sharp, Voronoi-like ridges).
-
-The second layer is timbral drift. Each wavelength in the material's spectrum tracks the noise field independently and slightly decorrelated from its neighbors, so harmonics shimmer rather than move in lockstep. **Freq** controls how far apart neighboring harmonics sample the field: tight and coherent at low values, twinkling and independent at high values. **Rate** controls how fast the underlying noise field itself evolves over time; at Rate=0 the shimmer freezes completely.
-
-At the audio layer, the same shimmer state that drives the timbral drift also drives a **sinusoidal wavefolder** on the output signal. The fold amount breathes in sync with the spectral movement instead of following a fixed curve, so the audio layer's harmonic complexity rises and falls with the same noise shaping the timbre. Unlike clipping or saturation, wavefolding is periodic and always stays within bounds, producing a more musical harmonic distribution.
-
-All three layers respond to **Deform** simultaneously, colored by Freq, Rate, and Noise type.
-
----
-
-## Physical Envelope
-
-The **Physical Envelope** extends the same optical logic into the amplitude domain. In Physical mode, the four ADSR stages are no longer manual knobs: they are derived automatically from the optical properties of the active material.
-
-- **Attack** is driven by light intensity. More light means more photonic energy, which means a faster attack: interpolating from 0.5s at minimum intensity down to 0.005s at maximum.
-- **Decay** is a function of material thickness and absorption. A thick, opaque material absorbs more light and produces a longer decay.
-- **Sustain** is mapped to the index of refraction (IOR), normalized against Diamond, the densest material at 2.42. Higher IOR means more internal reflections, which means a higher sustain level. Diamond sits near 0.95; Water around 0.55.
-- **Release** combines IOR and thickness. A dense, thick material traps light longer, producing a slower release.
-
-Every value recalculates automatically whenever you change the material, adjust the thickness, or move the lights. The envelope becomes a property of the scene, not a separate set of controls.
-
----
-
-## Light as a musical instrument
+## Shaping sound with lights
 
 The **Lights Bar** is one of Elements' most expressive features. Each light source has an intensity parameter that is directly mapped to pitch: at 50% intensity the pitch is neutral, below that it drops, above it rises. This means you can use light intensity as a performance parameter, creating pitch movement that feels organic rather than mechanical.
 

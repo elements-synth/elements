@@ -182,7 +182,7 @@ Release time of the filter envelope.
 
 ## Deformer
 
-The Deformer is currently available for the **Sphere geometry only**. It applies a 3D Simplex Noise field to the surface, affecting both the spectral path and the audio path simultaneously. See the [concept page](index#the-physics-behind-the-sound) for a full technical explanation.
+The Deformer is currently available for the **Sphere geometry only**. It applies a 3D Simplex Noise field to the surface, affecting both the spectral path and the audio path simultaneously. See [The Science](science#7-simplex-noise-gradient-deformer) for the full technical explanation.
 
 **Deform Amount** · `0.0 – 1.0` · Default: `0.0`
 Controls the intensity of the deformation. At 0.0 the sphere is undeformed and rotation has no timbral effect. As the value increases, the displaced normals introduce Fresnel variation across the surface, timbral drift sets in, and the sinusoidal wavefolder drive increases from 1 to 15, adding progressively denser harmonic content.
