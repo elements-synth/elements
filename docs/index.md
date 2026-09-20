@@ -65,7 +65,7 @@ This bidirectional relationship between light and pitch is at the heart of what 
 
 ---
 
-*Elements is currently in beta. Available for macOS and Windows.*
+*Available for macOS and Windows.*
 *macOS 12 or later · Universal Binary (Apple Silicon + Intel) · Windows 10/11 x64*
 
 [Quick Start](quick-start) · [Installation](installation) · [Materials & Geometry](materials-and-geometry) · [Parameters](parameters) · [Known Issues](known-issues) · [The Science](science)
