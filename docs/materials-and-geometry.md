@@ -31,7 +31,7 @@ This means the choice of light source matters as much as the choice of material.
 
 These materials have high transmission and produce rich, harmonically complex sounds.
 
-**Diamond** · IOR 2.42 · Avg. transmission ~96%
+**<span class="mat-diamond">Diamond</span>** · IOR 2.42 · Avg. transmission ~96%
 
 The most versatile material in Elements. Its transmission curve is uniformly high across the entire visible spectrum, meaning all harmonics are present with similar strength. The highest IOR of any material produces the most pronounced Fresnel response: rotation has a strong effect on timbre. Works well with all three light sources.
 
@@ -39,7 +39,7 @@ The most versatile material in Elements. Its transmission curve is uniformly hig
 
 ---
 
-**Sapphire** · IOR 1.77 · Avg. transmission ~40%
+**<span class="mat-sapphire">Sapphire</span>** · IOR 1.77 · Avg. transmission ~40%
 
 Transmits strongly in blue, with a sharp cutoff above 550nm. Pairs almost exclusively with LED Cool and Daylight. With Sunset there is virtually no spectral overlap and the material falls nearly silent. The narrow transmission window produces a focused, airy sound.
 
@@ -47,19 +47,35 @@ Transmits strongly in blue, with a sharp cutoff above 550nm. Pairs almost exclus
 
 ---
 
-**Emerald** · IOR 1.57 · Avg. transmission ~37%
+**<span class="mat-emerald">Emerald</span>** · IOR 1.57 · Avg. transmission ~37%
 
-Has a narrow transmission window centered on green (500–550nm), absorbing both blue and red. This spectral focus produces a characteristic midrange-only timbre: nasal, focused, unlike most other materials. Daylight is the natural pairing, with its emission peak centered exactly on Emerald's transmission window.
+Has a narrow transmission window centered on green (500–550nm), absorbing both blue and red. This spectral focus produces a characteristic midrange-only timbre: nasal, focused, unlike most other materials. Daylight is the natural pairing, with its emission peak centered exactly on <span class="mat-emerald">Emerald</span>'s transmission window.
 
 > Balanced, focused. Midrange harmonics only. Nasal character.
 
 ---
 
-**Amethyst** · IOR 1.54 · Avg. transmission ~44%
+**<span class="mat-malachite">Malachite</span>** · IOR 1.85 · Avg. transmission ~43%
 
-The most complex transmission curve in Elements: bimodal, transmitting both violet and some red while absorbing green and yellow. This produces a hollow character: high and low harmonics present, midrange absent. Responds differently to each light source: LED Cool emphasizes the highs, Sunset brings out the lows, Daylight activates both simultaneously.
+Cu²⁺ charge-transfer and d-d absorption cut both blue and red, leaving a narrow green transmission window similar to <span class="mat-emerald">Emerald</span>'s. Produces the same nasal, midrange-focused character, though the window sits slightly lower and the falloff is steeper on the red side.
+
+> Focused, mineral. Narrow green window. <span class="mat-emerald">Emerald</span>'s steeper-edged cousin.
+
+---
+
+**<span class="mat-amethyst">Amethyst</span>** · IOR 1.54 · Avg. transmission ~44%
+
+The most complex transmission curve among the gems: bimodal, transmitting both violet and some red while absorbing green and yellow. This produces a hollow character: high and low harmonics present, midrange absent. Responds differently to each light source: LED Cool emphasizes the highs, Sunset brings out the lows, Daylight activates both simultaneously.
 
 > Complex, hollow. High and low harmonics, midrange absent. Changes character significantly with each light source.
+
+---
+
+**<span class="mat-alexandrite">Alexandrite</span>** · IOR 1.745 · Avg. transmission ~53%
+
+Dual-peak transmission: a green window (490–570nm) and a separate red window above 640nm, with a dip between them. The classic "alexandrite effect": which window dominates the combined spectrum shifts audibly with the light source, cool sources emphasizing the green, warm sources the red. Two distinct harmonic clusters rather than one continuous band.
+
+> Complex, color-shifting. Two harmonic clusters. Character depends heavily on light source.
 
 ---
 
@@ -67,7 +83,7 @@ The most complex transmission curve in Elements: bimodal, transmitting both viol
 
 Materials with transmission weighted toward the red end of the spectrum, producing warmer, heavier sounds.
 
-**Ruby** · IOR 1.77 · Avg. transmission ~37%
+**<span class="mat-ruby">Ruby</span>** · IOR 1.77 · Avg. transmission ~37%
 
 Near-zero transmission until 600nm, then a sharp jump into high transmission in the red range. Pairs almost exclusively with Sunset. Under LED Cool it is practically silent. Produces a rich, saturated sound dominated by the fundamental and low harmonics; high harmonics are almost completely eliminated.
 
@@ -75,7 +91,7 @@ Near-zero transmission until 600nm, then a sharp jump into high transmission in 
 
 ---
 
-**Amber** · IOR 1.55 · Avg. transmission ~56%
+**<span class="mat-amber">Amber</span>** · IOR 1.55 · Avg. transmission ~56%
 
 Near-zero in blue, rising gradually toward red. A natural complement to Sunset light. Under LED Cool it becomes very faint. The gradual transmission curve produces a warm, organic character with emphasis on low and mid harmonics and an absence of highs.
 
@@ -87,7 +103,7 @@ Near-zero in blue, rising gradually toward red. A natural complement to Sunset l
 
 Metals behave differently from gems: their IOR values fall below 1.0, which means they reflect rather than refract. The Fresnel response is much softer, and the timbral character is distinctly metallic.
 
-**Gold** · IOR 0.47 · Avg. transmission ~58%
+**<span class="mat-gold">Gold</span>** · IOR 0.47 · Avg. transmission ~58%
 
 Near-zero transmission in blue, with an abrupt jump around 550nm: the interband transition characteristic of gold. Works well with Sunset and Daylight. The low IOR produces a softer Fresnel effect than gems. Warm, mid-heavy timbre.
 
@@ -95,9 +111,9 @@ Near-zero transmission in blue, with an abrupt jump around 550nm: the interband 
 
 ---
 
-**Copper** · IOR 0.46 · Avg. transmission ~30%
+**<span class="mat-copper">Copper</span>** · IOR 0.46 · Avg. transmission ~30%
 
-Even more extreme than Gold: only deep red and near-infrared light passes through. Pairs exclusively with Sunset. The most bass-heavy material in Elements, producing only the fundamental and first few harmonics.
+Even more extreme than <span class="mat-gold">Gold</span>: only deep red and near-infrared light passes through. Pairs exclusively with Sunset. The most bass-heavy material in Elements, producing only the fundamental and first few harmonics.
 
 > Extremely warm, deep. Fundamental and lowest harmonics only. Sunset only.
 
@@ -105,7 +121,7 @@ Even more extreme than Gold: only deep red and near-infrared light passes throug
 
 ### Special
 
-**Water** · IOR 1.33 · Avg. transmission ~72%
+**<span class="mat-water">Water</span>** · IOR 1.33 · Avg. transmission ~72%
 
 High transmission in blue and green, dropping sharply above 600nm due to O-H absorption. Produces prominent high harmonics with attenuated lows, a warm roll-off in the opposite direction to most warm materials. Best with LED Cool and Daylight. With Sunset it loses most of its brightness.
 
@@ -113,11 +129,19 @@ High transmission in blue and green, dropping sharply above 600nm due to O-H abs
 
 ---
 
-**Obsidian** · IOR 1.50 · Avg. transmission ~16%
+**<span class="mat-obsidian">Obsidian</span>** · IOR 1.50 · Avg. transmission ~16%
 
 The darkest material in Elements. Nearly opaque: only deep red light passes through, and only in thin sections. Even under Sunset it produces a very faint signal. Minimal harmonics, a barely-there presence. Use it for textural, atmospheric sound design rather than melodic content.
 
 > Dark, minimal. Very few harmonics. The quietest material.
+
+---
+
+**<span class="mat-neodymium">Neodymium</span>** · IOR 1.636 · Avg. transmission ~68%
+
+Rare-earth glass with six narrow f-f absorption bands scattered across the visible spectrum (~432/522/583/625/677/741nm), rather than one broad cutoff. Produces a comb-filter transmission curve, alternating narrow peaks and notches, giving it a harmonically dense character unlike any other material in Elements.
+
+> Complex, harmonically dense. Comb-filter spectrum. Unlike any other material.
 
 ---
 
@@ -135,23 +159,26 @@ Sound is only produced where the light emission overlaps with the material's tra
 
 | Material | Sunset | Daylight | LED Cool |
 |---|---|---|---|
-| Diamond | ✓ | ✓ | ✓ |
-| Water | △ | ✓ | ✓ |
-| Amber | ✓ | △ | ✗ |
-| Ruby | ✓ | △ | ✗ |
-| Gold | ✓ | ✓ | △ |
-| Emerald | △ | ✓ | △ |
-| Amethyst | ✓ | ✓ | ✓ |
-| Sapphire | ✗ | ✓ | ✓ |
-| Copper | ✓ | △ | ✗ |
-| Obsidian | △ | ✗ | ✗ |
+| <span class="mat-diamond">Diamond</span> | ✓ | ✓ | ✓ |
+| <span class="mat-water">Water</span> | △ | ✓ | ✓ |
+| <span class="mat-amber">Amber</span> | ✓ | △ | ✗ |
+| <span class="mat-ruby">Ruby</span> | ✓ | △ | ✗ |
+| <span class="mat-gold">Gold</span> | ✓ | ✓ | △ |
+| <span class="mat-emerald">Emerald</span> | △ | ✓ | △ |
+| <span class="mat-malachite">Malachite</span> | △ | ✓ | △ |
+| <span class="mat-amethyst">Amethyst</span> | ✓ | ✓ | ✓ |
+| <span class="mat-alexandrite">Alexandrite</span> | ✓ | ✓ | △ |
+| <span class="mat-sapphire">Sapphire</span> | ✗ | ✓ | ✓ |
+| <span class="mat-copper">Copper</span> | ✓ | △ | ✗ |
+| <span class="mat-obsidian">Obsidian</span> | △ | ✗ | ✗ |
+| <span class="mat-neodymium">Neodymium</span> | ✓ | ✓ | ✓ |
 
 *✓ Strong · △ Partial · ✗ Near-silence*
 
 **General rule:**
-- Cold materials (Sapphire, Water, Diamond) → LED Cool / Daylight
-- Warm materials (Ruby, Amber, Copper, Gold) → Sunset / Daylight
-- Complex materials (Amethyst, Emerald) → any light produces a different character
+- Cold materials (<span class="mat-sapphire">Sapphire</span>, <span class="mat-water">Water</span>, <span class="mat-diamond">Diamond</span>) → LED Cool / Daylight
+- Warm materials (<span class="mat-ruby">Ruby</span>, <span class="mat-amber">Amber</span>, <span class="mat-copper">Copper</span>, <span class="mat-gold">Gold</span>) → Sunset / Daylight
+- Complex materials (<span class="mat-amethyst">Amethyst</span>, <span class="mat-emerald">Emerald</span>) → any light produces a different character
 - Daylight is the most versatile source due to its broad emission (it overlaps with almost everything)
 
 ---
@@ -172,7 +199,7 @@ The most aggressive geometry. Six axis-aligned normals with a steep weighting (c
 
 **Sphere**: continuous surface
 
-Without the Deformer, the sphere does not respond to rotation at all: a perfect sphere always presents the same curved surface to the light from any angle. Stable, smooth, predictable. When the **Deformer** is active, the symmetry breaks: 12 displaced normals introduce rotation sensitivity, continuous timbral drift sets in, and the wavefolding adds harmonic density. The deformed sphere has the highest expressive range of any geometry.
+Without the Deformer, the sphere does not respond to rotation at all: a perfect sphere always presents the same curved surface to the light from any angle. Stable, smooth, predictable. When the **Deformer** is active, the symmetry breaks: 32 displaced normals introduce rotation sensitivity, continuous timbral drift sets in, and the wavefolding adds harmonic density. The deformed sphere has the highest expressive range of any geometry.
 
 > Stable and uniform without Deformer. Maximum movement with Deformer active.
 
@@ -194,14 +221,23 @@ Twelve faces distributed uniformly across the sphere using icosahedral symmetry.
 
 ---
 
+**Teapot**: 28 Bezier-patch normals
+
+The only asymmetric geometry in Elements. Twenty-eight Bezier patches sample surface normals from the spout, handle, body, and lid, each contributing a differently-weighted Fresnel response. Unlike the uniform solids above, rotation produces an irregular, non-repeating sequence of timbral changes rather than a predictable cycle.
+
+> Asymmetric, detailed. Irregular timbral variation. The most complex static geometry.
+
+---
+
 | | Faces | Rotation response | Character |
 |---|---|---|---|
 | **Cube** | 6 (axis-aligned) | Discrete, dramatic | Angular, punchy |
 | **Sphere** | Continuous | None (or full with Deformer) | Smooth, stable |
 | **Torus** | 12 + caustics | Continuous, smooth | Rich, mid-heavy |
 | **Dodecahedron** | 12 (uniform) | Continuous, textured | Dense, intricate |
+| **Teapot** | 28 (Bezier patches) | Continuous, irregular | Asymmetric, detailed |
 
-**Sound design rule:** Cube for stepped timbral changes, Dodecahedron for constant texture, Torus for midrange richness, Sphere for stability (or maximum movement with the Deformer).
+**Sound design rule:** Cube for stepped timbral changes, Dodecahedron for constant texture, Torus for midrange richness, Teapot for irregular asymmetric detail, Sphere for stability (or maximum movement with the Deformer).
 
 ---
 

@@ -134,6 +134,23 @@ dt {
   }
 }
 
+// Material name accent colors, matching MaterialAccents:: in ElementsUI.h
+// exactly, so a material's name always reads in the same color it has
+// on-screen in the plugin (knob rims, Help tab titles, light source labels).
+.mat-diamond      { color: #a8d8f0; }
+.mat-water        { color: #7ec8e3; }
+.mat-amber        { color: #f5b942; }
+.mat-ruby         { color: #e84b6a; }
+.mat-gold         { color: #d4a843; }
+.mat-emerald      { color: #4ecb8d; }
+.mat-amethyst     { color: #b57bee; }
+.mat-sapphire     { color: #5b9ef5; }
+.mat-copper       { color: #cf7e46; }
+.mat-obsidian     { color: #6a7a8a; }
+.mat-alexandrite  { color: #5b8a64; }
+.mat-malachite    { color: #2e7d52; }
+.mat-neodymium    { color: #9070c8; }
+
 section {
   #title {
     h1 {
