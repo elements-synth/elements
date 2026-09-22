@@ -21,7 +21,7 @@ The final spectrum you hear is the result of three factors multiplied together:
 sound = light emission × material transmission × fresnel response
 ```
 
-This means the choice of light source matters as much as the choice of material. A material that transmits only red light will produce almost no sound under a cool blue LED, because there is no spectral overlap between what the light emits and what the material allows through.
+This means the choice of light source matters as much as the choice of material. A material that transmits only red light will sound noticeably duller under a cool blue LED, because there is little spectral overlap between what the light emits and what the material allows through.
 
 ---
 
@@ -41,9 +41,9 @@ The most versatile material in Elements. Its transmission curve is uniformly hig
 
 **<span class="mat-sapphire">Sapphire</span>** · IOR 1.77 · Avg. transmission ~40%
 
-Transmits strongly in blue, with a sharp cutoff above 550nm. Pairs almost exclusively with LED Cool and Daylight. With Sunset there is virtually no spectral overlap and the material falls nearly silent. The narrow transmission window produces a focused, airy sound.
+Transmits strongly in blue, with a sharp cutoff above 550nm. Pairs best with LED Cool and Daylight. Under Sunset there is little spectral overlap and the material sounds noticeably duller. The narrow transmission window produces a focused, airy sound.
 
-> Clear, bright. High harmonics only. Almost silent under Sunset.
+> Clear, bright. High harmonics only. Noticeably duller under Sunset.
 
 ---
 
@@ -85,15 +85,15 @@ Materials with transmission weighted toward the red end of the spectrum, produci
 
 **<span class="mat-ruby">Ruby</span>** · IOR 1.77 · Avg. transmission ~37%
 
-Near-zero transmission until 600nm, then a sharp jump into high transmission in the red range. Pairs almost exclusively with Sunset. Under LED Cool it is practically silent. Produces a rich, saturated sound dominated by the fundamental and low harmonics; high harmonics are almost completely eliminated.
+Near-zero transmission until 600nm, then a sharp jump into high transmission in the red range. Pairs best with Sunset; under LED Cool it sounds duller and less saturated. Produces a rich, saturated sound dominated by the fundamental and low harmonics; high harmonics are almost completely eliminated.
 
-> Rich, saturated. Strong fundamental, minimal highs. Sunset only.
+> Rich, saturated. Strong fundamental, minimal highs. Sounds best under Sunset.
 
 ---
 
 **<span class="mat-amber">Amber</span>** · IOR 1.55 · Avg. transmission ~56%
 
-Near-zero in blue, rising gradually toward red. A natural complement to Sunset light. Under LED Cool it becomes very faint. The gradual transmission curve produces a warm, organic character with emphasis on low and mid harmonics and an absence of highs.
+Near-zero in blue, rising gradually toward red. A natural complement to Sunset light. Under LED Cool it sounds noticeably duller. The gradual transmission curve produces a warm, organic character with emphasis on low and mid harmonics and an absence of highs.
 
 > Warm, organic. Low and mid harmonics. Pairs naturally with Sunset.
 
@@ -113,9 +113,9 @@ Near-zero transmission in blue, with an abrupt jump around 550nm: the interband 
 
 **<span class="mat-copper">Copper</span>** · IOR 0.46 · Avg. transmission ~30%
 
-Even more extreme than <span class="mat-gold">Gold</span>: only deep red and near-infrared light passes through. Pairs exclusively with Sunset. The most bass-heavy material in Elements, producing only the fundamental and first few harmonics.
+Even more extreme than <span class="mat-gold">Gold</span>: only deep red and near-infrared light passes through. Pairs best with Sunset, and sounds much duller under LED Cool. The most bass-heavy material in Elements, producing only the fundamental and first few harmonics.
 
-> Extremely warm, deep. Fundamental and lowest harmonics only. Sunset only.
+> Extremely warm, deep. Fundamental and lowest harmonics only. Sounds best under Sunset.
 
 ---
 
@@ -123,7 +123,7 @@ Even more extreme than <span class="mat-gold">Gold</span>: only deep red and nea
 
 **<span class="mat-water">Water</span>** · IOR 1.33 · Avg. transmission ~72%
 
-High transmission in blue and green, dropping sharply above 600nm due to O-H absorption. Produces prominent high harmonics with attenuated lows, a warm roll-off in the opposite direction to most warm materials. Best with LED Cool and Daylight. With Sunset it loses most of its brightness.
+High transmission in blue and green, dropping sharply above 600nm due to O-H absorption. Produces prominent high harmonics with attenuated lows, a warm roll-off in the opposite direction to most warm materials. Best with LED Cool and Daylight. Somewhat duller under Sunset.
 
 > Soft, fluid. High harmonics prominent, lows attenuated. Warm roll-off.
 
@@ -131,9 +131,9 @@ High transmission in blue and green, dropping sharply above 600nm due to O-H abs
 
 **<span class="mat-obsidian">Obsidian</span>** · IOR 1.50 · Avg. transmission ~16%
 
-The darkest material in Elements. Nearly opaque: only deep red light passes through, and only in thin sections. Even under Sunset it produces a very faint signal. Minimal harmonics, a barely-there presence. Use it for textural, atmospheric sound design rather than melodic content.
+The darkest material in Elements. Nearly opaque: only deep red light passes through, and only in thin sections. Its raw transmission is the lowest of any material, but Elements compensates with gain correction, so its loudness stays comparable to other materials. What stays distinct is the harmonic content: minimal and muted rather than a full spectrum. Use it for textural, atmospheric sound design rather than melodic content.
 
-> Dark, minimal. Very few harmonics. The quietest material.
+> Dark, minimal. Very few harmonics, muted presence.
 
 ---
 
@@ -145,7 +145,7 @@ Rare-earth glass with six narrow f-f absorption bands scattered across the visib
 
 ---
 
-## Light × Material compatibility
+## Light sources
 
 The three light sources have Gaussian emission curves centered on different parts of the visible spectrum:
 
@@ -155,31 +155,13 @@ The three light sources have Gaussian emission curves centered on different part
 | **Daylight** | 550nm (green/yellow) | Broad, versatile |
 | **LED Cool** | 470nm (blue) | Cool, focused |
 
-Sound is only produced where the light emission overlaps with the material's transmission. No overlap means near-silence.
-
-| Material | Sunset | Daylight | LED Cool |
-|---|---|---|---|
-| <span class="mat-diamond">Diamond</span> | ✓ | ✓ | ✓ |
-| <span class="mat-water">Water</span> | △ | ✓ | ✓ |
-| <span class="mat-amber">Amber</span> | ✓ | △ | ✗ |
-| <span class="mat-ruby">Ruby</span> | ✓ | △ | ✗ |
-| <span class="mat-gold">Gold</span> | ✓ | ✓ | △ |
-| <span class="mat-emerald">Emerald</span> | △ | ✓ | △ |
-| <span class="mat-malachite">Malachite</span> | △ | ✓ | △ |
-| <span class="mat-amethyst">Amethyst</span> | ✓ | ✓ | ✓ |
-| <span class="mat-alexandrite">Alexandrite</span> | ✓ | ✓ | △ |
-| <span class="mat-sapphire">Sapphire</span> | ✗ | ✓ | ✓ |
-| <span class="mat-copper">Copper</span> | ✓ | △ | ✗ |
-| <span class="mat-obsidian">Obsidian</span> | △ | ✗ | ✗ |
-| <span class="mat-neodymium">Neodymium</span> | ✓ | ✓ | ✓ |
-
-*✓ Strong · △ Partial · ✗ Near-silence*
+How much a light's emission overlaps with a material's transmission curve shapes both timbre and loudness: strong overlap gives a fuller, brighter sound, while a mismatched pairing sounds duller and more muted. Elements' lights always retain some output across the full spectrum and material loudness is gain-compensated, so no combination ever goes silent, they just sound different. See each material's description above for how it responds to the three light sources.
 
 **General rule:**
-- Cold materials (<span class="mat-sapphire">Sapphire</span>, <span class="mat-water">Water</span>, <span class="mat-diamond">Diamond</span>) → LED Cool / Daylight
-- Warm materials (<span class="mat-ruby">Ruby</span>, <span class="mat-amber">Amber</span>, <span class="mat-copper">Copper</span>, <span class="mat-gold">Gold</span>) → Sunset / Daylight
-- Complex materials (<span class="mat-amethyst">Amethyst</span>, <span class="mat-emerald">Emerald</span>) → any light produces a different character
-- Daylight is the most versatile source due to its broad emission (it overlaps with almost everything)
+- Cold materials (<span class="mat-sapphire">Sapphire</span>, <span class="mat-water">Water</span>, <span class="mat-diamond">Diamond</span>) sound best under LED Cool / Daylight
+- Warm materials (<span class="mat-ruby">Ruby</span>, <span class="mat-amber">Amber</span>, <span class="mat-copper">Copper</span>, <span class="mat-gold">Gold</span>) sound best under Sunset / Daylight
+- Complex materials (<span class="mat-amethyst">Amethyst</span>, <span class="mat-emerald">Emerald</span>) produce a distinctly different character under each light
+- Daylight is the most versatile source due to its broad emission
 
 ---
 
