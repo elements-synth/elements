@@ -27,6 +27,8 @@ This means the choice of light source matters as much as the choice of material.
 
 ## Materials
 
+Materials also differ from each other in overall loudness, independent of light choice or rotation. A naturally quiet material (Copper, Obsidian) can stay noticeably quieter than a naturally loud one (Water, Amber) even when each is paired with its own best-case light. If a material feels underpowered, Volume is the most direct fix; switching to Sphere geometry also helps, since it samples the most surface normals and tends to sound loudest of the five geometries.
+
 ### Transparent gems
 
 These materials have high transmission and produce rich, harmonically complex sounds.
