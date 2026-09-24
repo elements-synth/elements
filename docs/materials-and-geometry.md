@@ -41,9 +41,9 @@ The most versatile material in Elements. Its transmission curve is uniformly hig
 
 **<span class="mat-sapphire">Sapphire</span>** · IOR 1.77 · Avg. transmission ~40%
 
-Transmits strongly in blue, with a sharp cutoff above 550nm. Pairs best with LED Cool and Daylight. Under Sunset there is little spectral overlap and the material sounds noticeably duller. The narrow transmission window produces a focused, airy sound.
+Transmits strongly in blue, with a sharp cutoff above 550nm. Quieter under Sunset, where there is little spectral overlap; loudest under Daylight and LED Cool, where the harmonic content skews almost entirely toward the highs with very little low end. The narrow transmission window produces a focused, airy sound.
 
-> Clear, bright. High harmonics only. Noticeably duller under Sunset.
+> Clear, bright. High harmonics only. Quietest under Sunset.
 
 ---
 
@@ -85,17 +85,17 @@ Materials with transmission weighted toward the red end of the spectrum, produci
 
 **<span class="mat-ruby">Ruby</span>** · IOR 1.77 · Avg. transmission ~37%
 
-Near-zero transmission until 600nm, then a sharp jump into high transmission in the red range. Pairs best with Sunset; under LED Cool it sounds duller and less saturated. Produces a rich, saturated sound dominated by the fundamental and low harmonics; high harmonics are almost completely eliminated.
+Near-zero transmission until 600nm, then a sharp jump into high transmission in the red range. Loudest and most saturated under Sunset; quieter under LED Cool. Produces a rich, saturated sound dominated by the fundamental and low harmonics; high harmonics stay almost completely absent regardless of light source.
 
-> Rich, saturated. Strong fundamental, minimal highs. Sounds best under Sunset.
+> Rich, saturated. Strong fundamental, minimal highs. Loudest under Sunset.
 
 ---
 
 **<span class="mat-amber">Amber</span>** · IOR 1.55 · Avg. transmission ~56%
 
-Near-zero in blue, rising gradually toward red. A natural complement to Sunset light. Under LED Cool it sounds noticeably duller. The gradual transmission curve produces a warm, organic character with emphasis on low and mid harmonics and an absence of highs.
+Near-zero in blue, rising gradually toward red. Loudest and warmest under Sunset, where low and mid harmonics dominate; quieter under LED Cool, but with proportionally more high-harmonic content coming through, giving it a brighter, thinner edge despite the drop in volume. The gradual transmission curve produces a warm, organic character overall.
 
-> Warm, organic. Low and mid harmonics. Pairs naturally with Sunset.
+> Warm, organic. Fuller and louder under Sunset, brighter and thinner under LED Cool.
 
 ---
 
@@ -113,9 +113,9 @@ Near-zero transmission in blue, with an abrupt jump around 550nm: the interband 
 
 **<span class="mat-copper">Copper</span>** · IOR 0.46 · Avg. transmission ~30%
 
-Even more extreme than <span class="mat-gold">Gold</span>: only deep red and near-infrared light passes through. Pairs best with Sunset, and sounds much duller under LED Cool. The most bass-heavy material in Elements, producing only the fundamental and first few harmonics.
+Even more extreme than <span class="mat-gold">Gold</span>: only deep red and near-infrared light passes through. Loudest and richest under Sunset; much quieter under LED Cool. The most bass-heavy material in Elements, producing only the fundamental and first few harmonics.
 
-> Extremely warm, deep. Fundamental and lowest harmonics only. Sounds best under Sunset.
+> Extremely warm, deep. Fundamental and lowest harmonics only. Loudest under Sunset.
 
 ---
 
@@ -123,7 +123,7 @@ Even more extreme than <span class="mat-gold">Gold</span>: only deep red and nea
 
 **<span class="mat-water">Water</span>** · IOR 1.33 · Avg. transmission ~72%
 
-High transmission in blue and green, dropping sharply above 600nm due to O-H absorption. Produces prominent high harmonics with attenuated lows, a warm roll-off in the opposite direction to most warm materials. Best with LED Cool and Daylight. Somewhat duller under Sunset.
+High transmission in blue and green, dropping sharply above 600nm due to O-H absorption. Produces prominent high harmonics with attenuated lows, a warm roll-off in the opposite direction to most warm materials. Loudest and brightest under LED Cool and Daylight; quieter and warmer under Sunset.
 
 > Soft, fluid. High harmonics prominent, lows attenuated. Warm roll-off.
 
