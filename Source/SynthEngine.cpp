@@ -1433,6 +1433,14 @@ void ElementsSynth::calculateSpectrumForMaterial(int matIndex, std::array<float,
 // Main spectrum update function: calculates both oscillator spectra
 void ElementsSynth::updateSpectrum()
 {
+    // Held for the whole function, not just the publish step: this can run
+    // concurrently from the message thread (material/light/geometry setters)
+    // and the audio thread (deform evolution below), and calculateSpectrumFor
+    // Material() below writes hasActiveLights/spectralAmplitudeTarget as side
+    // effects (not just its outputSpectrum param) — those need covering too,
+    // not just spectrumA/B/pendingSpectrumA/B/regenPending.
+    const juce::SpinLock::ScopedLockType lock(spectrumLock);
+
     // Count active lights
     int activeLightCount = 0;
     for (int i = 0; i < 3; ++i)
@@ -1447,18 +1455,21 @@ void ElementsSynth::updateSpectrum()
     {
         std::fill(spectrumA.begin(), spectrumA.end(), 0.0f);
         std::fill(spectrumB.begin(), spectrumB.end(), 0.0f);
-        // Don't regenerate wavetables — processBlock will output silence
+        std::fill(pendingSpectrumA.begin(), pendingSpectrumA.end(), 0.0f);
+        std::fill(pendingSpectrumB.begin(), pendingSpectrumB.end(), 0.0f);
+        regenPending = true;  // still request a regen so silence actually takes effect
         return;
     }
 
-    // Calculate spectrum A (always)
+    // Calculate spectrum A (always). Note: this can itself downgrade
+    // hasActiveLights back to false (spectrum-too-weak silence case) — that
+    // must be allowed to stick, so nothing below may unconditionally
+    // overwrite hasActiveLights afterward.
     calculateSpectrumForMaterial(currentMaterialIndexA, spectrumA);
 
     // Calculate spectrum B (only if dual-osc is active)
     if (mixAmount > 0.001f)
-    {
         calculateSpectrumForMaterial(currentMaterialIndexB, spectrumB);
-    }
 
     // Store pending spectra and mark for regeneration
     pendingSpectrumA = spectrumA;
@@ -1473,6 +1484,16 @@ void ElementsSynth::regenerateWavetables()
     // Parameter-change regens keep the long crossfade (200ms) to avoid clicks.
     float xfadeDuration = deformEvolutionRegen ? 0.010f : crossfadeDuration;
     deformEvolutionRegen = false;  // consumed
+
+    // Snapshot the pending spectra under lock — updateSpectrum() can write
+    // these concurrently from the message thread while this (audio-thread)
+    // regen is in progress. Everything below reads the local copies only.
+    std::array<float, NUM_WAVELENGTHS> localPendingA, localPendingB;
+    {
+        const juce::SpinLock::ScopedLockType lock(spectrumLock);
+        localPendingA = pendingSpectrumA;
+        localPendingB = pendingSpectrumB;
+    }
 
     // Store old wavetables for crossfade if voices are playing
     bool hasActiveVoices = false;
@@ -1523,7 +1544,7 @@ void ElementsSynth::regenerateWavetables()
         // wobble as broadband. freqNorm=0 → flat (uniform depth); freqNorm=1 → depth
         // ranges from ~0.25x at the red end to ~1.75x at the blue/high-harmonic end.
         float freqNormTilt = (deformFrequency - 0.5f) / 9.5f;
-        auto shimmerSpectrum = pendingSpectrumA;
+        auto shimmerSpectrum = localPendingA;
         for (int w = 0; w < NUM_WAVELENGTHS; ++w)
         {
             float wNorm = 1.0f - static_cast<float>(w) / static_cast<float>(NUM_WAVELENGTHS - 1);
@@ -1556,9 +1577,13 @@ void ElementsSynth::regenerateWavetables()
     }
     else
     {
-        wavetableGen.generateBandLimitedSet(pendingSpectrumA, static_cast<float>(sampleRate), currentWavetablesA);
+        wavetableGen.generateBandLimitedSet(localPendingA, static_cast<float>(sampleRate), currentWavetablesA);
     }
-    spectrumA = pendingSpectrumA;  // store unmodulated physics spectrum for display
+    {
+        // store unmodulated physics spectrum for display
+        const juce::SpinLock::ScopedLockType lock(spectrumLock);
+        spectrumA = localPendingA;
+    }
 
     // Oscillator B crossfade setup (only if dual-osc is active)
     if (mixAmount > 0.001f)
@@ -1586,11 +1611,15 @@ void ElementsSynth::regenerateWavetables()
             crossfadeB.active = true;
         }
 
-        wavetableGen.generateBandLimitedSet(pendingSpectrumB, static_cast<float>(sampleRate), currentWavetablesB);
-        spectrumB = pendingSpectrumB;
+        wavetableGen.generateBandLimitedSet(localPendingB, static_cast<float>(sampleRate), currentWavetablesB);
+        {
+            const juce::SpinLock::ScopedLockType lock(spectrumLock);
+            spectrumB = localPendingB;
+        }
     }
 
     regenPending = false;
+    regenCount.fetch_add(1, std::memory_order_relaxed);
 }
 
 float ElementsSynth::generateEnvelopeSample(Voice& voice)

@@ -14,6 +14,7 @@
 #include <vector>
 #include <map>
 #include <cmath>
+#include <atomic>
 
 // ==============================================================================
 // CONSTANTS
@@ -435,6 +436,23 @@ public:
     const std::array<float, NUM_WAVELENGTHS>& getSpectrumA() const { return spectrumA; }
     const std::array<float, NUM_WAVELENGTHS>& getSpectrumB() const { return spectrumB; }
 
+    // --- Wavetable Diagnostics (for regen/race verification, e.g. ElementsTests) ---
+    // Cheap fingerprint of currentWavetablesA/B's mid band — changes iff
+    // regenerateWavetables() actually rebuilt the tables with different content.
+    float getWavetableChecksumA() const
+    {
+        float sum = 0.0f;
+        for (float v : currentWavetablesA.mid) sum += std::abs(v);
+        return sum;
+    }
+    float getWavetableChecksumB() const
+    {
+        float sum = 0.0f;
+        for (float v : currentWavetablesB.mid) sum += std::abs(v);
+        return sum;
+    }
+    int getRegenCount() const { return regenCount; }
+
     // --- Oscilloscope Access (for visualization) ---
 
     const std::array<float, 512>& getOscilloscopeBuffer() const { return oscilloscopeBuffer; }
@@ -482,6 +500,12 @@ private:
     std::array<LightConfig, 3> lights;
     RotationMatrix objectRotationMatrix;  // Gimbal-lock-free rotation storage
 
+    // updateSpectrum() runs on both the message thread (material/light/geometry
+    // setters) and the audio thread (continuous deform-evolution regen in
+    // processBlock) — this guards spectrumA/B and pendingSpectrumA/B, which are
+    // written by both, from torn/lost concurrent updates.
+    juce::SpinLock spectrumLock;
+
     // Oscillator A: Spectrum and Wavetables
     std::array<float, NUM_WAVELENGTHS> spectrumA;
     std::array<float, NUM_WAVELENGTHS> pendingSpectrumA{};
@@ -517,6 +541,7 @@ private:
     int samplesSinceLastRegen = 0;
     int regenThrottleSamples = 882;   // ~20ms at 44.1kHz — fast enough for deform animation at high Rate
     bool regenPending = false;
+    std::atomic<int> regenCount { 0 };  // bumped once per regenerateWavetables() call — diagnostic only
 
     // Voices
     std::array<Voice, MAX_POLYPHONY> voices;
