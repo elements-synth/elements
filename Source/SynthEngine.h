@@ -473,6 +473,7 @@ private:
 
     float generateEnvelopeSample(Voice& voice);
     float generateFilterEnvelopeSample(int numSamples);
+    float peekEnvelopeLevel(const Voice& voice) const;
     float readWavetable(float phase, const std::array<float, WAVETABLE_SIZE>& wavetable);
 
     int findFreeVoice();

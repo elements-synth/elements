@@ -479,6 +479,13 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     // Count active voices for mixing
     int activeVoiceCount = 0;
 
+    // Envelope-weighted voice count for polyphony gain compensation below —
+    // a voice deep into a long release contributes almost nothing here, so
+    // its eventual silence doesn't cause an audible volume jump on whatever
+    // else is still sounding. activeVoiceCount above stays a plain integer
+    // for its other use (line ~779, "anything playing at all?").
+    float voicePolyphonyWeight = 0.0f;
+
     // Only capture Osc B samples from the first active non-stealing voice
     bool oscBVoiceCaptured = false;
 
@@ -489,6 +496,7 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
             continue;
 
         activeVoiceCount++;
+        voicePolyphonyWeight += peekEnvelopeLevel(voice);
 
         // Oscillator A wavetable
         const auto& wavetableA = currentWavetablesA.getForFrequency(voice.frequency);
@@ -721,9 +729,13 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
     filterEnabledMix += filterMixStep * numSamples;
     filterEnabledMix = clamp(filterEnabledMix, 0.0f, 1.0f);
 
-    // Voice count compensation: 1 voice = 1.0, 2 = 0.71, 4 = 0.50, 8 = 0.35
-    // Smoothed to prevent clicks when voice count changes between blocks
-    float voiceScaleTarget = 1.0f / std::sqrt(static_cast<float>(std::max(activeVoiceCount, 1)));
+    // Voice count compensation: 1 voice = 1.0, 2 = 0.71, 4 = 0.50, 8 = 0.35.
+    // Uses voicePolyphonyWeight (envelope-weighted), not the raw active count —
+    // otherwise a voice deep into a long release still counts as "1 full voice"
+    // right up until it goes silent, so its disappearance snaps the target back
+    // up and produces an audible volume jump on any voice still sounding.
+    // Smoothed to prevent clicks when voice count changes between blocks.
+    float voiceScaleTarget = 1.0f / std::sqrt(std::max(voicePolyphonyWeight, 1.0f));
     float voiceScaleStart = voiceScaleSmoothed;
     // Per-sample smoothing coefficient: ~5ms ramp at 44.1kHz
     float voiceScaleSmoothCoeff = 1.0f - std::exp(-1.0f / (0.005f * static_cast<float>(sampleRate)));
@@ -1620,6 +1632,42 @@ void ElementsSynth::regenerateWavetables()
 
     regenPending = false;
     regenCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+// Read-only peek at a voice's current amplitude-envelope level, without
+// advancing any state (generateEnvelopeSample() below does that, once per
+// sample, for actual audio generation). Used only to weight the polyphony
+// gain compensation (see activeVoiceCount/voiceScaleTarget in processBlock)
+// by how loud a voice actually still is, so a voice deep into a long
+// release contributes almost nothing to the count — without this, a voice
+// counts exactly the same whether it just started or is nearly silent at
+// the end of a multi-second release, so its eventual disappearance causes
+// an audible volume jump on any remaining voice(s) once release finishes.
+float ElementsSynth::peekEnvelopeLevel(const Voice& voice) const
+{
+    const ADSREnvelope& env = getActiveEnvelope();
+    int attackSamples  = static_cast<int>(env.attack  * sampleRate);
+    int decaySamples   = static_cast<int>(env.decay   * sampleRate);
+    int releaseSamples = static_cast<int>(env.release * sampleRate);
+    if (attackSamples  < 1) attackSamples  = 1;
+    if (decaySamples   < 1) decaySamples   = 1;
+    if (releaseSamples < 1) releaseSamples = 1;
+
+    if (voice.releasing)
+    {
+        if (voice.releaseAge >= releaseSamples)
+            return 0.0f;
+        return voice.releaseStartLevel * (1.0f - static_cast<float>(voice.releaseAge) / releaseSamples);
+    }
+
+    if (voice.age <= attackSamples)
+        return static_cast<float>(voice.age) / attackSamples;
+    if (voice.age < attackSamples + decaySamples)
+    {
+        float decayProgress = static_cast<float>(voice.age - attackSamples) / decaySamples;
+        return 1.0f - (1.0f - env.sustain) * decayProgress;
+    }
+    return env.sustain;
 }
 
 float ElementsSynth::generateEnvelopeSample(Voice& voice)
