@@ -181,5 +181,20 @@ private:
     int   lastDeformNoiseType = 1;
     float lastDeformRate = 1.0f;
 
+    // Chorus (EXPERIMENTAL, audio-only prototype — see CLAUDE.md).
+    // Single shared mono delay line: both channels read it at independently
+    // wobbling delay times (different noise phase), which is what produces
+    // stereo width from one mono source, rather than needing separate L/R lines.
+    static constexpr int   kChorusMaxVoices    = 4;
+    static constexpr float kChorusMaxSpreadMs  = 40.0f;
+    static constexpr float kChorusModRangeMs   = 6.0f;  // max wobble excursion added on top of base delay
+
+    std::vector<float> chorusDelayLine;
+    int    chorusWritePos = 0;
+    double chorusNoiseTimeL = 0.0;
+    double chorusNoiseTimeR = 1000.0;  // arbitrary offset seed so L/R decorrelate
+
+    void processChorus(juce::AudioBuffer<float>& buffer, int numSamples);
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ElementsAudioProcessor)
 };

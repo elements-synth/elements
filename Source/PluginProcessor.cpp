@@ -285,6 +285,45 @@ ElementsAudioProcessor::createParameterLayout()
         [](int v, int) { return (v == 0) ? juce::String("0 st")
                                           : juce::String(v > 0 ? "+" : "") + juce::String(v) + " st"; }));
 
+    // =====================================================================
+    // CHORUS (EXPERIMENTAL — audio-only prototype, see CLAUDE.md
+    // "Post-1.0.0 Parking Lot / Chorus (geometry-trail) feature")
+    // Not yet wired to any custom UI; test via the DAW's generic parameter
+    // list. Represents up to 4 duplicate copies of the object receding
+    // along a light's direction: each one arrives later (Spread) and
+    // loses energy (Decay, same exponential-falloff form as Beer-Lambert,
+    // hop-based rather than distance-based since the engine has no spatial
+    // scale). Wobble animates the delay time per tap (via the same noise
+    // machinery Deform uses) — that animation, not the static gain/delay
+    // alone, is what actually produces a chorus character rather than a
+    // fixed comb filter.
+    // =====================================================================
+
+    layout.add(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{"chorusVoices", 1},
+        "Chorus Voices",
+        0, 4,
+        0));
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"chorusSpread", 1},
+        "Chorus Spread",
+        juce::NormalisableRange<float>(5.0f, 40.0f, 0.1f),
+        15.0f,
+        "ms"));
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"chorusDecay", 1},
+        "Chorus Decay",
+        juce::NormalisableRange<float>(0.0f, 0.9f, 0.01f),
+        0.6f));
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"chorusWobble", 1},
+        "Chorus Wobble",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
+        0.4f));
+
     return layout;
 }
 
@@ -367,6 +406,14 @@ void ElementsAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
 {
     // Preparar el motor de síntesis
     synth.prepareToPlay(sampleRate, samplesPerBlock);
+
+    // Chorus delay line: sized for the worst case (max voices * max spread,
+    // plus wobble headroom so the modulated read never runs past what's
+    // been written), rounded up with a small safety margin.
+    int maxDelaySamples = static_cast<int>(std::ceil(
+        (kChorusMaxSpreadMs * kChorusMaxVoices + kChorusModRangeMs) * 0.001 * sampleRate)) + 8;
+    chorusDelayLine.assign(static_cast<size_t>(maxDelaySamples), 0.0f);
+    chorusWritePos = 0;
 }
 
 void ElementsAudioProcessor::releaseResources()
@@ -608,21 +655,119 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     synth.processBlock(channelData, numSamples);
 
     // =========================================================================
-    // COPIAR A STEREO (si hay más de un canal)
+    // COPIAR A STEREO (si hay más de un canal) + CHORUS (EXPERIMENTAL)
     // =========================================================================
 
-    /**
-     * Nuestro synth genera mono. Para stereo, simplemente copiamos
-     * el canal izquierdo al derecho.
-     *
-     * En el futuro podríamos agregar panning o efectos stereo.
-     */
-    if (numChannels > 1)
+    int chorusVoices = static_cast<int>(apvts.getRawParameterValue("chorusVoices")->load());
+
+    if (chorusVoices > 0)
     {
+        // processChorus writes channel 0 (and channel 1, if stereo) itself —
+        // it reads the mono dry signal from channel 0 before overwriting it.
+        processChorus(buffer, numSamples);
+    }
+    else if (numChannels > 1)
+    {
+        // Nuestro synth genera mono. Sin chorus, simplemente copiamos
+        // el canal izquierdo al derecho.
         for (int ch = 1; ch < numChannels; ++ch)
         {
             buffer.copyFrom(ch, 0, buffer, 0, 0, numSamples);
         }
+    }
+}
+
+// ==============================================================================
+// CHORUS (EXPERIMENTAL — audio-only prototype, see CLAUDE.md "Post-1.0.0
+// Parking Lot / Chorus (geometry-trail) feature")
+//
+// Models up to 4 duplicate copies of the object receding along a light's
+// direction: each copy arrives later (Spread) and quieter (Decay, an
+// exponential per-hop falloff — same mathematical form as Beer-Lambert,
+// but hop-based rather than distance-based since the engine has no spatial
+// scale to compute a real distance from). The delay time for each copy is
+// animated (Wobble) using the same simplex-noise machinery the Deformer
+// uses elsewhere — a static delay+gain sum alone would just be a fixed comb
+// filter, not a chorus; the movement is what gives it life.
+//
+// Single shared mono delay line, read independently by L and R at different
+// noise phases, so a genuinely mono source produces real stereo width
+// rather than an identical comb filter duplicated to both ears.
+// ==============================================================================
+void ElementsAudioProcessor::processChorus(juce::AudioBuffer<float>& buffer, int numSamples)
+{
+    const int numChannels = buffer.getNumChannels();
+    const int lineSize = static_cast<int>(chorusDelayLine.size());
+    if (lineSize == 0)
+        return;
+
+    const int   voices   = juce::jlimit(0, kChorusMaxVoices,
+                                static_cast<int>(apvts.getRawParameterValue("chorusVoices")->load()));
+    const float spreadMs = apvts.getRawParameterValue("chorusSpread")->load();
+    const float decay    = apvts.getRawParameterValue("chorusDecay")->load();
+    const float wobble   = apvts.getRawParameterValue("chorusWobble")->load();
+
+    const float sr = static_cast<float>(getSampleRate());
+    const float modRangeSamples = kChorusModRangeMs * 0.001f * sr;
+
+    // Wobble rate: slow enough to read as a chorus "breathe," not a tremolo.
+    constexpr float kWobbleHz = 0.15f;
+    const double noiseAdvancePerSample = static_cast<double>(kWobbleHz) / sr;
+
+    auto* left  = buffer.getWritePointer(0);
+    auto* right = (numChannels > 1) ? buffer.getWritePointer(1) : nullptr;
+
+    auto readDelayLine = [&](float delaySamples) -> float
+    {
+        delaySamples = juce::jlimit(0.0f, static_cast<float>(lineSize - 2), delaySamples);
+        float readPosF = static_cast<float>(chorusWritePos) - delaySamples;
+        while (readPosF < 0.0f)
+            readPosF += static_cast<float>(lineSize);
+
+        int   idx0 = static_cast<int>(readPosF) % lineSize;
+        int   idx1 = (idx0 + 1) % lineSize;
+        float frac = readPosF - std::floor(readPosF);
+        return chorusDelayLine[static_cast<size_t>(idx0)] * (1.0f - frac)
+             + chorusDelayLine[static_cast<size_t>(idx1)] * frac;
+    };
+
+    auto computeWetSample = [&](double& noiseTime) -> float
+    {
+        float wet = 0.0f;
+        float gain = 1.0f;
+        for (int v = 1; v <= voices; ++v)
+        {
+            gain *= decay;  // hop-based exponential falloff (Beer-Lambert-style form)
+
+            float baseDelayMs = spreadMs * static_cast<float>(v);
+            float noise = simplex3D(static_cast<float>(v) * 1.7f,
+                                     static_cast<float>(noiseTime), 0.0f);
+            float delaySamples = (baseDelayMs * 0.001f * sr) + wobble * modRangeSamples * noise;
+
+            wet += gain * readDelayLine(delaySamples);
+        }
+        return wet;
+    };
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        float dry = left[i];
+
+        chorusDelayLine[static_cast<size_t>(chorusWritePos)] = dry;
+
+        float wetL = computeWetSample(chorusNoiseTimeL);
+        float outL = std::tanh(dry + wetL);
+        left[i] = outL;
+
+        if (right != nullptr)
+        {
+            float wetR = computeWetSample(chorusNoiseTimeR);
+            right[i] = std::tanh(dry + wetR);
+        }
+
+        chorusWritePos = (chorusWritePos + 1) % lineSize;
+        chorusNoiseTimeL += noiseAdvancePerSample;
+        chorusNoiseTimeR += noiseAdvancePerSample;
     }
 }
 
