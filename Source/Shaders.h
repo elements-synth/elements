@@ -59,6 +59,9 @@ static constexpr const char* pbrFragmentShader = R"(
     uniform vec3 u_absorptionColor;
     uniform float u_thickness;
 
+    // Chorus trail: fades receding copies (1.0 = primary object, unfaded)
+    uniform float u_copyAlpha;
+
     // Environment map (equirectangular HDR, sampled as 2D texture)
     uniform sampler2D u_envMap;
 
@@ -260,8 +263,9 @@ static constexpr const char* pbrFragmentShader = R"(
         color = color / (color + vec3(1.0));
         color = pow(color, vec3(1.0 / 2.2));
 
-        // Alpha: slightly transparent for refractive materials
-        float alpha = 1.0 - u_transparency * 0.3;
+        // Alpha: slightly transparent for refractive materials, further
+        // faded by u_copyAlpha for receding Chorus trail copies
+        float alpha = (1.0 - u_transparency * 0.3) * u_copyAlpha;
 
         gl_FragColor = vec4(color, alpha);
     }

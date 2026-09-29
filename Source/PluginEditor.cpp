@@ -238,6 +238,43 @@ void Viewport3D::renderOpenGL()
 
     if (shaderReady)
     {
+        // Chorus trail: duplicate copies of the object receding along a
+        // fixed world-space Z axis (see CLAUDE.md "Post-1.0.0 Parking Lot" /
+        // this feature's design discussion) — not tied to any light's
+        // direction, matches how the light positions themselves are fixed
+        // world-space vectors. Draw farthest-first so alpha blending
+        // composites correctly, primary object (unfaded, zOffset=0) last.
+        bool chorusOn = processor.apvts.getRawParameterValue("chorusEnabled")->load() > 0.5f;
+        if (chorusOn)
+        {
+            int voices = juce::jlimit(0, ElementsAudioProcessor::kChorusMaxVoices,
+                static_cast<int>(processor.apvts.getRawParameterValue("chorusVoices")->load()));
+            float decay    = processor.apvts.getRawParameterValue("chorusDecay")->load();
+            float spreadMs = processor.apvts.getRawParameterValue("chorusSpread")->load();
+
+            // "Voices" counts the primary object too (matches the audio's
+            // dry + N-1 delayed taps convention) — draw voices-1 trail
+            // copies behind it, not "voices" extra ones.
+            int trailCopies = voices - 1;
+
+            // Spacing driven by Spread (5-40ms), mapped to world units — not
+            // a literal ms->distance conversion (the engine has no spatial
+            // scale, see CLAUDE.md), just a proportional visual response so
+            // Spread has viewport feedback too. The largest geometries
+            // (Sphere/Torus/Dodecahedron) are ~1.7 units across, so the
+            // range floor (1.9) guarantees real separation even at min Spread.
+            float spacing = juce::jmap(spreadMs, 5.0f, 40.0f, 1.9f, 3.5f);
+
+            for (int v = trailCopies; v >= 1; --v)
+            {
+                float zOffset = -spacing * static_cast<float>(v);
+                // Decay = fraction of energy lost per hop, so high Decay
+                // fades copies out faster (matches the audio-side convention).
+                float alpha = std::pow(1.0f - decay, static_cast<float>(v));
+                renderGeometryPBR(zOffset, alpha);
+            }
+        }
+
         renderGeometryPBR();
     }
     else
@@ -1298,7 +1335,7 @@ void Viewport3D::getCameraPosition(float* outPos, float tiltDeg, float rotYDeg, 
     outPos[2] =  cy * cx * dist;
 }
 
-void Viewport3D::renderGeometryPBR()
+void Viewport3D::renderGeometryPBR(float zOffset, float copyAlpha)
 {
     using namespace juce::gl;
 
@@ -1409,9 +1446,12 @@ void Viewport3D::renderGeometryPBR()
             albedo[c] = lerpf(albedo[c], mat.albedoSecondary[c], warmthFactor);
     }
 
-    // Enable alpha blending for transparent materials
+    // Enable alpha blending for transparent materials, or for a faded
+    // Chorus trail copy (opaque materials need this too, since they have
+    // no other alpha path — u_copyAlpha is what fades them).
     bool isTransparent = mat.transparency > 0.0f;
-    if (isTransparent)
+    bool blendEnabled = isTransparent || copyAlpha < 0.999f;
+    if (blendEnabled)
     {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1446,7 +1486,15 @@ void Viewport3D::renderGeometryPBR()
         if (loc >= 0) glUniform1i(loc, v);
     };
 
-    setMat4("u_modelMatrix", rotationMatrix);
+    // Chorus trail: translate along world-space Z, applied AFTER rotation
+    // (rotationMatrix's translation column is otherwise always identity),
+    // so the copy keeps the same orientation and just sits further back.
+    float instanceModelMatrix[16];
+    for (int i = 0; i < 16; ++i)
+        instanceModelMatrix[i] = rotationMatrix[i];
+    instanceModelMatrix[14] += zOffset;
+
+    setMat4("u_modelMatrix", instanceModelMatrix);
     setMat4("u_viewMatrix", viewMatrix);
     setMat4("u_projMatrix", projMatrix);
     setMat3("u_normalMatrix", normalMatrix);
@@ -1463,6 +1511,7 @@ void Viewport3D::renderGeometryPBR()
     setFloat("u_sssRadius", mat.sssRadius);
     setVec3("u_absorptionColor", mat.absorptionColor[0], mat.absorptionColor[1], mat.absorptionColor[2]);
     setFloat("u_thickness", currentThickness);
+    setFloat("u_copyAlpha", copyAlpha);
     setFloat("u_bandingStrength",  mat.bandingStrength);
     setFloat("u_bandingFrequency", mat.bandingFrequency);
 
@@ -1566,7 +1615,7 @@ void Viewport3D::renderGeometryPBR()
 
     // Unbind environment map and disable blend
     glBindTexture(GL_TEXTURE_2D, 0);
-    if (isTransparent)
+    if (blendEnabled)
     {
         glDisable(GL_BLEND);
     }
@@ -3168,6 +3217,47 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     resetRotationButton.addListener(this);
     viewport3D.addAndMakeVisible(resetRotationButton);
 
+    // === Chorus (floating inside viewport, top-left — hides while GEOMETRIES
+    // accordion panel is open). Same category as Rotation above: arranges
+    // copies of the object in space, doesn't change what the object is. ===
+    chorusEnableButton.setColour(juce::ToggleButton::textColourId, ElementsColors::text);
+    viewport3D.addAndMakeVisible(chorusEnableButton);
+    chorusEnableAttachment = std::make_unique<ButtonAttachment>(
+        audioProcessor.apvts, "chorusEnabled", chorusEnableButton);
+
+    auto setupChorusLabel = [&](juce::Label& lbl, const juce::String& text) {
+        lbl.setText(text, juce::dontSendNotification);
+        lbl.setFont(juce::Font(10.0f, juce::Font::bold));
+        lbl.setJustificationType(juce::Justification::centredLeft);
+        lbl.setColour(juce::Label::textColourId, ElementsColors::text);
+        viewport3D.addAndMakeVisible(lbl);
+    };
+    auto setupChorusSlider = [&](juce::Slider& sld) {
+        sld.setSliderStyle(juce::Slider::LinearHorizontal);
+        sld.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
+        viewport3D.addAndMakeVisible(sld);
+    };
+
+    setupChorusLabel(chorusVoicesLabel, "Voices");
+    setupChorusSlider(chorusVoicesSlider);
+    chorusVoicesAttachment = std::make_unique<SliderAttachment>(
+        audioProcessor.apvts, "chorusVoices", chorusVoicesSlider);
+
+    setupChorusLabel(chorusSpreadLabel, "Spread");
+    setupChorusSlider(chorusSpreadSlider);
+    chorusSpreadAttachment = std::make_unique<SliderAttachment>(
+        audioProcessor.apvts, "chorusSpread", chorusSpreadSlider);
+
+    setupChorusLabel(chorusDecayLabel, "Decay");
+    setupChorusSlider(chorusDecaySlider);
+    chorusDecayAttachment = std::make_unique<SliderAttachment>(
+        audioProcessor.apvts, "chorusDecay", chorusDecaySlider);
+
+    setupChorusLabel(chorusWobbleLabel, "Wobble");
+    setupChorusSlider(chorusWobbleSlider);
+    chorusWobbleAttachment = std::make_unique<SliderAttachment>(
+        audioProcessor.apvts, "chorusWobble", chorusWobbleSlider);
+
     // === Lights (floating inside viewport bottom) ===
 
     lightsLabel.setText("LIGHTS", juce::dontSendNotification);
@@ -3646,6 +3736,49 @@ void ElementsAudioProcessorEditor::resized()
     rotZLabel.setBounds(rotLx, ry, rotLW, rotH);
     rotZValue.setBounds(rotLx + rotLW + 2, ry, rotFW, rotH);  ry += rotH + rotGap;
     resetRotationButton.setBounds(rotLx, ry, rotLW + 2 + rotFW, rotH);
+
+    // === CHORUS: top-left, below accordion header — hides while GEOMETRIES
+    // panel is open (same screen region it expands into) ===
+    {
+        bool chorusVisible = !accordion.isGeoOpen();
+        chorusEnableButton.setVisible(chorusVisible);
+        chorusVoicesLabel.setVisible(chorusVisible);
+        chorusVoicesSlider.setVisible(chorusVisible);
+        chorusSpreadLabel.setVisible(chorusVisible);
+        chorusSpreadSlider.setVisible(chorusVisible);
+        chorusDecayLabel.setVisible(chorusVisible);
+        chorusDecaySlider.setVisible(chorusVisible);
+        chorusWobbleLabel.setVisible(chorusVisible);
+        chorusWobbleSlider.setVisible(chorusVisible);
+
+        if (chorusVisible)
+        {
+            int cx = 8;
+            int cy = accordion.kHeaderH + 6;
+            int cW = vpW / 2 - 16;
+            int labelW = 50;  // shortened labels (Voices/Spread/Decay/Wobble), no "Chorus" prefix
+            int sliderW = (cW - labelW - 2) / 2;  // halved so sliders invade the viewport less
+            int rowH = 20, rowGap = 5;
+
+            chorusEnableButton.setBounds(cx, cy, cW, rowH + 2);
+            cy += rowH + 2 + rowGap;
+
+            chorusVoicesLabel.setBounds(cx, cy, labelW, rowH);
+            chorusVoicesSlider.setBounds(cx + labelW + 2, cy, sliderW, rowH);
+            cy += rowH + rowGap;
+
+            chorusSpreadLabel.setBounds(cx, cy, labelW, rowH);
+            chorusSpreadSlider.setBounds(cx + labelW + 2, cy, sliderW, rowH);
+            cy += rowH + rowGap;
+
+            chorusDecayLabel.setBounds(cx, cy, labelW, rowH);
+            chorusDecaySlider.setBounds(cx + labelW + 2, cy, sliderW, rowH);
+            cy += rowH + rowGap;
+
+            chorusWobbleLabel.setBounds(cx, cy, labelW, rowH);
+            chorusWobbleSlider.setBounds(cx + labelW + 2, cy, sliderW, rowH);
+        }
+    }
 
     // === LIGHTS: bottom bar — Key left, Fill center, Rim right ===
     lightsLabel.setBounds(8, barY, 46, barH);

@@ -157,6 +157,11 @@ public:
     // Splash screen: only show once per plugin instance (survives editor destroy/recreate)
     bool splashShown = false;
 
+    // Chorus voice cap — public so the viewport's trail-rendering loop
+    // (PluginEditor.cpp) can share the same bound as the DSP, rather than
+    // duplicating the number in two places.
+    static constexpr int kChorusMaxVoices = 5;
+
 private:
     // The synthesis engine
     ElementsSynth synth;
@@ -181,16 +186,39 @@ private:
     int   lastDeformNoiseType = 1;
     float lastDeformRate = 1.0f;
 
-    // Chorus (EXPERIMENTAL, audio-only prototype — see CLAUDE.md).
+    // Chorus (shipping in v1.0.0 — see PluginEditor.cpp for the viewport UI).
     // Single shared mono delay line: both channels read it at independently
     // wobbling delay times (different noise phase), which is what produces
     // stereo width from one mono source, rather than needing separate L/R lines.
-    static constexpr int   kChorusMaxVoices    = 4;
     static constexpr float kChorusMaxSpreadMs  = 40.0f;
     static constexpr float kChorusModRangeMs   = 6.0f;  // max wobble excursion added on top of base delay
 
+    // The delay line is now always fed live audio, even while Chorus is
+    // "off" (chorusActiveSmoothed just crossfades the wet contribution to
+    // 0) — mirrors SynthEngine's filterEnabledMix/Target pattern: never
+    // hard-branch between two code paths, always compute both, blend via a
+    // smoothly-ramped mix. This also means the delay line never goes stale,
+    // so re-enabling always reads recent, musically-continuous audio.
     std::vector<float> chorusDelayLine;
     int    chorusWritePos = 0;
+
+    float chorusActiveSmoothed = 0.0f;  // 0=fully bypassed, 1=fully wet — ramps
+                                         // toward chorusEnabled's target, same
+                                         // role as SynthEngine's filterEnabledMix
+    // Per-tap presence (0..1), indexed by tap v-1 — ramps toward 1 if tap v
+    // should be active (v <= voices-1) else 0, so changing Voices fades a
+    // tap in/out instead of it appearing/disappearing at full gain in one
+    // block.
+    std::array<float, kChorusMaxVoices - 1> chorusTapPresence{};
+
+    // Smoothed toward their APVTS targets each block (see processChorus) —
+    // Spread/Wobble feed directly into the delay-line read position, so an
+    // abrupt step (e.g. mid-drag) reads a discontinuous point in the
+    // buffer's history and clicks; Decay smoothed too for the same reason
+    // applied to tap gain.
+    float chorusSpreadSmoothed = 15.0f;
+    float chorusWobbleSmoothed = 0.4f;
+    float chorusDecaySmoothed  = 0.4f;
     double chorusNoiseTimeL = 0.0;
     double chorusNoiseTimeR = 1000.0;  // arbitrary offset seed so L/R decorrelate
 

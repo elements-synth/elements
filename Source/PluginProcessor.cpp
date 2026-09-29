@@ -286,24 +286,27 @@ ElementsAudioProcessor::createParameterLayout()
                                           : juce::String(v > 0 ? "+" : "") + juce::String(v) + " st"; }));
 
     // =====================================================================
-    // CHORUS (EXPERIMENTAL — audio-only prototype, see CLAUDE.md
-    // "Post-1.0.0 Parking Lot / Chorus (geometry-trail) feature")
-    // Not yet wired to any custom UI; test via the DAW's generic parameter
-    // list. Represents up to 4 duplicate copies of the object receding
-    // along a light's direction: each one arrives later (Spread) and
-    // loses energy (Decay, same exponential-falloff form as Beer-Lambert,
-    // hop-based rather than distance-based since the engine has no spatial
-    // scale). Wobble animates the delay time per tap (via the same noise
-    // machinery Deform uses) — that animation, not the static gain/delay
-    // alone, is what actually produces a chorus character rather than a
-    // fixed comb filter.
+    // CHORUS — models up to kChorusMaxVoices total copies of the object
+    // (the primary object counts as one voice) receding along a light's
+    // direction: each one arrives later (Spread) and loses energy
+    // (Decay, same exponential-falloff form as Beer-Lambert, hop-based
+    // rather than distance-based since the engine has no spatial scale).
+    // Wobble animates the delay time per tap (via the same noise machinery
+    // Deform uses) — that animation, not the static gain/delay alone, is
+    // what actually produces a chorus character rather than a fixed comb
+    // filter. Shipping as part of v1.0.0.
     // =====================================================================
+
+    layout.add(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"chorusEnabled", 1},
+        "Chorus",
+        false));
 
     layout.add(std::make_unique<juce::AudioParameterInt>(
         juce::ParameterID{"chorusVoices", 1},
         "Chorus Voices",
-        0, 4,
-        0));
+        2, kChorusMaxVoices,
+        2));
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"chorusSpread", 1},
@@ -316,7 +319,7 @@ ElementsAudioProcessor::createParameterLayout()
         juce::ParameterID{"chorusDecay", 1},
         "Chorus Decay",
         juce::NormalisableRange<float>(0.0f, 0.9f, 0.01f),
-        0.6f));
+        0.4f));
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"chorusWobble", 1},
@@ -414,6 +417,11 @@ void ElementsAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
         (kChorusMaxSpreadMs * kChorusMaxVoices + kChorusModRangeMs) * 0.001 * sampleRate)) + 8;
     chorusDelayLine.assign(static_cast<size_t>(maxDelaySamples), 0.0f);
     chorusWritePos = 0;
+    chorusActiveSmoothed = 0.0f;
+    chorusTapPresence.fill(0.0f);
+    chorusSpreadSmoothed = apvts.getRawParameterValue("chorusSpread")->load();
+    chorusWobbleSmoothed = apvts.getRawParameterValue("chorusWobble")->load();
+    chorusDecaySmoothed  = apvts.getRawParameterValue("chorusDecay")->load();
 }
 
 void ElementsAudioProcessor::releaseResources()
@@ -655,34 +663,24 @@ void ElementsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     synth.processBlock(channelData, numSamples);
 
     // =========================================================================
-    // COPIAR A STEREO (si hay más de un canal) + CHORUS (EXPERIMENTAL)
+    // COPIAR A STEREO (si hay más de un canal) + CHORUS
     // =========================================================================
 
-    int chorusVoices = static_cast<int>(apvts.getRawParameterValue("chorusVoices")->load());
-
-    if (chorusVoices > 0)
-    {
-        // processChorus writes channel 0 (and channel 1, if stereo) itself —
-        // it reads the mono dry signal from channel 0 before overwriting it.
-        processChorus(buffer, numSamples);
-    }
-    else if (numChannels > 1)
-    {
-        // Nuestro synth genera mono. Sin chorus, simplemente copiamos
-        // el canal izquierdo al derecho.
-        for (int ch = 1; ch < numChannels; ++ch)
-        {
-            buffer.copyFrom(ch, 0, buffer, 0, 0, numSamples);
-        }
-    }
+    // Always run Chorus processing — never hard-branch between an "on" and
+    // "off" code path (mirrors SynthEngine's filterEnabledMix pattern).
+    // processChorus() internally crossfades the wet contribution toward
+    // chorusEnabled's target, so toggling it (or changing Voices) fades
+    // smoothly instead of stepping. It writes channel 0 (and channel 1, if
+    // stereo) itself, reading the mono dry signal from channel 0 first.
+    processChorus(buffer, numSamples);
 }
 
 // ==============================================================================
-// CHORUS (EXPERIMENTAL — audio-only prototype, see CLAUDE.md "Post-1.0.0
-// Parking Lot / Chorus (geometry-trail) feature")
+// CHORUS
 //
-// Models up to 4 duplicate copies of the object receding along a light's
-// direction: each copy arrives later (Spread) and quieter (Decay, an
+// Models up to kChorusMaxVoices total copies of the object (dry signal
+// counts as one) receding along a light's direction: each copy arrives
+// later (Spread) and quieter (Decay, an
 // exponential per-hop falloff — same mathematical form as Beer-Lambert,
 // but hop-based rather than distance-based since the engine has no spatial
 // scale to compute a real distance from). The delay time for each copy is
@@ -703,12 +701,52 @@ void ElementsAudioProcessor::processChorus(juce::AudioBuffer<float>& buffer, int
 
     const int   voices   = juce::jlimit(0, kChorusMaxVoices,
                                 static_cast<int>(apvts.getRawParameterValue("chorusVoices")->load()));
-    const float spreadMs = apvts.getRawParameterValue("chorusSpread")->load();
-    const float decay    = apvts.getRawParameterValue("chorusDecay")->load();
-    const float wobble   = apvts.getRawParameterValue("chorusWobble")->load();
+    const int   trailTapsTarget = voices - 1;  // "Voices" counts the dry signal too
 
     const float sr = static_cast<float>(getSampleRate());
-    const float modRangeSamples = kChorusModRangeMs * 0.001f * sr;
+    float smoothCoeff = 1.0f - std::exp(-static_cast<float>(numSamples) / (0.03f * sr));
+
+    // Spread/Wobble feed directly into the delay-line read position, so even
+    // a smoothed but block-stepped value still jumps once per block (~86
+    // times/sec at typical buffer sizes) — audible as clicking during a
+    // drag. Interpolate per SAMPLE across the block (start->end), same
+    // pattern SynthEngine.cpp uses for spectral amplitude/filter cutoff,
+    // rather than holding one smoothed value for the whole block.
+    float spreadStart = chorusSpreadSmoothed;
+    float wobbleStart = chorusWobbleSmoothed;
+    float decayStart  = chorusDecaySmoothed;
+
+    chorusSpreadSmoothed += (apvts.getRawParameterValue("chorusSpread")->load() - chorusSpreadSmoothed) * smoothCoeff;
+    chorusWobbleSmoothed += (apvts.getRawParameterValue("chorusWobble")->load() - chorusWobbleSmoothed) * smoothCoeff;
+    chorusDecaySmoothed  += (apvts.getRawParameterValue("chorusDecay")->load()  - chorusDecaySmoothed)  * smoothCoeff;
+
+    float spreadEnd = chorusSpreadSmoothed;
+    float wobbleEnd = chorusWobbleSmoothed;
+    float decayEnd  = chorusDecaySmoothed;
+
+    // Chorus on/off crossfade — never hard-branch between two code paths
+    // (mirrors SynthEngine's filterEnabledMix/Target pattern): always
+    // compute wet, blend toward 0/1, so toggling Chorus fades instead of
+    // cutting the wet tail instantly.
+    bool chorusEnabled = apvts.getRawParameterValue("chorusEnabled")->load() > 0.5f;
+    float activeStart = chorusActiveSmoothed;
+    chorusActiveSmoothed += ((chorusEnabled ? 1.0f : 0.0f) - chorusActiveSmoothed) * smoothCoeff;
+    float activeEnd = chorusActiveSmoothed;
+
+    // Per-tap presence crossfade — same reasoning applied to Voices: a tap
+    // beyond the current count fades toward 0 rather than vanishing
+    // instantly, and a newly-added tap fades in rather than appearing at
+    // full gain in one block.
+    std::array<float, kChorusMaxVoices - 1> presenceStart = chorusTapPresence;
+    for (int v = 1; v <= kChorusMaxVoices - 1; ++v)
+    {
+        float target = (v <= trailTapsTarget) ? 1.0f : 0.0f;
+        chorusTapPresence[static_cast<size_t>(v - 1)] +=
+            (target - chorusTapPresence[static_cast<size_t>(v - 1)]) * smoothCoeff;
+    }
+    std::array<float, kChorusMaxVoices - 1> presenceEnd = chorusTapPresence;
+
+    const float modRangeSamplesAbs = kChorusModRangeMs * 0.001f * sr;
 
     // Wobble rate: slow enough to read as a chorus "breathe," not a tremolo.
     constexpr float kWobbleHz = 0.15f;
@@ -731,38 +769,64 @@ void ElementsAudioProcessor::processChorus(juce::AudioBuffer<float>& buffer, int
              + chorusDelayLine[static_cast<size_t>(idx1)] * frac;
     };
 
-    auto computeWetSample = [&](double& noiseTime) -> float
+    // Always compute every possible tap slot (not just up to the current
+    // Voices count) — presence[] mutes the ones that shouldn't be active,
+    // fading in/out smoothly instead of a hard cutoff at trailTapsTarget.
+    auto computeWetSample = [&](double& noiseTime, float spreadMs, float decay, float wobble,
+                                 const std::array<float, kChorusMaxVoices - 1>& presence) -> float
     {
         float wet = 0.0f;
         float gain = 1.0f;
-        for (int v = 1; v <= voices; ++v)
+        for (int v = 1; v <= kChorusMaxVoices - 1; ++v)
         {
-            gain *= decay;  // hop-based exponential falloff (Beer-Lambert-style form)
+            // Decay is the fraction of energy LOST per hop (Beer-Lambert-style
+            // absorption), not retained — so high Decay = dimmer/quieter copies,
+            // matching what the label implies.
+            gain *= (1.0f - decay);
 
             float baseDelayMs = spreadMs * static_cast<float>(v);
+            float baseDelaySamples = baseDelayMs * 0.001f * sr;
+
+            // Cap the wobble excursion at a fraction of this tap's own base
+            // delay, so it can never push delaySamples to/past 0 — crossing
+            // that clamp boundary is a real discontinuity (a kink in the
+            // delay trajectory), not just a level change, and clicks.
+            float modRangeSamples = std::min(modRangeSamplesAbs, baseDelaySamples * 0.9f);
+
             float noise = simplex3D(static_cast<float>(v) * 1.7f,
                                      static_cast<float>(noiseTime), 0.0f);
-            float delaySamples = (baseDelayMs * 0.001f * sr) + wobble * modRangeSamples * noise;
+            float delaySamples = baseDelaySamples + wobble * modRangeSamples * noise;
 
-            wet += gain * readDelayLine(delaySamples);
+            wet += gain * presence[static_cast<size_t>(v - 1)] * readDelayLine(delaySamples);
         }
         return wet;
     };
 
     for (int i = 0; i < numSamples; ++i)
     {
+        float t = static_cast<float>(i) / static_cast<float>(numSamples);
+        float spreadMsNow = spreadStart + (spreadEnd - spreadStart) * t;
+        float wobbleNow   = wobbleStart + (wobbleEnd - wobbleStart) * t;
+        float decayNow    = decayStart  + (decayEnd  - decayStart)  * t;
+        float activeNow   = activeStart + (activeEnd - activeStart) * t;
+
+        std::array<float, kChorusMaxVoices - 1> presenceNow;
+        for (int k = 0; k < kChorusMaxVoices - 1; ++k)
+            presenceNow[static_cast<size_t>(k)] = presenceStart[static_cast<size_t>(k)]
+                + (presenceEnd[static_cast<size_t>(k)] - presenceStart[static_cast<size_t>(k)]) * t;
+
         float dry = left[i];
 
         chorusDelayLine[static_cast<size_t>(chorusWritePos)] = dry;
 
-        float wetL = computeWetSample(chorusNoiseTimeL);
-        float outL = std::tanh(dry + wetL);
+        float wetL = computeWetSample(chorusNoiseTimeL, spreadMsNow, decayNow, wobbleNow, presenceNow);
+        float outL = std::tanh(dry + wetL * activeNow);
         left[i] = outL;
 
         if (right != nullptr)
         {
-            float wetR = computeWetSample(chorusNoiseTimeR);
-            right[i] = std::tanh(dry + wetR);
+            float wetR = computeWetSample(chorusNoiseTimeR, spreadMsNow, decayNow, wobbleNow, presenceNow);
+            right[i] = std::tanh(dry + wetR * activeNow);
         }
 
         chorusWritePos = (chorusWritePos + 1) % lineSize;

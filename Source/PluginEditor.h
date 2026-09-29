@@ -167,7 +167,10 @@ private:
     void createVBOs();
     void destroyVBOs();
     bool compileShader();
-    void renderGeometryPBR();
+    // zOffset: world-space Z translation applied after rotation (Chorus trail
+    // copies, negative = further from camera). copyAlpha: opacity multiplier
+    // for receding copies (1.0 = primary object, unfaded).
+    void renderGeometryPBR(float zOffset = 0.0f, float copyAlpha = 1.0f);
 
     // Displaced sphere (simplex noise deformation)
     std::vector<PBRVertex> baseSphereVerts;
@@ -1392,6 +1395,14 @@ private:
     juce::Label rotXValue, rotYValue, rotZValue;
     juce::TextButton resetRotationButton{"Reset"};
 
+    // Chorus (floating inside viewport, top-left — hides while GEOMETRIES
+    // accordion panel is open, since they'd otherwise overlap). Not a
+    // geometry/material property — arranges copies of the object in space,
+    // same conceptual family as Rotation above.
+    juce::ToggleButton chorusEnableButton{"Chorus"};
+    juce::Label  chorusVoicesLabel, chorusSpreadLabel, chorusDecayLabel, chorusWobbleLabel;
+    juce::Slider chorusVoicesSlider, chorusSpreadSlider, chorusDecaySlider, chorusWobbleSlider;
+
     // === BOTTOM: Piano ===
     PianoRoll pianoRoll;
     juce::Label transposeLabel;
@@ -1448,6 +1459,7 @@ private:
     // destroyed FIRST, before the widgets they reference)
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
+    using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<SliderAttachment> cutoffAttachment;
     std::unique_ptr<SliderAttachment> resonanceAttachment;
     std::unique_ptr<ComboBoxAttachment> filterTypeAttachment;
@@ -1462,6 +1474,11 @@ private:
     std::unique_ptr<SliderAttachment> ampReleaseAttachment;
     std::unique_ptr<SliderAttachment>    thicknessAttachment;
     std::unique_ptr<SliderAttachment>    deformAttachment;
+    std::unique_ptr<ButtonAttachment>    chorusEnableAttachment;
+    std::unique_ptr<SliderAttachment>    chorusVoicesAttachment;
+    std::unique_ptr<SliderAttachment>    chorusSpreadAttachment;
+    std::unique_ptr<SliderAttachment>    chorusDecayAttachment;
+    std::unique_ptr<SliderAttachment>    chorusWobbleAttachment;
     std::unique_ptr<ComboBoxAttachment>  noiseTypeAttachment;
     std::unique_ptr<SliderAttachment>    freqAttachment;
     std::unique_ptr<SliderAttachment>    rateAttachment;
