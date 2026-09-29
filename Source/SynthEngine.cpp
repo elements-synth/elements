@@ -298,9 +298,15 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
         }
     }
 
-    // Smooth filter parameters toward targets (per-block, but with gentler coefficient)
-    // Using smaller step to reduce zipper noise
-    float filterSmoothCoeff = 0.02f;  // Gentler smoothing
+    // Smooth filter parameters toward targets. Was a fixed 0.02-per-BLOCK-CALL
+    // coefficient with no sample-rate/block-size correction — at a typical
+    // 512-sample block that's ~1.7s to settle (150 blocks to ~95%), which
+    // reads as sluggish lag on the Cutoff knob, not the "avoid zipper noise"
+    // behavior the old comment described. Replaced with the same
+    // block-size-independent coefficient pattern used everywhere else in
+    // this file (voiceScaleSmoothed, mixAmountSmooth, etc.), targeting a
+    // real ~12ms time constant regardless of host buffer size.
+    float filterSmoothCoeff = 1.0f - std::exp(-static_cast<float>(numSamples) / (0.012f * static_cast<float>(sampleRate)));
     filterCutoff += (filterCutoffTarget - filterCutoff) * filterSmoothCoeff;
     filterResonance += (filterResonanceTarget - filterResonance) * filterSmoothCoeff;
 
