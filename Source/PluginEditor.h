@@ -167,10 +167,20 @@ private:
     void createVBOs();
     void destroyVBOs();
     bool compileShader();
-    // zOffset: world-space Z translation applied after rotation (Chorus trail
-    // copies, negative = further from camera). copyAlpha: opacity multiplier
-    // for receding copies (1.0 = primary object, unfaded).
-    void renderGeometryPBR(float zOffset = 0.0f, float copyAlpha = 1.0f);
+
+    // One entry per drawn copy (primary object + Chorus trail copies).
+    // zOffset: world-space Z translation applied after rotation (negative =
+    // further from camera). copyAlpha: opacity multiplier (1.0 = unfaded).
+    struct GeometryInstance { float zOffset; float copyAlpha; };
+
+    // Binds shader/VBO/texture and sets all material/light/camera uniforms
+    // ONCE, then loops only the per-instance varying uniforms (model matrix,
+    // alpha) and the draw call — Chorus can mean up to 5 draws/frame, and
+    // they share everything except position/alpha, so redoing the full
+    // glUseProgram/glBindTexture/glBindBuffer/uniform-location-lookup dance
+    // per copy was pure waste (multiplied again by however many plugin
+    // instances are loaded).
+    void renderGeometryPBR(const GeometryInstance* instances, int instanceCount);
 
     // Displaced sphere (simplex noise deformation)
     std::vector<PBRVertex> baseSphereVerts;

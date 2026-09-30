@@ -239,11 +239,16 @@ void Viewport3D::renderOpenGL()
     if (shaderReady)
     {
         // Chorus trail: duplicate copies of the object receding along a
-        // fixed world-space Z axis (see CLAUDE.md "Post-1.0.0 Parking Lot" /
-        // this feature's design discussion) — not tied to any light's
-        // direction, matches how the light positions themselves are fixed
-        // world-space vectors. Draw farthest-first so alpha blending
-        // composites correctly, primary object (unfaded, zOffset=0) last.
+        // fixed world-space Z axis (see CLAUDE.md "Chorus" section) — not
+        // tied to any light's direction, matches how the light positions
+        // themselves are fixed world-space vectors. Built as a single
+        // instance list (farthest first, primary object last for correct
+        // alpha blending) and handed to renderGeometryPBR() in one call, so
+        // the shader/VBO/texture/uniform-location setup happens once per
+        // frame no matter how many copies are drawn.
+        GeometryInstance instances[ElementsAudioProcessor::kChorusMaxVoices];  // primary + up to (kChorusMaxVoices-1) trail copies
+        int instanceCount = 0;
+
         bool chorusOn = processor.apvts.getRawParameterValue("chorusEnabled")->load() > 0.5f;
         if (chorusOn)
         {
@@ -271,11 +276,13 @@ void Viewport3D::renderOpenGL()
                 // Decay = fraction of energy lost per hop, so high Decay
                 // fades copies out faster (matches the audio-side convention).
                 float alpha = std::pow(1.0f - decay, static_cast<float>(v));
-                renderGeometryPBR(zOffset, alpha);
+                instances[instanceCount++] = { zOffset, alpha };
             }
         }
 
-        renderGeometryPBR();
+        instances[instanceCount++] = { 0.0f, 1.0f };  // primary object, unfaded, last
+
+        renderGeometryPBR(instances, instanceCount);
     }
     else
     {
@@ -1335,9 +1342,12 @@ void Viewport3D::getCameraPosition(float* outPos, float tiltDeg, float rotYDeg, 
     outPos[2] =  cy * cx * dist;
 }
 
-void Viewport3D::renderGeometryPBR(float zOffset, float copyAlpha)
+void Viewport3D::renderGeometryPBR(const GeometryInstance* instances, int instanceCount)
 {
     using namespace juce::gl;
+
+    if (instanceCount <= 0)
+        return;
 
     // Build matrices
     float aspect = getWidth() / static_cast<float>(std::max(1, getHeight()));
@@ -1446,97 +1456,98 @@ void Viewport3D::renderGeometryPBR(float zOffset, float copyAlpha)
             albedo[c] = lerpf(albedo[c], mat.albedoSecondary[c], warmthFactor);
     }
 
-    // Enable alpha blending for transparent materials, or for a faded
-    // Chorus trail copy (opaque materials need this too, since they have
-    // no other alpha path — u_copyAlpha is what fades them).
+    // isTransparent is material-derived, so it's the same for every instance
+    // in this batch (they're all copies of the same object/material) — if
+    // true, blend can just stay on for the whole batch. copyAlpha varies per
+    // instance though (that's decided inside the loop below).
     bool isTransparent = mat.transparency > 0.0f;
-    bool blendEnabled = isTransparent || copyAlpha < 0.999f;
-    if (blendEnabled)
+    if (isTransparent)
     {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
-    // Bind environment map (equirectangular 2D texture) to texture unit 0
+    // Bind environment map (equirectangular 2D texture) to texture unit 0 — once.
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, envTexture);
 
-    // === Activate shader ===
+    // === Activate shader — once for the whole batch ===
     pbrShader->use();
+    GLuint prog = pbrShader->getProgramID();
 
-    // Set uniforms
-    auto setMat4 = [&](const char* name, const float* m) {
-        auto loc = glGetUniformLocation(pbrShader->getProgramID(), name);
-        if (loc >= 0) glUniformMatrix4fv(loc, 1, GL_FALSE, m);
-    };
-    auto setMat3 = [&](const char* name, const float* m) {
-        auto loc = glGetUniformLocation(pbrShader->getProgramID(), name);
-        if (loc >= 0) glUniformMatrix3fv(loc, 1, GL_FALSE, m);
-    };
-    auto setVec3 = [&](const char* name, float x, float y, float z) {
-        auto loc = glGetUniformLocation(pbrShader->getProgramID(), name);
-        if (loc >= 0) glUniform3f(loc, x, y, z);
-    };
-    auto setFloat = [&](const char* name, float v) {
-        auto loc = glGetUniformLocation(pbrShader->getProgramID(), name);
-        if (loc >= 0) glUniform1f(loc, v);
-    };
-    auto setInt = [&](const char* name, int v) {
-        auto loc = glGetUniformLocation(pbrShader->getProgramID(), name);
-        if (loc >= 0) glUniform1i(loc, v);
-    };
+    // Resolve every uniform location ONCE per frame, not once per draw call —
+    // glGetUniformLocation is a string lookup, and with Chorus this function
+    // can be called for up to 5 copies; doing this per-copy (as before) meant
+    // up to 5x the redundant lookups every repaint, times however many
+    // plugin instances are loaded.
+    auto loc = [&](const char* name) { return glGetUniformLocation(prog, name); };
 
-    // Chorus trail: translate along world-space Z, applied AFTER rotation
-    // (rotationMatrix's translation column is otherwise always identity),
-    // so the copy keeps the same orientation and just sits further back.
-    float instanceModelMatrix[16];
-    for (int i = 0; i < 16; ++i)
-        instanceModelMatrix[i] = rotationMatrix[i];
-    instanceModelMatrix[14] += zOffset;
+    GLint locModelMatrix  = loc("u_modelMatrix");   // varies per instance
+    GLint locCopyAlpha    = loc("u_copyAlpha");     // varies per instance
+    GLint locViewMatrix   = loc("u_viewMatrix");
+    GLint locProjMatrix   = loc("u_projMatrix");
+    GLint locNormalMatrix = loc("u_normalMatrix");
+    GLint locAlbedo       = loc("u_albedo");
+    GLint locMetallic     = loc("u_metallic");
+    GLint locRoughness    = loc("u_roughness");
+    GLint locCameraPos    = loc("u_cameraPos");
+    GLint locIor          = loc("u_ior");
+    GLint locTransparency = loc("u_transparency");
+    GLint locSssStrength  = loc("u_sssStrength");
+    GLint locSssRadius    = loc("u_sssRadius");
+    GLint locAbsorptionColor = loc("u_absorptionColor");
+    GLint locThickness    = loc("u_thickness");
+    GLint locBandingStrength  = loc("u_bandingStrength");
+    GLint locBandingFrequency = loc("u_bandingFrequency");
+    GLint locEnvMap       = loc("u_envMap");
 
-    setMat4("u_modelMatrix", instanceModelMatrix);
-    setMat4("u_viewMatrix", viewMatrix);
-    setMat4("u_projMatrix", projMatrix);
-    setMat3("u_normalMatrix", normalMatrix);
+    struct LightLoc { GLint pos, color, enabled, intensity; };
+    LightLoc lightLocs[3];
+    for (int i = 0; i < 3; ++i)
+    {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "u_lightPos[%d]", i);       lightLocs[i].pos       = loc(buf);
+        std::snprintf(buf, sizeof(buf), "u_lightColor[%d]", i);     lightLocs[i].color     = loc(buf);
+        std::snprintf(buf, sizeof(buf), "u_lightEnabled[%d]", i);   lightLocs[i].enabled   = loc(buf);
+        std::snprintf(buf, sizeof(buf), "u_lightIntensity[%d]", i); lightLocs[i].intensity = loc(buf);
+    }
 
-    setVec3("u_albedo", albedo[0], albedo[1], albedo[2]);
-    setFloat("u_metallic", mat.metallic);
-    setFloat("u_roughness", mat.roughness);
-    setVec3("u_cameraPos", cameraPos[0], cameraPos[1], cameraPos[2]);
+    // Set every uniform that's the SAME for all instances in this batch — once.
+    if (locViewMatrix >= 0)   glUniformMatrix4fv(locViewMatrix, 1, GL_FALSE, viewMatrix);
+    if (locProjMatrix >= 0)   glUniformMatrix4fv(locProjMatrix, 1, GL_FALSE, projMatrix);
+    if (locNormalMatrix >= 0) glUniformMatrix3fv(locNormalMatrix, 1, GL_FALSE, normalMatrix);
 
-    // New material uniforms
-    setFloat("u_ior", mat.ior);
-    setFloat("u_transparency", mat.transparency);
-    setFloat("u_sssStrength", mat.sssStrength);
-    setFloat("u_sssRadius", mat.sssRadius);
-    setVec3("u_absorptionColor", mat.absorptionColor[0], mat.absorptionColor[1], mat.absorptionColor[2]);
-    setFloat("u_thickness", currentThickness);
-    setFloat("u_copyAlpha", copyAlpha);
-    setFloat("u_bandingStrength",  mat.bandingStrength);
-    setFloat("u_bandingFrequency", mat.bandingFrequency);
+    if (locAlbedo >= 0)    glUniform3f(locAlbedo, albedo[0], albedo[1], albedo[2]);
+    if (locMetallic >= 0)  glUniform1f(locMetallic, mat.metallic);
+    if (locRoughness >= 0) glUniform1f(locRoughness, mat.roughness);
+    if (locCameraPos >= 0) glUniform3f(locCameraPos, cameraPos[0], cameraPos[1], cameraPos[2]);
 
-    // Environment cubemap sampler
-    setInt("u_envMap", 0);  // Texture unit 0
+    if (locIor >= 0)          glUniform1f(locIor, mat.ior);
+    if (locTransparency >= 0) glUniform1f(locTransparency, mat.transparency);
+    if (locSssStrength >= 0)  glUniform1f(locSssStrength, mat.sssStrength);
+    if (locSssRadius >= 0)    glUniform1f(locSssRadius, mat.sssRadius);
+    if (locAbsorptionColor >= 0)
+        glUniform3f(locAbsorptionColor, mat.absorptionColor[0], mat.absorptionColor[1], mat.absorptionColor[2]);
+    if (locThickness >= 0)         glUniform1f(locThickness, currentThickness);
+    if (locBandingStrength >= 0)   glUniform1f(locBandingStrength, mat.bandingStrength);
+    if (locBandingFrequency >= 0)  glUniform1f(locBandingFrequency, mat.bandingFrequency);
 
-    // Set light uniforms
+    if (locEnvMap >= 0) glUniform1i(locEnvMap, 0);  // Texture unit 0
+
     for (int i = 0; i < 3; ++i)
     {
         bool enabled = processor.isLightEnabled(i);
         int sourceIdx = processor.getLightSource(i);
         const float* col = lightColors[sourceIdx];
 
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), "u_lightPos[%d]", i);
-        setVec3(buf, lightPositions[i][0], lightPositions[i][1], lightPositions[i][2]);
-
-        std::snprintf(buf, sizeof(buf), "u_lightColor[%d]", i);
-        setVec3(buf, col[0], col[1], col[2]);
-
-        std::snprintf(buf, sizeof(buf), "u_lightEnabled[%d]", i);
-        setInt(buf, enabled ? 1 : 0);
-
-        std::snprintf(buf, sizeof(buf), "u_lightIntensity[%d]", i);
-        setFloat(buf, processor.getSynth().getLightIntensity(i));
+        if (lightLocs[i].pos >= 0)
+            glUniform3f(lightLocs[i].pos, lightPositions[i][0], lightPositions[i][1], lightPositions[i][2]);
+        if (lightLocs[i].color >= 0)
+            glUniform3f(lightLocs[i].color, col[0], col[1], col[2]);
+        if (lightLocs[i].enabled >= 0)
+            glUniform1i(lightLocs[i].enabled, enabled ? 1 : 0);
+        if (lightLocs[i].intensity >= 0)
+            glUniform1f(lightLocs[i].intensity, processor.getSynth().getLightIntensity(i));
     }
 
     // Select VBO
@@ -1582,27 +1593,60 @@ void Viewport3D::renderGeometryPBR(float zOffset, float copyAlpha)
                               sizeof(PBRVertex), reinterpret_cast<void*>(offsetof(PBRVertex, normal)));
     }
 
-    // Draw with proper face ordering for transparency
+    // Per-instance: only the model matrix, alpha, and (for opaque materials,
+    // where blend wasn't already left on above) blend state actually differ
+    // between the primary object and each Chorus trail copy — everything
+    // else was already bound/set once above.
     glEnable(GL_CULL_FACE);
 
-    if (isTransparent)
+    for (int inst = 0; inst < instanceCount; ++inst)
     {
-        // Two-pass rendering for transparent geometry:
-        // Pass 1: back faces (interior) with depth write off
-        glCullFace(GL_FRONT);       // Cull front → draw back faces
-        glDepthMask(GL_FALSE);      // Don't write depth (back faces shouldn't occlude)
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+        float zOffset   = instances[inst].zOffset;
+        float copyAlpha = instances[inst].copyAlpha;
 
-        // Pass 2: front faces (exterior) on top
-        glCullFace(GL_BACK);        // Cull back → draw front faces
-        glDepthMask(GL_TRUE);       // Restore depth write
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount);
-    }
-    else
-    {
-        // Opaque: single pass, cull back faces
-        glCullFace(GL_BACK);
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+        // Chorus trail: translate along world-space Z, applied AFTER rotation
+        // (rotationMatrix's translation column is otherwise always identity),
+        // so the copy keeps the same orientation and just sits further back.
+        float instanceModelMatrix[16];
+        for (int i = 0; i < 16; ++i)
+            instanceModelMatrix[i] = rotationMatrix[i];
+        instanceModelMatrix[14] += zOffset;
+
+        if (locModelMatrix >= 0) glUniformMatrix4fv(locModelMatrix, 1, GL_FALSE, instanceModelMatrix);
+        if (locCopyAlpha >= 0)   glUniform1f(locCopyAlpha, copyAlpha);
+
+        // Opaque materials have no other alpha path, so a faded trail copy
+        // (copyAlpha < 1) still needs blend on for just this instance.
+        // Transparent materials already left blend on for the whole batch.
+        bool needsOwnBlend = !isTransparent && copyAlpha < 0.999f;
+        if (needsOwnBlend)
+        {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+
+        if (isTransparent)
+        {
+            // Two-pass rendering for transparent geometry:
+            // Pass 1: back faces (interior) with depth write off
+            glCullFace(GL_FRONT);       // Cull front → draw back faces
+            glDepthMask(GL_FALSE);      // Don't write depth (back faces shouldn't occlude)
+            glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+
+            // Pass 2: front faces (exterior) on top
+            glCullFace(GL_BACK);        // Cull back → draw front faces
+            glDepthMask(GL_TRUE);       // Restore depth write
+            glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+        }
+        else
+        {
+            // Opaque: single pass, cull back faces
+            glCullFace(GL_BACK);
+            glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+        }
+
+        if (needsOwnBlend)
+            glDisable(GL_BLEND);
     }
 
     glDisable(GL_CULL_FACE);
@@ -1615,7 +1659,7 @@ void Viewport3D::renderGeometryPBR(float zOffset, float copyAlpha)
 
     // Unbind environment map and disable blend
     glBindTexture(GL_TEXTURE_2D, 0);
-    if (blendEnabled)
+    if (isTransparent)
     {
         glDisable(GL_BLEND);
     }
