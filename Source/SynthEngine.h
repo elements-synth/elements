@@ -21,6 +21,16 @@
 // ==============================================================================
 
 constexpr int WAVETABLE_SIZE = 2048;
+
+// Band-limited wavetable bands. One table per octave: band 0 serves notes below
+// 32 Hz, band i serves [32*2^(i-1), 32*2^i) Hz, and the last band everything
+// from 8192 Hz up. Each table holds every harmonic that fits below ~0.45*sr for
+// the TOP of its band (capped at MAX_TABLE_HARMONICS), so the oscillator always
+// has content up to roughly Nyquist for the filter to act on, whatever the
+// material.
+constexpr int NUM_WAVETABLE_BANDS = 10;
+constexpr float WAVETABLE_BAND0_TOP_HZ = 32.0f;
+constexpr int MAX_TABLE_HARMONICS = 512;
 constexpr int MAX_POLYPHONY = 8;
 
 // ==============================================================================
@@ -160,29 +170,35 @@ struct ADSREnvelope
 // ==============================================================================
 
 /**
- * Set of band-limited wavetables.
- *
- * Contiene 5 wavetables, uno para cada rango de frecuencia.
- * Esto evita aliasing (ruido de alta frecuencia no deseado).
+ * Set of band-limited wavetables, one per octave band (see NUM_WAVETABLE_BANDS).
+ * Higher bands carry fewer harmonics so nothing aliases past Nyquist.
  */
 struct WavetableSet
 {
-    std::array<float, WAVETABLE_SIZE> low;
-    std::array<float, WAVETABLE_SIZE> midLow;
-    std::array<float, WAVETABLE_SIZE> mid;
-    std::array<float, WAVETABLE_SIZE> midHigh;
-    std::array<float, WAVETABLE_SIZE> high;
+    std::array<std::array<float, WAVETABLE_SIZE>, NUM_WAVETABLE_BANDS> bands;
 
-    /**
-     * Get the appropriate wavetable for a frequency.
-     */
+    /** Index of the band whose table is band-limited for `freq`. */
+    static int bandForFrequency(float freq)
+    {
+        int band = 0;
+        float top = WAVETABLE_BAND0_TOP_HZ;
+        while (band < NUM_WAVETABLE_BANDS - 1 && freq >= top)
+        {
+            ++band;
+            top *= 2.0f;
+        }
+        return band;
+    }
+
+    /** Highest frequency (Hz) the given band's table is built to serve. */
+    static float bandTopFrequency(int band)
+    {
+        return WAVETABLE_BAND0_TOP_HZ * static_cast<float>(1 << band);
+    }
+
     const std::array<float, WAVETABLE_SIZE>& getForFrequency(float freq) const
     {
-        if (freq < 200.0f) return low;
-        if (freq < 400.0f) return midLow;
-        if (freq < 800.0f) return mid;
-        if (freq < 1600.0f) return midHigh;
-        return high;
+        return bands[static_cast<size_t>(bandForFrequency(freq))];
     }
 };
 
@@ -199,20 +215,26 @@ struct WavetableSet
 class WavetableGenerator
 {
 public:
-    WavetableGenerator() = default;
+    WavetableGenerator();
 
     /**
-     * Generate a single wavetable from spectrum.
+     * Number of harmonics (1..H) a table for notes up to `topFreq` can hold
+     * without aliasing: floor(0.45*sr / topFreq), capped at MAX_TABLE_HARMONICS.
+     */
+    static int harmonicLimit(float topFreq, float sampleRate);
+
+    /**
+     * Generate a single band-limited wavetable for notes up to `topFreq`.
      *
-     * El mapeo espectro → armónicos:
-     * - 380-500nm (azul/violeta) → armónicos 8-20 (brillo)
-     * - 500-600nm (verde/amarillo) → armónicos 3-8 (cuerpo)
-     * - 600-780nm (rojo/naranja) → armónicos 1-3 (calidez)
+     * Spectrum -> harmonic mapping ("body"): the first min(BODY_HARMONICS, H)
+     * harmonics carry the material's spectrum (harmonic 1 = red end, last body
+     * harmonic = blue end). Above the body, a material-independent ~1/h tail
+     * fills the table up to H, so a filter always has high-frequency content
+     * to shape regardless of material or note.
      */
     void generateFromSpectrum(const std::array<float, NUM_WAVELENGTHS>& spectrum,
-                              float fundamentalFreq,
+                              float topFreq,
                               float sampleRate,
-                              int maxHarmonics,
                               std::array<float, WAVETABLE_SIZE>& output,
                               const std::array<float, NUM_WAVELENGTHS>* harmonicPhases = nullptr);
 
@@ -229,17 +251,37 @@ public:
                                 WavetableSet& output,
                                 const std::array<float, NUM_WAVELENGTHS>* harmonicPhases = nullptr);
 
-private:
-    /**
-     * Apply soft saturation for analog warmth.
-     * tanh(x * drive) / tanh(drive)
-     */
-    void applySoftSaturation(std::array<float, WAVETABLE_SIZE>& wavetable, float drive = 1.5f);
+    /** Number of harmonics that carry the material's spectrum (the "body"). */
+    static constexpr int BODY_HARMONICS = 20;
 
-    /**
-     * Normalize wavetable to -1.0 to 1.0 range.
-     */
-    void normalize(std::array<float, WAVETABLE_SIZE>& wavetable);
+    /** Amplitude of the first tail harmonic, before the natural 1/h rolloff. */
+    static constexpr float TAIL_LEVEL = 0.03f;
+
+private:
+    using Spectrum = std::array<float, WAVETABLE_SIZE>;
+
+    // In-place radix-2 complex FFT. inverse=true uses the opposite twiddle
+    // sign and applies no 1/N scaling.
+    void fft(Spectrum& re, Spectrum& im, bool inverse) const;
+
+    // Material-shaped, saturated, peak-normalised body for `bodyHarmonics`
+    // harmonics, returned as its DFT (re/im).
+    void buildBodySpectrum(const std::array<float, NUM_WAVELENGTHS>& spectrum,
+                           int bodyHarmonics,
+                           const std::array<float, NUM_WAVELENGTHS>* harmonicPhases,
+                           Spectrum& bodyRe, Spectrum& bodyIm);
+
+    // Band-limit a body spectrum to H harmonics, add the tail above
+    // bodyHarmonics, inverse transform and peak-normalise into `output`.
+    void finishTable(const Spectrum& bodyRe, const Spectrum& bodyIm,
+                     int bodyHarmonics, int harmonicLimit, Spectrum& output);
+
+    // Scratch buffers (the generator runs on the audio thread: no allocation).
+    Spectrum re, im;
+    Spectrum sharedBodyRe, sharedBodyIm;
+    std::array<float, WAVETABLE_SIZE / 2> twiddleCos, twiddleSin;
+    std::array<uint16_t, WAVETABLE_SIZE> bitReverse;
+    std::array<float, MAX_TABLE_HARMONICS + 1> tailPhaseSin, tailPhaseCos;
 };
 
 // ==============================================================================
@@ -437,18 +479,18 @@ public:
     const std::array<float, NUM_WAVELENGTHS>& getSpectrumB() const { return spectrumB; }
 
     // --- Wavetable Diagnostics (for regen/race verification, e.g. ElementsTests) ---
-    // Cheap fingerprint of currentWavetablesA/B's mid band — changes iff
+    // Cheap fingerprint of currentWavetablesA/B's 256-512Hz band (index 4) — changes iff
     // regenerateWavetables() actually rebuilt the tables with different content.
     float getWavetableChecksumA() const
     {
         float sum = 0.0f;
-        for (float v : currentWavetablesA.mid) sum += std::abs(v);
+        for (float v : currentWavetablesA.bands[4]) sum += std::abs(v);
         return sum;
     }
     float getWavetableChecksumB() const
     {
         float sum = 0.0f;
-        for (float v : currentWavetablesB.mid) sum += std::abs(v);
+        for (float v : currentWavetablesB.bands[4]) sum += std::abs(v);
         return sum;
     }
     int getRegenCount() const { return regenCount; }

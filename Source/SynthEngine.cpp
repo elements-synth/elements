@@ -95,43 +95,108 @@ void BiquadFilter::reset()
 // WAVETABLE GENERATOR IMPLEMENTATION
 // ==============================================================================
 
-void WavetableGenerator::generateFromSpectrum(
-    const std::array<float, NUM_WAVELENGTHS>& spectrum,
-    float fundamentalFreq,
-    float sampleRate,
-    int maxHarmonics,
-    std::array<float, WAVETABLE_SIZE>& output,
-    const std::array<float, NUM_WAVELENGTHS>* harmonicPhases)
+WavetableGenerator::WavetableGenerator()
 {
-    // Clear output
-    std::fill(output.begin(), output.end(), 0.0f);
+    constexpr double PI = 3.14159265358979323846;
+    for (int i = 0; i < WAVETABLE_SIZE / 2; ++i)
+    {
+        twiddleCos[static_cast<size_t>(i)] = static_cast<float>(std::cos(2.0 * PI * i / WAVETABLE_SIZE));
+        twiddleSin[static_cast<size_t>(i)] = static_cast<float>(std::sin(2.0 * PI * i / WAVETABLE_SIZE));
+    }
 
-    // Calculate maximum harmonic before Nyquist
-    float nyquist = sampleRate / 2.0f;
-    int nyquistLimit = static_cast<int>(nyquist / fundamentalFreq);
-    int maxHarmonic = std::min(maxHarmonics, nyquistLimit);
-    if (maxHarmonic < 1) maxHarmonic = 1;
+    // Deterministic pseudo-random phase per harmonic (integer hash, fixed seed).
+    for (int h = 0; h <= MAX_TABLE_HARMONICS; ++h)
+    {
+        uint32_t x = static_cast<uint32_t>(h) * 2654435761u;
+        x ^= x >> 15; x *= 2246822519u; x ^= x >> 13; x *= 3266489917u; x ^= x >> 16;
+        const double phi = 2.0 * PI * (static_cast<double>(x) / 4294967296.0);
+        tailPhaseSin[static_cast<size_t>(h)] = static_cast<float>(std::sin(phi));
+        tailPhaseCos[static_cast<size_t>(h)] = static_cast<float>(std::cos(phi));
+    }
 
+    int bits = 0;
+    while ((1 << bits) < WAVETABLE_SIZE) ++bits;
+    for (int i = 0; i < WAVETABLE_SIZE; ++i)
+    {
+        int r = 0;
+        for (int b = 0; b < bits; ++b)
+            if (i & (1 << b)) r |= 1 << (bits - 1 - b);
+        bitReverse[static_cast<size_t>(i)] = static_cast<uint16_t>(r);
+    }
+}
+
+void WavetableGenerator::fft(Spectrum& xr, Spectrum& xi, bool inverse) const
+{
+    for (int i = 0; i < WAVETABLE_SIZE; ++i)
+    {
+        int j = bitReverse[static_cast<size_t>(i)];
+        if (j > i)
+        {
+            std::swap(xr[static_cast<size_t>(i)], xr[static_cast<size_t>(j)]);
+            std::swap(xi[static_cast<size_t>(i)], xi[static_cast<size_t>(j)]);
+        }
+    }
+
+    const float sign = inverse ? 1.0f : -1.0f;
+    for (int len = 2; len <= WAVETABLE_SIZE; len <<= 1)
+    {
+        const int half = len / 2;
+        const int step = WAVETABLE_SIZE / len;
+        for (int start = 0; start < WAVETABLE_SIZE; start += len)
+        {
+            for (int k = 0; k < half; ++k)
+            {
+                const float wr = twiddleCos[static_cast<size_t>(k * step)];
+                const float wi = sign * twiddleSin[static_cast<size_t>(k * step)];
+                const size_t a = static_cast<size_t>(start + k);
+                const size_t b = static_cast<size_t>(start + k + half);
+                const float tr = xr[b] * wr - xi[b] * wi;
+                const float ti = xr[b] * wi + xi[b] * wr;
+                xr[b] = xr[a] - tr;
+                xi[b] = xi[a] - ti;
+                xr[a] += tr;
+                xi[a] += ti;
+            }
+        }
+    }
+}
+
+int WavetableGenerator::harmonicLimit(float topFreq, float sampleRate)
+{
+    int limit = static_cast<int>(0.45f * sampleRate / topFreq);
+    return clamp(limit, 1, MAX_TABLE_HARMONICS);
+}
+
+void WavetableGenerator::buildBodySpectrum(
+    const std::array<float, NUM_WAVELENGTHS>& spectrum,
+    int bodyHarmonics,
+    const std::array<float, NUM_WAVELENGTHS>* harmonicPhases,
+    Spectrum& bodyRe, Spectrum& bodyIm)
+{
     // ==========================================================================
-    // HIGH-RESOLUTION SPECTRAL → HARMONIC MAPPING
+    // HIGH-RESOLUTION SPECTRAL -> HARMONIC MAPPING
     //
-    // Each harmonic maps to a specific wavelength via continuous interpolation:
-    //   Harmonic 1 (fundamental) → red wavelengths (750nm) → warmth
-    //   Harmonic N (highest)     → blue wavelengths (400nm) → brightness
+    // Each body harmonic maps to a specific wavelength via continuous interpolation:
+    //   Harmonic 1 (fundamental)  -> red wavelengths (750nm) -> warmth
+    //   Harmonic N (last of body) -> blue wavelengths (400nm) -> brightness
     //
     // This preserves the full 50-wavelength spectral shape instead of
     // collapsing it to 3 bands. When rotation changes the spectrum,
-    // EVERY harmonic responds individually → audible timbre changes.
+    // EVERY harmonic responds individually -> audible timbre changes.
+    //
+    // Built as an inverse DFT: bin h holds a*e^(j*phase), so the imaginary part
+    // of the transform is sum(a * sin(2*pi*h*n/N + phase)).
     // ==========================================================================
 
-    constexpr float TWO_PI = 2.0f * 3.14159265359f;
+    std::fill(re.begin(), re.end(), 0.0f);
+    std::fill(im.begin(), im.end(), 0.0f);
 
-    for (int h = 1; h <= maxHarmonic; ++h)
+    for (int h = 1; h <= bodyHarmonics; ++h)
     {
-        // Map harmonic to spectrum position: h=1 → red (end), h=max → blue (start)
+        // Map harmonic to spectrum position: h=1 -> red (end), h=max -> blue (start)
         float specPos;
-        if (maxHarmonic > 1)
-            specPos = 1.0f - static_cast<float>(h - 1) / static_cast<float>(maxHarmonic - 1);
+        if (bodyHarmonics > 1)
+            specPos = 1.0f - static_cast<float>(h - 1) / static_cast<float>(bodyHarmonics - 1);
         else
             specPos = 0.5f;
 
@@ -141,16 +206,13 @@ void WavetableGenerator::generateFromSpectrum(
         int i1 = std::min(i0 + 1, NUM_WAVELENGTHS - 1);
         float frac = idx - static_cast<float>(i0);
 
-        // Interpolate amplitude from spectrum
         float specAmp = spectrum[static_cast<size_t>(i0)] * (1.0f - frac)
                        + spectrum[static_cast<size_t>(i1)] * frac;
 
         // Emphasis curve: exaggerate spectral differences for audible contrast
-        // Higher exponent = more contrast between transparent and opaque regions
         specAmp = std::pow(specAmp, 3.0f);
 
         // Natural harmonic rolloff (higher harmonics are quieter)
-        // Moderate rolloff: preserves natural sound while allowing spectral character
         float rolloff = 1.0f / (1.0f + (h - 1) * 0.05f);
         float amplitude = specAmp * rolloff;
 
@@ -162,17 +224,99 @@ void WavetableGenerator::generateFromSpectrum(
 
         if (amplitude > 0.001f)
         {
-            for (int i = 0; i < WAVETABLE_SIZE; ++i)
-            {
-                float phase = static_cast<float>(i) / WAVETABLE_SIZE * TWO_PI * h;
-                output[i] += amplitude * std::sin(phase + phaseOffset);
-            }
+            re[static_cast<size_t>(h)] = amplitude * std::cos(phaseOffset);
+            im[static_cast<size_t>(h)] = amplitude * std::sin(phaseOffset);
         }
     }
 
-    // Apply soft saturation and normalize
-    applySoftSaturation(output, 1.5f);
-    normalize(output);
+    fft(re, im, true);
+
+    // Soft saturation (tanh) then peak-normalise, as before.
+    constexpr float drive = 1.5f;
+    const float tanhDrive = std::tanh(drive);
+    float maxVal = 0.0f;
+    for (int i = 0; i < WAVETABLE_SIZE; ++i)
+    {
+        const size_t u = static_cast<size_t>(i);
+        re[u] = std::tanh(im[u] * drive) / tanhDrive;
+        maxVal = std::max(maxVal, std::abs(re[u]));
+    }
+    const float norm = maxVal > 0.0f ? 1.0f / maxVal : 1.0f;
+    for (int i = 0; i < WAVETABLE_SIZE; ++i)
+    {
+        bodyRe[static_cast<size_t>(i)] = re[static_cast<size_t>(i)] * norm;
+        bodyIm[static_cast<size_t>(i)] = 0.0f;
+    }
+
+    // To the frequency domain, so each table can band-limit it and add its tail.
+    fft(bodyRe, bodyIm, false);
+}
+
+void WavetableGenerator::finishTable(const Spectrum& bodyRe, const Spectrum& bodyIm,
+                                     int bodyHarmonics, int limit, Spectrum& output)
+{
+    constexpr int N = WAVETABLE_SIZE;
+
+    // Band-limit: keep harmonics 1..limit (positive and mirrored negative bins).
+    // This also removes the saturation products that would alias at this
+    // table's top note.
+    for (int k = 0; k < N; ++k)
+    {
+        const int h = (k <= N / 2) ? k : N - k;
+        const size_t u = static_cast<size_t>(k);
+        if (h >= 1 && h <= limit && h < N / 2)
+        {
+            re[u] = bodyRe[u];
+            im[u] = bodyIm[u];
+        }
+        else
+        {
+            re[u] = 0.0f;
+            im[u] = 0.0f;
+        }
+    }
+
+    // Tail: material-independent ~1/h harmonics above the body, as sines.
+    // a*sin(h*theta + phi) is a*N/2 * (-j*e^(j*phi)) at bin +h and its
+    // conjugate at bin N-h.
+    // The tail's phases come from a fixed per-harmonic table (tailPhaseSin/Cos),
+    // not from this band's harmonic count, so harmonic h has the same phase in
+    // every band: a band switch mid-note (FM depth, detune) only adds or removes
+    // harmonics instead of swapping in a different tail waveform. The phases are
+    // pseudo-random rather than all zero: in-phase they would stack into a spike,
+    // and the final peak-normalisation would then shrink the material body.
+    for (int h = bodyHarmonics + 1; h <= limit; ++h)
+    {
+        const float a = TAIL_LEVEL / (1.0f + (h - 1) * 0.05f) * (static_cast<float>(N) * 0.5f);
+        const float sinP = tailPhaseSin[static_cast<size_t>(h)];
+        const float cosP = tailPhaseCos[static_cast<size_t>(h)];
+        re[static_cast<size_t>(h)]     += sinP * a;
+        im[static_cast<size_t>(h)]     -= cosP * a;
+        re[static_cast<size_t>(N - h)] += sinP * a;
+        im[static_cast<size_t>(N - h)] += cosP * a;
+    }
+
+    fft(re, im, true);
+
+    float maxVal = 0.0f;
+    for (int i = 0; i < N; ++i)
+        maxVal = std::max(maxVal, std::abs(re[static_cast<size_t>(i)]));
+    const float norm = maxVal > 0.0f ? 1.0f / maxVal : 1.0f;
+    for (int i = 0; i < N; ++i)
+        output[static_cast<size_t>(i)] = re[static_cast<size_t>(i)] * norm;
+}
+
+void WavetableGenerator::generateFromSpectrum(
+    const std::array<float, NUM_WAVELENGTHS>& spectrum,
+    float topFreq,
+    float sampleRate,
+    std::array<float, WAVETABLE_SIZE>& output,
+    const std::array<float, NUM_WAVELENGTHS>* harmonicPhases)
+{
+    const int limit = harmonicLimit(topFreq, sampleRate);
+    const int body = std::min(BODY_HARMONICS, limit);
+    buildBodySpectrum(spectrum, body, harmonicPhases, sharedBodyRe, sharedBodyIm);
+    finishTable(sharedBodyRe, sharedBodyIm, body, limit, output);
 }
 
 void WavetableGenerator::generateBandLimitedSet(
@@ -181,44 +325,32 @@ void WavetableGenerator::generateBandLimitedSet(
     WavetableSet& output,
     const std::array<float, NUM_WAVELENGTHS>* harmonicPhases)
 {
-    // Low frequencies (< 200Hz): Full harmonics
-    generateFromSpectrum(spectrum, 100.0f, sampleRate, 20, output.low, harmonicPhases);
+    // Every band whose limit allows a full BODY_HARMONICS body shares one body
+    // spectrum, computed once; only the band-limit and tail differ per band.
+    // Higher bands (fewer harmonics available) stretch the material across the
+    // harmonics they have, so the spectrum's blue end stays audible.
+    bool sharedBodyBuilt = false;
 
-    // Mid-low frequencies (200-400Hz)
-    generateFromSpectrum(spectrum, 300.0f, sampleRate, 20, output.midLow, harmonicPhases);
-
-    // Mid frequencies (400-800Hz)
-    generateFromSpectrum(spectrum, 600.0f, sampleRate, 16, output.mid, harmonicPhases);
-
-    // Mid-high frequencies (800-1600Hz)
-    generateFromSpectrum(spectrum, 1200.0f, sampleRate, 12, output.midHigh, harmonicPhases);
-
-    // High frequencies (> 1600Hz)
-    generateFromSpectrum(spectrum, 2000.0f, sampleRate, 8, output.high, harmonicPhases);
-}
-
-void WavetableGenerator::applySoftSaturation(std::array<float, WAVETABLE_SIZE>& wavetable, float drive)
-{
-    float tanhDrive = std::tanh(drive);
-    for (int i = 0; i < WAVETABLE_SIZE; ++i)
+    for (int band = 0; band < NUM_WAVETABLE_BANDS; ++band)
     {
-        wavetable[i] = std::tanh(wavetable[i] * drive) / tanhDrive;
-    }
-}
+        const int limit = harmonicLimit(WavetableSet::bandTopFrequency(band), sampleRate);
+        auto& table = output.bands[static_cast<size_t>(band)];
 
-void WavetableGenerator::normalize(std::array<float, WAVETABLE_SIZE>& wavetable)
-{
-    // Normalize to -1.0 to 1.0 range
-    float maxVal = 0.0f;
-    for (int i = 0; i < WAVETABLE_SIZE; ++i)
-    {
-        maxVal = std::max(maxVal, std::abs(wavetable[i]));
-    }
-    if (maxVal > 0.0f)
-    {
-        for (int i = 0; i < WAVETABLE_SIZE; ++i)
+        if (limit >= BODY_HARMONICS)
         {
-            wavetable[i] /= maxVal;
+            if (!sharedBodyBuilt)
+            {
+                buildBodySpectrum(spectrum, BODY_HARMONICS, harmonicPhases, sharedBodyRe, sharedBodyIm);
+                sharedBodyBuilt = true;
+            }
+            finishTable(sharedBodyRe, sharedBodyIm, BODY_HARMONICS, limit, table);
+        }
+        else
+        {
+            // Own body, stretched across `limit` harmonics.
+            Spectrum bodyRe, bodyIm;
+            buildBodySpectrum(spectrum, limit, harmonicPhases, bodyRe, bodyIm);
+            finishTable(bodyRe, bodyIm, limit, limit, table);
         }
     }
 }
@@ -504,10 +636,20 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
         activeVoiceCount++;
         voicePolyphonyWeight += peekEnvelopeLevel(voice);
 
+        // Ring Mod and AM multiply A by B, so the product's bandwidth is the SUM of
+        // the two operands' bandwidths. With full-bandwidth tables (harmonics up to
+        // ~0.45*sr) the products fold back past Nyquist as inharmonic aliasing, so
+        // when both oscillators are heard through a multiplicative blend each
+        // operand reads the table one octave up (half the harmonics): products then
+        // stay below Nyquist. A muted A means B is heard alone, no multiplication.
+        const bool multiplicativeBlend = dualOscActive && !oscAMuted && (blendMode == 0 || blendMode == 1);
+        const float bandFreqScale = multiplicativeBlend ? 2.0f : 1.0f;
+
         // Oscillator A wavetable
-        const auto& wavetableA = currentWavetablesA.getForFrequency(voice.frequency);
+        const float freqSelA = voice.frequency * bandFreqScale;
+        const auto& wavetableA = currentWavetablesA.getForFrequency(freqSelA);
         const auto* oldWavetableA = crossfadeA.active
-            ? &crossfadeA.oldTables.getForFrequency(voice.frequency)
+            ? &crossfadeA.oldTables.getForFrequency(freqSelA)
             : nullptr;
 
         // Oscillator B wavetable (only if dual-osc active)
@@ -515,7 +657,7 @@ void ElementsSynth::processBlock(float* buffer, int numSamples)
         const std::array<float, WAVETABLE_SIZE>* oldWavetableBPtr = nullptr;
         if (dualOscActive)
         {
-            float freqB = voice.frequency * detuneRatio;
+            float freqB = voice.frequency * detuneRatio * bandFreqScale;
             wavetableBPtr = &wavetablesBPtr->getForFrequency(freqB);
             if (crossfadeBPtr->active)
                 oldWavetableBPtr = &crossfadeBPtr->oldTables.getForFrequency(freqB);
@@ -1534,13 +1676,12 @@ void ElementsSynth::regenerateWavetables()
             // Without this, rapid regens (e.g. rotation dragging) always fade from the very
             // first snapshot, making the 200ms crossfade permanently block timbre changes.
             float p = crossfadeA.progress;
-            for (int i = 0; i < WAVETABLE_SIZE; ++i)
+            for (int band = 0; band < NUM_WAVETABLE_BANDS; ++band)
             {
-                crossfadeA.oldTables.low[i]     = lerp(crossfadeA.oldTables.low[i],     currentWavetablesA.low[i],     p);
-                crossfadeA.oldTables.midLow[i]  = lerp(crossfadeA.oldTables.midLow[i],  currentWavetablesA.midLow[i],  p);
-                crossfadeA.oldTables.mid[i]     = lerp(crossfadeA.oldTables.mid[i],     currentWavetablesA.mid[i],     p);
-                crossfadeA.oldTables.midHigh[i] = lerp(crossfadeA.oldTables.midHigh[i], currentWavetablesA.midHigh[i], p);
-                crossfadeA.oldTables.high[i]    = lerp(crossfadeA.oldTables.high[i],    currentWavetablesA.high[i],    p);
+                auto& oldT = crossfadeA.oldTables.bands[static_cast<size_t>(band)];
+                const auto& curT = currentWavetablesA.bands[static_cast<size_t>(band)];
+                for (int i = 0; i < WAVETABLE_SIZE; ++i)
+                    oldT[i] = lerp(oldT[i], curT[i], p);
             }
         }
         else
@@ -1611,13 +1752,12 @@ void ElementsSynth::regenerateWavetables()
             if (crossfadeB.active)
             {
                 float p = crossfadeB.progress;
-                for (int i = 0; i < WAVETABLE_SIZE; ++i)
+                for (int band = 0; band < NUM_WAVETABLE_BANDS; ++band)
                 {
-                    crossfadeB.oldTables.low[i]     = lerp(crossfadeB.oldTables.low[i],     currentWavetablesB.low[i],     p);
-                    crossfadeB.oldTables.midLow[i]  = lerp(crossfadeB.oldTables.midLow[i],  currentWavetablesB.midLow[i],  p);
-                    crossfadeB.oldTables.mid[i]     = lerp(crossfadeB.oldTables.mid[i],     currentWavetablesB.mid[i],     p);
-                    crossfadeB.oldTables.midHigh[i] = lerp(crossfadeB.oldTables.midHigh[i], currentWavetablesB.midHigh[i], p);
-                    crossfadeB.oldTables.high[i]    = lerp(crossfadeB.oldTables.high[i],    currentWavetablesB.high[i],    p);
+                    auto& oldT = crossfadeB.oldTables.bands[static_cast<size_t>(band)];
+                    const auto& curT = currentWavetablesB.bands[static_cast<size_t>(band)];
+                    for (int i = 0; i < WAVETABLE_SIZE; ++i)
+                        oldT[i] = lerp(oldT[i], curT[i], p);
                 }
             }
             else
