@@ -21,11 +21,17 @@ ElementsAudioProcessor::createParameterLayout()
     // 1. SYNTH PARAMETERS
     // =====================================================================
 
-    // Filter Cutoff: 20 Hz – 20 kHz, log skew, default 2000 Hz
+    // Filter Cutoff: 20 Hz – 20 kHz, default 2000 Hz. The knob's midpoint is
+    // set to the geometric mean of the range (~632Hz) via setSkewForCentre —
+    // a true logarithmic, equal-per-octave feel. (NormalisableRange's 3-arg
+    // constructor takes an interval/step, NOT a centre value, so the skew has
+    // to be applied separately.)
+    juce::NormalisableRange<float> cutoffRange(20.0f, 20000.0f, 0.1f);
+    cutoffRange.setSkewForCentre(632.45f);
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"filterCutoff", 1},
         "Cutoff",
-        juce::NormalisableRange<float>(20.0f, 20000.0f, 0.1f, 0.3f),
+        cutoffRange,
         2000.0f,
         juce::String(),
         juce::AudioProcessorParameter::genericParameter,
