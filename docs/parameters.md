@@ -124,6 +124,19 @@ Time to fall from sustain level to silence after a note is released. Ignored in 
 
 A global filter applied to the output signal, with its own independent ADSR envelope.
 
+### How the filter works in Elements
+
+The filter is a standard 12 dB per octave state-variable filter (Lowpass, Highpass or Bandpass). It sits **after** the oscillators, on the mixed signal of both materials, and it knows nothing about materials, lights or geometry. It behaves like the filter on any other synthesizer, over the full 20 Hz to 20 kHz range.
+
+What differs from a conventional synth is the signal it filters. The oscillator always contains harmonics all the way up toward the top of the spectrum, so a lowpass has something to cut at every cutoff setting, whichever material you choose. The material decides how much energy each harmonic carries, so the same cutoff sounds different on Diamond than on Ruby, just as it would on different waveforms of a conventional synth.
+
+A few things worth knowing when you sweep the cutoff:
+
+- **The effect depends on the note.** A lowpass is most audible between the note's fundamental and roughly its 20th harmonic. For a 110 Hz note that is about 110 Hz to 2 kHz. Below the fundamental the sound disappears entirely. Far above the 20th harmonic the filter only trims the quiet upper partials.
+- **The Cutoff knob is not linear.** Its midpoint is about 2 kHz, so the lower half of the knob covers 20 Hz to 2 kHz, where most of the action is. Moving a knob a fixed distance changes the cutoff by roughly the same number of octaves, not the same number of hertz.
+- **Materials with weak low harmonics need a higher cutoff to be heard working.** Sapphire, for example, has very little energy near the fundamental, so a low cutoff on it sounds nearly silent.
+- **The envelope moves the cutoff in octaves.** At full Filter Env Amt the envelope can open the cutoff up to 7 octaves above the Cutoff setting.
+
 **Filter Type**
 - Options: Lowpass, Highpass, Bandpass
 - Default: Lowpass
@@ -132,7 +145,7 @@ A global filter applied to the output signal, with its own independent ADSR enve
 ---
 
 **Cutoff** · `20 Hz – 20,000 Hz` · Default: `2000 Hz`
-Cutoff frequency of the filter. Scaled logarithmically.
+Cutoff frequency of the filter. The knob is non-linear, with its midpoint at about 2 kHz.
 
 - *Automatable*
 
@@ -146,7 +159,7 @@ Emphasis at the cutoff frequency. Higher values produce a more pronounced peak.
 ---
 
 **Filter Env Amt** · `0.0 – 1.0` · Default: `0.0`
-Depth of the filter envelope modulation over the cutoff frequency. At 0.0 the filter envelope has no effect.
+Depth of the filter envelope modulation over the cutoff frequency. At 0.0 the filter envelope has no effect. At 1.0 it can open the cutoff up to 7 octaves.
 
 - *Automatable*
 

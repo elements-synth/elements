@@ -29,7 +29,7 @@ Core functionality working:
 - **Dual-oscillator** with 4 blend modes (Ring Mod, AM, XOR, FM); independent material per oscillator
 - **Geometric Deformer** — 3-layer noise (Simplex, Alligator, Worley) deforms surface normals for timbral drift
 - **Physical Envelope** mode — ADSR derived from optical material properties
-- Polyphonic wavetable synthesis (8 voices, band-limited, 5 frequency bands)
+- Polyphonic wavetable synthesis (8 voices, band-limited, 10 octave bands up to Nyquist)
 - Biquad filter (LP/HP/BP), ADSR envelope, ADSR graph display
 - Anti-click system (crossfades, voice stealing, retrigger fades)
 - Volume and all key parameters are DAW-automatable via APVTS

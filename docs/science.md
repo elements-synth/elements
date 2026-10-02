@@ -146,21 +146,33 @@ A_final(h) = A_emphasis · rolloff
 
 The cube (`A³`) amplifies spectral differences: high-transmission values are preserved (`0.9³ = 0.73`) while low values are strongly suppressed (`0.1³ = 0.001`). This translates subtle optical differences into audible timbral contrast.
 
-The final wavetable is built by additive synthesis:
+The first 20 harmonics (the "body") carry the material's spectrum this way. Above the body, a material-independent tail with a gentle `1/h` slope fills the table up to the highest harmonic that fits below Nyquist. The tail is deliberately the same for every material: the filter sits after the oscillator and works on whatever harmonics exist, so every note has content all the way up the spectrum for a lowpass to shape, whatever the material.
+
+The wavetable is built by additive synthesis (computed with an inverse FFT), soft-saturated with `tanh`, then band-limited again so the saturation cannot create harmonics past Nyquist:
 
 ```
-wavetable[i] = Σₕ A_final(h) · sin(2π·h·i / TABLE_SIZE)
+body[i]      = Σₕ≤20 A_final(h) · sin(2π·h·i / TABLE_SIZE)
+wavetable[i] = band_limit( tanh(body[i]) ) + tail[i]
 ```
 
-Five band-limited wavetables are generated to prevent aliasing:
+Ten band-limited wavetables, one per octave, prevent aliasing. Each holds every harmonic that fits below about 0.45 of the sample rate for the top note of its band (up to 512 harmonics):
 
-| Band | Frequency range | Max harmonics |
+| Band | Frequency range | Harmonics (44.1 kHz) |
 |---|---|---|
-| Low | < 200 Hz | 20 |
-| Mid-Low | 200–400 Hz | 20 |
-| Mid | 400–800 Hz | 16 |
-| Mid-High | 800–1600 Hz | 12 |
-| High | > 1600 Hz | 8 |
+| 1 | < 32 Hz | 512 |
+| 2 | 32–64 Hz | 310 |
+| 3 | 64–128 Hz | 155 |
+| 4 | 128–256 Hz | 77 |
+| 5 | 256–512 Hz | 38 |
+| 6 | 512–1024 Hz | 19 |
+| 7 | 1–2 kHz | 9 |
+| 8 | 2–4 kHz | 4 |
+| 9 | 4–8 kHz | 2 |
+| 10 | > 8 kHz | 1 |
+
+Where a band holds fewer than 20 harmonics (above about 512 Hz), the material's spectrum is spread across the harmonics it has, so the blue end of the spectrum stays audible on high notes.
+
+Ring Mod and AM multiply the two oscillators, and the product contains the sum of both oscillators' frequencies. To keep those products below Nyquist, both oscillators read the table one octave higher (half the harmonics) while either of those modes is active.
 
 ---
 
