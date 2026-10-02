@@ -565,7 +565,18 @@ namespace HelpContent
             "28 Bezier patches sample normals from the spout,\n"
             "handle, body, and lid. Asymmetric, highly detailed\n"
             "spectrum - richer and less regular than the\n"
-            "symmetric solids above.";
+            "symmetric solids above.\n"
+            "\n"
+            "--- CHORUS ---\n"
+            "\n"
+            "Duplicates the object into a trail receding behind it.\n"
+            "\n"
+            "Voices: how many copies total, including the object\n"
+            "itself\n"
+            "Spread: time between each copy, and the space between\n"
+            "them in the viewport\n"
+            "Decay: how much each copy fades and quiets going back\n"
+            "Wobble: how much each copy's timing drifts over time";
     }
 
     inline juce::String lights()
