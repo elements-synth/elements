@@ -125,15 +125,26 @@ WavetableGenerator::WavetableGenerator()
     }
 }
 
-void WavetableGenerator::fft(Spectrum& xr, Spectrum& xi, bool inverse) const
+void WavetableGenerator::fft(Spectrum& xrArr, Spectrum& xiArr, bool inverse) const
 {
+    // Raw pointers on purpose: this runs on the audio thread for every table of
+    // every regeneration, and std::array::operator[] is not inlined in Debug
+    // builds, which made the generator several times slower than the code it
+    // replaced (enough to overrun the block time with Deform regenerating
+    // every block).
+    float* const xr = xrArr.data();
+    float* const xi = xiArr.data();
+    const uint16_t* const rev = bitReverse.data();
+    const float* const twC = twiddleCos.data();
+    const float* const twS = twiddleSin.data();
+
     for (int i = 0; i < WAVETABLE_SIZE; ++i)
     {
-        int j = bitReverse[static_cast<size_t>(i)];
+        const int j = rev[i];
         if (j > i)
         {
-            std::swap(xr[static_cast<size_t>(i)], xr[static_cast<size_t>(j)]);
-            std::swap(xi[static_cast<size_t>(i)], xi[static_cast<size_t>(j)]);
+            std::swap(xr[i], xr[j]);
+            std::swap(xi[i], xi[j]);
         }
     }
 
@@ -144,18 +155,20 @@ void WavetableGenerator::fft(Spectrum& xr, Spectrum& xi, bool inverse) const
         const int step = WAVETABLE_SIZE / len;
         for (int start = 0; start < WAVETABLE_SIZE; start += len)
         {
+            float* const ar = xr + start;
+            float* const ai = xi + start;
+            float* const br = xr + start + half;
+            float* const bi = xi + start + half;
             for (int k = 0; k < half; ++k)
             {
-                const float wr = twiddleCos[static_cast<size_t>(k * step)];
-                const float wi = sign * twiddleSin[static_cast<size_t>(k * step)];
-                const size_t a = static_cast<size_t>(start + k);
-                const size_t b = static_cast<size_t>(start + k + half);
-                const float tr = xr[b] * wr - xi[b] * wi;
-                const float ti = xr[b] * wi + xi[b] * wr;
-                xr[b] = xr[a] - tr;
-                xi[b] = xi[a] - ti;
-                xr[a] += tr;
-                xi[a] += ti;
+                const float wr = twC[k * step];
+                const float wi = sign * twS[k * step];
+                const float tr = br[k] * wr - bi[k] * wi;
+                const float ti = br[k] * wi + bi[k] * wr;
+                br[k] = ar[k] - tr;
+                bi[k] = ai[k] - ti;
+                ar[k] += tr;
+                ai[k] += ti;
             }
         }
     }
@@ -234,18 +247,21 @@ void WavetableGenerator::buildBodySpectrum(
     // Soft saturation (tanh) then peak-normalise, as before.
     constexpr float drive = 1.5f;
     const float tanhDrive = std::tanh(drive);
+    float* const rp = re.data();
+    const float* const ip = im.data();
+    float* const outRe = bodyRe.data();
+    float* const outIm = bodyIm.data();
     float maxVal = 0.0f;
     for (int i = 0; i < WAVETABLE_SIZE; ++i)
     {
-        const size_t u = static_cast<size_t>(i);
-        re[u] = std::tanh(im[u] * drive) / tanhDrive;
-        maxVal = std::max(maxVal, std::abs(re[u]));
+        rp[i] = std::tanh(ip[i] * drive) / tanhDrive;
+        maxVal = std::max(maxVal, std::abs(rp[i]));
     }
     const float norm = maxVal > 0.0f ? 1.0f / maxVal : 1.0f;
     for (int i = 0; i < WAVETABLE_SIZE; ++i)
     {
-        bodyRe[static_cast<size_t>(i)] = re[static_cast<size_t>(i)] * norm;
-        bodyIm[static_cast<size_t>(i)] = 0.0f;
+        outRe[i] = rp[i] * norm;
+        outIm[i] = 0.0f;
     }
 
     // To the frequency domain, so each table can band-limit it and add its tail.
@@ -260,20 +276,17 @@ void WavetableGenerator::finishTable(const Spectrum& bodyRe, const Spectrum& bod
     // Band-limit: keep harmonics 1..limit (positive and mirrored negative bins).
     // This also removes the saturation products that would alias at this
     // table's top note.
-    for (int k = 0; k < N; ++k)
+    float* const rp = re.data();
+    float* const ip = im.data();
+    const float* const bre = bodyRe.data();
+    const float* const bim = bodyIm.data();
+    std::fill(re.begin(), re.end(), 0.0f);
+    std::fill(im.begin(), im.end(), 0.0f);
+    const int keep = std::min(limit, N / 2 - 1);
+    for (int h = 1; h <= keep; ++h)
     {
-        const int h = (k <= N / 2) ? k : N - k;
-        const size_t u = static_cast<size_t>(k);
-        if (h >= 1 && h <= limit && h < N / 2)
-        {
-            re[u] = bodyRe[u];
-            im[u] = bodyIm[u];
-        }
-        else
-        {
-            re[u] = 0.0f;
-            im[u] = 0.0f;
-        }
+        rp[h] = bre[h];         ip[h] = bim[h];
+        rp[N - h] = bre[N - h]; ip[N - h] = bim[N - h];
     }
 
     // Tail: material-independent ~1/h harmonics above the body, as sines.
@@ -285,25 +298,26 @@ void WavetableGenerator::finishTable(const Spectrum& bodyRe, const Spectrum& bod
     // harmonics instead of swapping in a different tail waveform. The phases are
     // pseudo-random rather than all zero: in-phase they would stack into a spike,
     // and the final peak-normalisation would then shrink the material body.
+    const float* const tSin = tailPhaseSin.data();
+    const float* const tCos = tailPhaseCos.data();
     for (int h = bodyHarmonics + 1; h <= limit; ++h)
     {
         const float a = TAIL_LEVEL / (1.0f + (h - 1) * 0.05f) * (static_cast<float>(N) * 0.5f);
-        const float sinP = tailPhaseSin[static_cast<size_t>(h)];
-        const float cosP = tailPhaseCos[static_cast<size_t>(h)];
-        re[static_cast<size_t>(h)]     += sinP * a;
-        im[static_cast<size_t>(h)]     -= cosP * a;
-        re[static_cast<size_t>(N - h)] += sinP * a;
-        im[static_cast<size_t>(N - h)] += cosP * a;
+        rp[h]     += tSin[h] * a;
+        ip[h]     -= tCos[h] * a;
+        rp[N - h] += tSin[h] * a;
+        ip[N - h] += tCos[h] * a;
     }
 
     fft(re, im, true);
 
     float maxVal = 0.0f;
     for (int i = 0; i < N; ++i)
-        maxVal = std::max(maxVal, std::abs(re[static_cast<size_t>(i)]));
+        maxVal = std::max(maxVal, std::abs(rp[i]));
     const float norm = maxVal > 0.0f ? 1.0f / maxVal : 1.0f;
+    float* const out = output.data();
     for (int i = 0; i < N; ++i)
-        output[static_cast<size_t>(i)] = re[static_cast<size_t>(i)] * norm;
+        out[i] = rp[i] * norm;
 }
 
 void WavetableGenerator::generateFromSpectrum(
@@ -1678,8 +1692,8 @@ void ElementsSynth::regenerateWavetables()
             float p = crossfadeA.progress;
             for (int band = 0; band < NUM_WAVETABLE_BANDS; ++band)
             {
-                auto& oldT = crossfadeA.oldTables.bands[static_cast<size_t>(band)];
-                const auto& curT = currentWavetablesA.bands[static_cast<size_t>(band)];
+                float* const oldT = crossfadeA.oldTables.bands[static_cast<size_t>(band)].data();
+                const float* const curT = currentWavetablesA.bands[static_cast<size_t>(band)].data();
                 for (int i = 0; i < WAVETABLE_SIZE; ++i)
                     oldT[i] = lerp(oldT[i], curT[i], p);
             }
@@ -1754,8 +1768,8 @@ void ElementsSynth::regenerateWavetables()
                 float p = crossfadeB.progress;
                 for (int band = 0; band < NUM_WAVETABLE_BANDS; ++band)
                 {
-                    auto& oldT = crossfadeB.oldTables.bands[static_cast<size_t>(band)];
-                    const auto& curT = currentWavetablesB.bands[static_cast<size_t>(band)];
+                    float* const oldT = crossfadeB.oldTables.bands[static_cast<size_t>(band)].data();
+                    const float* const curT = currentWavetablesB.bands[static_cast<size_t>(band)].data();
                     for (int i = 0; i < WAVETABLE_SIZE; ++i)
                         oldT[i] = lerp(oldT[i], curT[i], p);
                 }
