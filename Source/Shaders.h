@@ -124,6 +124,15 @@ static constexpr const char* pbrFragmentShader = R"(
     void main()
     {
         vec3 N = normalize(v_worldNormal);
+
+        // Two-sided shading: transparent materials draw their back faces (the
+        // interior) in a separate pass, and the vertex normal always points
+        // outward. Seen from behind, an outward normal gives N.V < 0, which the
+        // clamps below turn into a flat grazing/rim term for every back-face
+        // fragment. Flip it so back faces shade as surfaces facing the viewer.
+        if (!gl_FrontFacing)
+            N = -N;
+
         vec3 V = normalize(u_cameraPos - v_worldPos);
         float NdotV = max(dot(N, V), 0.0);
 
