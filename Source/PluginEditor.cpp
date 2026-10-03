@@ -1102,7 +1102,11 @@ void Viewport3D::updateDisplacedSphere(float amount, float frequency, int noiseT
 
     constexpr float eps = 0.01f;
     const float dispScale = amount * 1.5f;
-    const float normalScale = dispScale * frequency;
+    // Same scale as the physics side (Physics.cpp: gradient * amount * 1.5, no
+    // extra frequency factor). The viewport used to multiply by frequency as
+    // well, which tilted the shading normals up to 10x harder than the audio's
+    // and left most of the camera-facing surface at grazing angles.
+    const float normalScale = dispScale;
 
     auto noiseFunc = [noiseType](float nx, float ny, float nz) -> float {
         switch (noiseType) {
@@ -1132,47 +1136,38 @@ void Viewport3D::updateDisplacedSphere(float amount, float frequency, int noiseT
         displaced[i].position[1] = py + ny * displacement;
         displaced[i].position[2] = pz + nz * displacement;
 
-        // Worley and Alligator are O(27) per call — skip gradient for those types
-        // and use base normal directly (displacement shape still fully visible)
-        const bool skipGradient = (noiseType == 1 || noiseType == 2);
+        // Gradient normals for every noise type, matching the physics side
+        // (Physics.cpp computes displaced normals from the noise gradient for
+        // all of Simplex/Alligator/Worley), so the viewport shading reflects the
+        // same surface the audio is derived from. Forward differences: reuse the
+        // center sample, 3 extra calls vs 6 for central.
+        float dndx = (noiseFunc(sx+eps, sy, sz) - noise) / eps;
+        float dndy = (noiseFunc(sx, sy+eps, sz) - noise) / eps;
+        float dndz = (noiseFunc(sx, sy, sz+eps) - noise) / eps;
 
-        if (skipGradient)
+        // Project gradient onto tangent plane (remove radial/normal component)
+        float radialComp = dndx * nx + dndy * ny + dndz * nz;
+        float tanX = dndx - nx * radialComp;
+        float tanY = dndy - ny * radialComp;
+        float tanZ = dndz - nz * radialComp;
+
+        // Tilt base normal by tangential gradient
+        float newNx = nx - tanX * normalScale;
+        float newNy = ny - tanY * normalScale;
+        float newNz = nz - tanZ * normalScale;
+
+        float len = std::sqrt(newNx * newNx + newNy * newNy + newNz * newNz);
+        if (len > 1e-6f)
+        {
+            displaced[i].normal[0] = newNx / len;
+            displaced[i].normal[1] = newNy / len;
+            displaced[i].normal[2] = newNz / len;
+        }
+        else
         {
             displaced[i].normal[0] = nx;
             displaced[i].normal[1] = ny;
             displaced[i].normal[2] = nz;
-        }
-        else
-        {
-            // Forward differences: reuse center sample, 3 extra calls vs 6 for central
-            float dndx = (noiseFunc(sx+eps, sy, sz) - noise) / eps;
-            float dndy = (noiseFunc(sx, sy+eps, sz) - noise) / eps;
-            float dndz = (noiseFunc(sx, sy, sz+eps) - noise) / eps;
-
-            // Project gradient onto tangent plane (remove radial/normal component)
-            float radialComp = dndx * nx + dndy * ny + dndz * nz;
-            float tanX = dndx - nx * radialComp;
-            float tanY = dndy - ny * radialComp;
-            float tanZ = dndz - nz * radialComp;
-
-            // Tilt base normal by tangential gradient
-            float newNx = nx - tanX * normalScale;
-            float newNy = ny - tanY * normalScale;
-            float newNz = nz - tanZ * normalScale;
-
-            float len = std::sqrt(newNx * newNx + newNy * newNy + newNz * newNz);
-            if (len > 1e-6f)
-            {
-                displaced[i].normal[0] = newNx / len;
-                displaced[i].normal[1] = newNy / len;
-                displaced[i].normal[2] = newNz / len;
-            }
-            else
-            {
-                displaced[i].normal[0] = nx;
-                displaced[i].normal[1] = ny;
-                displaced[i].normal[2] = nz;
-            }
         }
     }
 
