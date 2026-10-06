@@ -10,6 +10,11 @@
     <PARAM id="ampRelease" value="0.075"/>
     <PARAM id="ampSustain" value="0.85"/>
     <PARAM id="blendMode" value="0.0"/>
+    <PARAM id="chorusDecay" value="0.4"/>
+    <PARAM id="chorusEnabled" value="0.0"/>
+    <PARAM id="chorusSpread" value="15.0"/>
+    <PARAM id="chorusVoices" value="2.0"/>
+    <PARAM id="chorusWobble" value="0.4"/>
     <PARAM id="deformAmount" value="0.0"/>
     <PARAM id="deformFrequency" value="2.0"/>
     <PARAM id="deformNoiseType" value="0.0"/>

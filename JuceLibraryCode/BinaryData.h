@@ -27,49 +27,49 @@ namespace BinaryData
     const int            studio_kontrast_03_2k_hdrSize = 5909219;
 
     extern const char*   Diamond_Lead_preset;
-    const int            Diamond_Lead_presetSize = 1590;
+    const int            Diamond_Lead_presetSize = 1806;
 
     extern const char*   Gold_Spike_preset;
-    const int            Gold_Spike_presetSize = 1588;
+    const int            Gold_Spike_presetSize = 1804;
 
     extern const char*   Hollow_Lead_preset;
-    const int            Hollow_Lead_presetSize = 1592;
+    const int            Hollow_Lead_presetSize = 1808;
 
     extern const char*   Amber_Pad_preset;
-    const int            Amber_Pad_presetSize = 1586;
+    const int            Amber_Pad_presetSize = 1802;
 
     extern const char*   Amethyst_Veil_preset;
-    const int            Amethyst_Veil_presetSize = 1584;
+    const int            Amethyst_Veil_presetSize = 1800;
 
     extern const char*   Copper_Bloom_preset;
-    const int            Copper_Bloom_presetSize = 1587;
+    const int            Copper_Bloom_presetSize = 1803;
 
     extern const char*   Obsidian_Drone_preset;
-    const int            Obsidian_Drone_presetSize = 1582;
+    const int            Obsidian_Drone_presetSize = 1799;
 
     extern const char*   Alexandrite_Hum_preset;
-    const int            Alexandrite_Hum_presetSize = 1589;
+    const int            Alexandrite_Hum_presetSize = 1805;
 
     extern const char*   Teapot_Void_preset;
-    const int            Teapot_Void_presetSize = 1581;
+    const int            Teapot_Void_presetSize = 1797;
 
     extern const char*   Water_Choir_preset;
-    const int            Water_Choir_presetSize = 1590;
+    const int            Water_Choir_presetSize = 1806;
 
     extern const char*   Molten_Choir_preset;
-    const int            Molten_Choir_presetSize = 1588;
+    const int            Molten_Choir_presetSize = 1804;
 
     extern const char*   Crystal_Choir_preset;
-    const int            Crystal_Choir_presetSize = 1589;
+    const int            Crystal_Choir_presetSize = 1805;
 
     extern const char*   Sub_Womb_preset;
-    const int            Sub_Womb_presetSize = 1587;
+    const int            Sub_Womb_presetSize = 1803;
 
     extern const char*   Deep_Current_preset;
-    const int            Deep_Current_presetSize = 1588;
+    const int            Deep_Current_presetSize = 1804;
 
     extern const char*   Resonant_Fang_preset;
-    const int            Resonant_Fang_presetSize = 1589;
+    const int            Resonant_Fang_presetSize = 1805;
 
     extern const char*   knob_00000_png;
     const int            knob_00000_pngSize = 114110;

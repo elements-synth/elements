@@ -10,6 +10,11 @@
     <PARAM id="ampRelease" value="1.6"/>
     <PARAM id="ampSustain" value="0.85"/>
     <PARAM id="blendMode" value="1.0"/>
+    <PARAM id="chorusDecay" value="0.25"/>
+    <PARAM id="chorusEnabled" value="1.0"/>
+    <PARAM id="chorusSpread" value="10.5"/>
+    <PARAM id="chorusVoices" value="5.0"/>
+    <PARAM id="chorusWobble" value="1.0"/>
     <PARAM id="deformAmount" value="0.4"/>
     <PARAM id="deformFrequency" value="7.5"/>
     <PARAM id="deformNoiseType" value="1.0"/>
@@ -32,7 +37,7 @@
     <PARAM id="rotationY" value="140.0"/>
     <PARAM id="rotationZ" value="0.0"/>
     <PARAM id="thickness" value="0.5"/>
-    <PARAM id="transpose" value="12.0"/>
+    <PARAM id="transpose" value="0.0"/>
     <PARAM id="volume" value="0.85"/>
   </Parameters>
 </ElementsState>
