@@ -299,6 +299,17 @@ float alligator3D(float x, float y, float z);
 /** 3D Worley cellular noise. Returns approximately -1..1. */
 float worley3D(float x, float y, float z);
 
+/**
+ * Noise value plus forward differences, in one call:
+ *   out[0] = f(x,y,z)   out[1] = f(x+eps,y,z)   out[2] = f(x,y+eps,z)   out[3] = f(x,y,z+eps)
+ * where f is the noise selected by noiseType (0 = Simplex, 1 = Alligator, 2 = Worley).
+ * Returns exactly what four separate calls would. For the cell-based noises the four
+ * samples almost always fall in the same cells, so the per-cell feature points
+ * (a chain of permutation-table lookups each) are computed once and shared, which is
+ * several times cheaper. Used by the viewport's per-vertex displacement.
+ */
+void noise3DWithForwardDiffs(int noiseType, float x, float y, float z, float eps, float out[4]);
+
 // --- Utility Functions ---
 
 /**

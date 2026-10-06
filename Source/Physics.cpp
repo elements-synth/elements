@@ -1369,3 +1369,119 @@ float alligator3D(float x, float y, float z)
     }
     return value / totalAmp;
 }
+
+// Evaluates the Worley (F1) or Alligator (F2-F1 ridge) cell function at four query
+// points that share the same integer cell, computing each neighbouring cell's feature
+// point once. Arithmetic is identical, operation for operation, to worleyCell /
+// alligatorCell, so the results are bit-identical to four separate calls.
+template <bool Alligator>
+static void cellNoise4(const float qx[4], const float qy[4], const float qz[4], int ix, int iy, int iz, float out[4])
+{
+    float fx[4], fy[4], fz[4], f1[4], f2[4];
+    for (int k = 0; k < 4; ++k)
+    {
+        fx[k] = qx[k] - ix; fy[k] = qy[k] - iy; fz[k] = qz[k] - iz;
+        f1[k] = 9.0f; f2[k] = 9.0f;
+    }
+
+    for (int dx = -1; dx <= 1; ++dx)
+    for (int dy = -1; dy <= 1; ++dy)
+    for (int dz = -1; dz <= 1; ++dz)
+    {
+        int cx = (ix + dx) & 255, cy = (iy + dy) & 255, cz = (iz + dz) & 255;
+        float px = dx + (snPerm[(snPerm[(snPerm[cx] + cy) & 255] + cz) & 255]         / 255.0f);
+        float py = dy + (snPerm[(snPerm[(snPerm[(cx+37)&255] + (cy+17)) & 255] + (cz+29)) & 255] / 255.0f);
+        float pz = dz + (snPerm[(snPerm[(snPerm[(cx+59)&255] + (cy+43)) & 255] + (cz+71)) & 255] / 255.0f);
+        for (int k = 0; k < 4; ++k)
+        {
+            float d2 = (px-fx[k])*(px-fx[k]) + (py-fy[k])*(py-fy[k]) + (pz-fz[k])*(pz-fz[k]);
+            if (Alligator)
+            {
+                if (d2 < f1[k]) { f2[k] = f1[k]; f1[k] = d2; }
+                else if (d2 < f2[k]) { f2[k] = d2; }
+            }
+            else
+            {
+                if (d2 < f1[k]) f1[k] = d2;
+            }
+        }
+    }
+
+    for (int k = 0; k < 4; ++k)
+    {
+        if (Alligator)
+        {
+            float ridge = std::sqrt(f2[k]) - std::sqrt(f1[k]);
+            out[k] = 1.0f - 2.0f * clamp(ridge, 0.0f, 1.0f);
+        }
+        else
+        {
+            out[k] = 2.0f * std::sqrt(f1[k]) - 1.0f;
+        }
+    }
+}
+
+template <bool Alligator>
+static void cellNoiseFBm4(float x, float y, float z, float eps, float out[4])
+{
+    constexpr float gain       = 0.5f;
+    constexpr float lacunarity = 2.0f;
+    constexpr float totalAmp   = 1.0f + gain + gain * gain;  // 1.75
+
+    float value[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    float amp  = 1.0f;
+    float freq = 1.0f;
+    for (int oct = 0; oct < 3; ++oct)
+    {
+        // Same query coordinates the separate calls would use: (x+eps)*freq etc.
+        const float qx[4] = { x * freq, (x + eps) * freq, x * freq, x * freq };
+        const float qy[4] = { y * freq, y * freq, (y + eps) * freq, y * freq };
+        const float qz[4] = { z * freq, z * freq, z * freq, (z + eps) * freq };
+
+        int ix = static_cast<int>(std::floor(qx[0]));
+        int iy = static_cast<int>(std::floor(qy[0]));
+        int iz = static_cast<int>(std::floor(qz[0]));
+
+        float cell[4];
+        bool sameCell = true;
+        for (int k = 1; k < 4; ++k)
+            if (static_cast<int>(std::floor(qx[k])) != ix ||
+                static_cast<int>(std::floor(qy[k])) != iy ||
+                static_cast<int>(std::floor(qz[k])) != iz)
+                sameCell = false;
+
+        if (sameCell)
+        {
+            cellNoise4<Alligator>(qx, qy, qz, ix, iy, iz, cell);
+        }
+        else
+        {
+            // A sample crossed a cell boundary: evaluate the four separately.
+            for (int k = 0; k < 4; ++k)
+                cell[k] = Alligator ? alligatorCell(qx[k], qy[k], qz[k])
+                                    : worleyCell(qx[k], qy[k], qz[k]);
+        }
+
+        for (int k = 0; k < 4; ++k)
+            value[k] += cell[k] * amp;
+        amp  *= gain;
+        freq *= lacunarity;
+    }
+    for (int k = 0; k < 4; ++k)
+        out[k] = value[k] / totalAmp;
+}
+
+void noise3DWithForwardDiffs(int noiseType, float x, float y, float z, float eps, float out[4])
+{
+    switch (noiseType)
+    {
+        case 1:  cellNoiseFBm4<true>(x, y, z, eps, out);  return;
+        case 2:  cellNoiseFBm4<false>(x, y, z, eps, out); return;
+        default:
+            out[0] = simplex3D(x, y, z);
+            out[1] = simplex3D(x + eps, y, z);
+            out[2] = simplex3D(x, y + eps, z);
+            out[3] = simplex3D(x, y, z + eps);
+            return;
+    }
+}
