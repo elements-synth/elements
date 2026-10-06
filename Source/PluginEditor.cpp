@@ -504,7 +504,17 @@ void Viewport3D::timerCallback()
         if (matIndex >= 0 && matIndex < NUM_MATERIALS)
             materialColour = colours[matIndex];
 
-        repaint();
+        // Redraw the 3D scene only. Component::repaint() would invalidate this
+        // component's whole area, and JUCE would then re-composite every overlay
+        // child (rotation fields, light panels, Chorus controls, accordion) through
+        // its per-scanline GL image path on every animated frame, even though none
+        // of them changed. triggerRepaint() requests a GL frame; JUCE's cached
+        // overlay framebuffer (only its invalid regions are repainted) is just
+        // blitted. Children that really change still invalidate themselves.
+        if (openGLContext.isAttached())
+            openGLContext.triggerRepaint();
+        else
+            repaint();
     }
 }
 
