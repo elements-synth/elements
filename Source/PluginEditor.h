@@ -46,6 +46,12 @@ private:
     ElementsAudioProcessor& processor;
     juce::OpenGLContext openGLContext;
 
+    // "RMB Orbit  Scroll Zoom" hint. A child label (cached to an image by the
+    // editor) instead of text drawn in paint(): paint() on a GL-attached
+    // component runs on every GL frame, and laying out/rasterising that text each
+    // time showed up in the profile.
+    juce::Label hintLabel;
+
     Geometry currentGeometry = Geometry::Sphere;
     juce::Colour materialColour{0xFFE8F4FF};
 
@@ -183,7 +189,18 @@ private:
     void renderGeometryPBR(const GeometryInstance* instances, int instanceCount);
 
     // Displaced sphere (simplex noise deformation)
-    std::vector<PBRVertex> baseSphereVerts;
+    // The deformed sphere is drawn INDEXED: only the distinct vertices of the
+    // (non-indexed) generated mesh are kept, the noise displacement is evaluated
+    // once per distinct vertex, and an index buffer (built once) rebuilds the
+    // triangles. That is ~5.8x fewer vertices to displace, upload every frame
+    // (glBufferSubData) and transform than the raw triangle list, with identical
+    // output.
+    std::vector<PBRVertex> sphereUniqueBase;       // distinct base vertices
+    std::vector<PBRVertex> sphereUniqueDisplaced;  // scratch, reused every update
+    GLuint displacedIndexVBO = 0;                  // GL_ELEMENT_ARRAY_BUFFER, static
+    bool lastDeformAnimating = false;
+    int  displacedVertexCount = 0;                // INDEX count of the displaced mesh (draw count)
+    static constexpr int kDisplacedSphereSegments = 56;
     GLuint displacedSphereVBO = 0;
     bool displacedVBODirty = true;
     float lastDeformAmount = 0.0f;
