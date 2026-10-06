@@ -3014,7 +3014,7 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
     setLookAndFeel(&lookAndFeel);
     juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
     auto initAccent = MaterialAccents::getAccentForMaterial(audioProcessor.getMaterial());
-    lookAndFeel.setAccent(initAccent);
+    applyAccent(initAccent);
     pianoRoll.setHighlightColour(initAccent);
 
     // Load custom knob frames from disk (test mode)
@@ -3301,7 +3301,7 @@ ElementsAudioProcessorEditor::ElementsAudioProcessorEditor(ElementsAudioProcesso
         matCombo.setSelectedId(matB + 1, juce::dontSendNotification);
         matBCombo.setSelectedId(matA + 1, juce::dontSendNotification);
         auto accentA = MaterialAccents::getAccentForMaterial(matB);
-        lookAndFeel.setAccent(accentA);
+        applyAccent(accentA);
         matCombo.setColour(juce::ComboBox::textColourId, accentA);
         oscilloscopeDisplay.setWaveformColour(accentA);
         adsrDisplay.setEnvelopeColour(accentA);
@@ -3558,6 +3558,20 @@ ElementsAudioProcessorEditor::~ElementsAudioProcessorEditor()
     setLookAndFeel(nullptr);
 }
 
+void ElementsAudioProcessorEditor::applyAccent(juce::Colour accent)
+{
+    if (lookAndFeel.getAccent() == accent)
+        return;
+
+    lookAndFeel.setAccent(accent);
+
+    // repaint() on a buffered child invalidates its cached image (and a repaint of
+    // anything inside it invalidates the buffered ancestor), so each overlay child
+    // is re-rendered once with the new accent, then cached again.
+    for (auto* child : viewport3D.getChildren())
+        child->repaint();
+}
+
 void ElementsAudioProcessorEditor::timerCallback()
 {
     // Sync combos from processor (for DAW automation changes)
@@ -3582,7 +3596,7 @@ void ElementsAudioProcessorEditor::timerCallback()
     {
         matCombo.setSelectedId(mat, juce::dontSendNotification);
         auto accent = MaterialAccents::getAccentForMaterial(mat - 1);
-        lookAndFeel.setAccent(accent);
+        applyAccent(accent);
         matCombo.setColour(juce::ComboBox::textColourId, accent);
         oscilloscopeDisplay.setWaveformColour(accent);
         adsrDisplay.setEnvelopeColour(accent);
@@ -3988,7 +4002,7 @@ void ElementsAudioProcessorEditor::comboBoxChanged(juce::ComboBox* combo)
         int matIndex = matCombo.getSelectedId() - 1;
         audioProcessor.setMaterial(matIndex);
         auto accent = MaterialAccents::getAccentForMaterial(matIndex);
-        lookAndFeel.setAccent(accent);
+        applyAccent(accent);
         matCombo.setColour(juce::ComboBox::textColourId, accent);
         oscilloscopeDisplay.setWaveformColour(accent);
         adsrDisplay.setEnvelopeColour(accent);
@@ -4242,7 +4256,7 @@ void ElementsAudioProcessorEditor::loadPreset(const juce::File& file)
     rimLightPanel->setSource(audioProcessor.getLightSource(2));
 
     auto accent = MaterialAccents::getAccentForMaterial(matA);
-    lookAndFeel.setAccent(accent);
+    applyAccent(accent);
     matCombo.setColour(juce::ComboBox::textColourId, accent);
     oscilloscopeDisplay.setWaveformColour(accent);
     adsrDisplay.setEnvelopeColour(accent);

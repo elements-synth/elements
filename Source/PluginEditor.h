@@ -1377,6 +1377,13 @@ private:
     ElementsAudioProcessor& audioProcessor;
     ElementsLookAndFeel lookAndFeel;
 
+    // Set the look-and-feel accent AND invalidate the cached viewport overlay.
+    // The overlay children (accordion, light panels, Chorus controls...) are
+    // buffered to images (see the setBufferedToImage loop in the constructor), and
+    // a look-and-feel colour change doesn't repaint them by itself, so without
+    // this their sliders kept the previous material's accent colour.
+    void applyAccent(juce::Colour accent);
+
     // === TOOLBAR: Logo + Geometry + Material dropdowns + Help ===
     ElementsLogo elementsLogo;
     juce::TextButton helpButton{"?"};
