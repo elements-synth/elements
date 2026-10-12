@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Elements VERSION 0.9.3 LANGUAGES C CXX)
+project(Elements VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,6 +44,7 @@ target_sources(Elements
 
 # Binary resources (fonts, logo, knob frames)
 file(GLOB KNOB_FRAMES "custom_knob_render/knob/knob_*.png")
+file(GLOB FACTORY_PRESETS "Source/FactoryPresets/*.preset")
 juce_add_binary_data(ElementsBinaryData
     SOURCES
         Source/JetBrainsMono-Regular.ttf
@@ -53,6 +54,7 @@ juce_add_binary_data(ElementsBinaryData
         Source/swap_arrows.png
         studio_kontrast_03_2k.hdr
         ${KNOB_FRAMES}
+        ${FACTORY_PRESETS}
 )
 
 # Include paths
