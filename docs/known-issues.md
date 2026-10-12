@@ -7,13 +7,13 @@ title: Known Issues & Limitations · Elements
 
 # Known Issues & Limitations
 
-Elements Beta 1.0 is functional and stable, but there are known limitations to be aware of before using it in a production context.
+Elements 1.0 is functional and stable, but there are known limitations to be aware of before using it in a production context.
 
 ---
 
 ## Presets
 
-There is no preset system in Beta 1.0. The plugin reports a single program placeholder as required by JUCE, but there is no preset save/load and no factory presets. Your DAW will show an empty preset list. This is expected. Preset support is planned for a future release.
+Elements has its own preset system: 15 factory presets plus SAVE / DEL for your own, all in the PRESET dropdown inside the plugin. Presets are not exposed to your DAW's own preset browser. The plugin reports a single program placeholder as required by JUCE, so the DAW's preset list will look empty. This is expected.
 
 ---
 
@@ -56,7 +56,7 @@ Elements uses JUCE's generic VST3 and AU implementation with no host-specific wo
 
 **Occasional saturation**: With spectrally dense materials and high polyphony, the output signal can clip. A soft clipper (tanh) is in place but there is no full limiter. If you experience saturation, reduce the light intensities or the number of simultaneous voices.
 
-**Apple Silicon + Intel**: Beta 1.0 is a Universal Binary, running natively on both Apple Silicon and Intel Macs. Windows builds are planned for a future release.
+**Apple Silicon + Intel**: Elements is a Universal Binary, running natively on both Apple Silicon and Intel Macs. A Windows x64 build is also provided, but it is built automatically and is less tested than the macOS version.
 
 **Deformer is Sphere-only**: The Geometric Deformer is currently implemented for the Sphere geometry only. Support for other geometries is planned.
 

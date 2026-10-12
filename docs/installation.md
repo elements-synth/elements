@@ -24,7 +24,7 @@ title: Installation · Elements
 
 ## Download
 
-Download the latest release from the [Elements releases page](https://github.com/elements-synth/elements/releases).
+Download the latest release (v1.0.0) from the [Elements releases page](https://github.com/elements-synth/elements/releases/latest).
 
 - `Elements-VST3-macOS-Universal.zip`: macOS (Apple Silicon + Intel)
 - `Elements-VST3-Windows-x64.zip`: Windows 64-bit
@@ -81,7 +81,7 @@ If your DAW does not find the plugin after scanning, verify that the files are i
 
 ---
 
-## Hosts tested in Beta v0.9.4
+## Hosts tested (as of v0.9.4)
 
 | Host | macOS VST3 | Windows VST3 |
 |------|------------|--------------|

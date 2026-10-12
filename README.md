@@ -2,7 +2,7 @@
 
 A VST3 synthesizer where **light generates sound**. Materials with real optical properties (Fresnel equations, wavelength-dependent transmission) shape harmonic spectra through physics simulation.
 
-**[Download Beta v0.9.4](https://github.com/elements-synth/elements/releases)** — macOS & Windows · Free
+**[Download v1.0.0](https://github.com/elements-synth/elements/releases/latest)** — macOS & Windows · Free
 
 **[Documentation](https://elements-synth.github.io/elements/)**
 
@@ -18,7 +18,7 @@ Rotating the object changes the angle between each face and the lights, producin
 
 ## Current State
 
-**v0.9.4-beta**
+**v1.0.0**
 
 Core functionality working:
 
@@ -29,6 +29,9 @@ Core functionality working:
 - **Dual-oscillator** with 4 blend modes (Ring Mod, AM, XOR, FM); independent material per oscillator
 - **Geometric Deformer** — 3-layer noise (Simplex, Alligator, Worley) deforms surface normals for timbral drift
 - **Physical Envelope** mode — ADSR derived from optical material properties
+- **15 factory presets** (Bass, Lead, Pad, Drone, Choir) plus your own saved presets
+- **Chorus** — duplicates the object into a trail receding behind it, in sound and in the viewport
+- **Transpose** (-2 to +2 octaves)
 - Polyphonic wavetable synthesis (8 voices, band-limited, 10 octave bands up to Nyquist)
 - Biquad filter (LP/HP/BP), ADSR envelope, ADSR graph display
 - Anti-click system (crossfades, voice stealing, retrigger fades)
