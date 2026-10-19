@@ -49,6 +49,11 @@ def build_sphere_renderer(workdir):
            "float absorptionColor[3]; bool hasChromism; float albedoSecondary[3]; float bandingStrength, bandingFrequency; };\n"
            + table + "\n")
     open(os.path.join(TOOLS, "pbr_table.inc"), "w").write(inc)
+    editor_cpp = open(os.path.join(ROOT, "Source", "PluginEditor.cpp")).read()
+    i = editor_cpp.index("std::vector<Viewport3D::PBRVertex> Viewport3D::generateCubeVertices")
+    k = editor_cpp.index("std::vector<Viewport3D::PBRVertex> Viewport3D::generateTeapotVertices")
+    j = editor_cpp.index("\n}\n", k) + 3
+    open(os.path.join(TOOLS, "mesh_funcs.inc"), "w").write(editor_cpp[i:j])
     exe = os.path.join(workdir, "render_spheres")
     subprocess.check_call(["clang++", "-std=c++17", "-O1", "-Wno-deprecated-declarations",
                            os.path.join(TOOLS, "render_spheres.cpp"), "-framework", "OpenGL",
@@ -85,6 +90,35 @@ def render_wavetables(dump):
         ws.render([tab[b] for b in range(10)], ACCENT[m], os.path.join(OUT, f"{name}-wavetable.png"))
 
 
+GEOMS = ["cube", "sphere", "torus", "dodecahedron", "teapot"]   # renderer geometry ids 0..4
+GEO_MATERIAL = 0                                                # Diamond is the placeholder material
+
+
+def render_geometries(exe, workdir):
+    """One Diamond thumbnail per geometry, same camera/lights as the material spheres. All five share one
+    crop size (centred on each silhouette) so their relative sizes stay honest."""
+    rgba = {}
+    for g, name in enumerate(GEOMS):
+        ch = []
+        for bg in (0, 1):
+            d = os.path.join(workdir, f"geo{g}_bg{bg}")
+            os.makedirs(d, exist_ok=True)
+            subprocess.check_call([exe, d, str(RENDER_SIZE), str(bg), "kf1", "1", "3.4", str(g), str(GEO_MATERIAL)], cwd=TOOLS)
+            ch.append(np.fromfile(os.path.join(d, f"m{GEO_MATERIAL:02d}.rgba"), dtype=np.uint8)
+                      .reshape(RENDER_SIZE, RENDER_SIZE, 4)[::-1, :, :3].astype(np.float32) / 255)
+        black, white = ch
+        a = np.clip(1 - (white - black).mean(axis=2), 0, 1)
+        c = np.where(a[..., None] > 1e-3, black / np.maximum(a[..., None], 1e-3), 0).clip(0, 1)
+        rgba[name] = (np.dstack([c, a]) * 255).astype(np.uint8), a
+    boxes = {n: np.where(a > 0.004) for n, (_, a) in rgba.items()}
+    half = max(max(xs.max() - xs.min(), ys.max() - ys.min()) for ys, xs in boxes.values()) // 2 + int(0.04 * RENDER_SIZE)
+    for name, (img, _) in rgba.items():
+        ys, xs = boxes[name]
+        cx, cy = (xs.min() + xs.max()) // 2, (ys.min() + ys.max()) // 2
+        im = Image.fromarray(img, "RGBA").crop((cx - half, cy - half, cx + half, cy + half)).resize((FINAL_SIZE, FINAL_SIZE), Image.LANCZOS)
+        im.save(os.path.join(OUT, f"geometry-{name}.png"), optimize=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dump", required=True, help="directory written by dump_probe.cpp")
@@ -94,7 +128,9 @@ def main():
     render_wavetables(args.dump)
     if not args.skip_spheres:
         with tempfile.TemporaryDirectory() as wd:
-            render_spheres(build_sphere_renderer(wd), wd)
+            exe = build_sphere_renderer(wd)
+            render_spheres(exe, wd)
+            render_geometries(exe, wd)
     print("wrote", len(os.listdir(OUT)), "images to", OUT)
 
 

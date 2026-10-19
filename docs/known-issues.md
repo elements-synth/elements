@@ -19,24 +19,19 @@ Elements has its own preset system: 15 factory presets plus SAVE / DEL for your 
 
 ## Polyphony
 
-Elements has a fixed limit of **8 voices**. When all 8 are active, soft voice stealing kicks in: the oldest voice fades out over 256 samples (~5.8ms) and is reassigned. If all 8 voices are simultaneously fading out, new notes are discarded silently with no click or artifact. This can occur in fast passages with long sustain times.
+Elements has a fixed limit of **8 voices**. When a ninth note arrives, the oldest held voice is taken over for the new note, with a short (~5.8 ms) anti-click fade-in. In practice no note is dropped, but with long release times and fast passages you will hear the oldest notes cut short to make room.
 
 ---
 
 ## State persistence
 
-The plugin saves and restores its state between sessions. The following is persisted:
+The plugin saves and restores its full state with your project:
 
-- All 28 automatable parameters (filter, envelopes, rotation, thickness, deform, light intensities, etc.)
-- Selected material and geometry
-- Volume
+- All 35 automatable parameters (filter, envelopes, rotation, thickness, deform, light intensities, dual-oscillator and chorus controls, transpose, volume, etc.)
+- Selected material (A and B), blend mode and geometry
+- Light source (Sunset / Daylight / LED Cool) and on/off state for each of the three lights
 
-The following resets to defaults when reopening a project:
-
-- **Light source selection per slot** (Sunset / Daylight / LED Cool)
-- **Light on/off state per slot**
-
-This means you will need to reassign your light sources after reloading a project. This will be addressed in a future update.
+Nothing is known to reset when you reopen a project. Your own presets are stored separately by the plugin's PRESET menu.
 
 ---
 
@@ -58,7 +53,7 @@ Elements uses JUCE's generic VST3 and AU implementation with no host-specific wo
 
 **Apple Silicon + Intel**: Elements is a Universal Binary, running natively on both Apple Silicon and Intel Macs. A Windows x64 build is also provided, but it is built automatically and is less tested than the macOS version.
 
-**Deformer is Sphere-only**: The Geometric Deformer is currently implemented for the Sphere geometry only. Support for other geometries is planned.
+**Deformer is Sphere-only**: The Geometric Deformer works on the Sphere geometry only. With the other geometries its controls are greyed out and the sound is not deformed.
 
 ---
 

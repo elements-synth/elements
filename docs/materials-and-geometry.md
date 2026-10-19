@@ -240,6 +240,10 @@ Geometry determines how many surface normals interact with the light and how the
 
 **Cube**: 6 faces
 
+<div class="mat-figs mat-figs-geo">
+  <img class="mat-sphere" src="{{ '/assets/images/materials/geometry-cube.png' | relative_url }}" alt="Cube geometry rendered in Diamond, as in the Elements viewport" loading="lazy">
+</div>
+
 The most aggressive geometry. Six axis-aligned normals with a steep weighting (cos⁴): the face pointing most directly at the light dominates almost completely. Rotating the cube changes the timbre in sharp steps as one face takes over from another, and it has both the strongest timbral response to rotation and the widest swings in level of any geometry. Good for rhythmic or sequenced sounds where automation produces clear, differentiated changes.
 
 > Angular, punchy. Dramatic timbral steps on rotation.
@@ -247,6 +251,10 @@ The most aggressive geometry. Six axis-aligned normals with a steep weighting (c
 ---
 
 **Sphere**: continuous surface
+
+<div class="mat-figs mat-figs-geo">
+  <img class="mat-sphere" src="{{ '/assets/images/materials/geometry-sphere.png' | relative_url }}" alt="Sphere geometry rendered in Diamond, as in the Elements viewport" loading="lazy">
+</div>
 
 Without the Deformer, the sphere does not respond to rotation at all: a perfect sphere always presents the same curved surface to the light from any angle. Stable, smooth, predictable, and the loudest of the five geometries. When the **Deformer** is active, the symmetry breaks: 32 displaced normals introduce rotation sensitivity, continuous timbral drift sets in, a rough-surface scattering darkens the spectrum, and the wavefolding adds harmonic density. How much it responds to rotation grows with the Deformer's Amount; the deformed sphere has the highest expressive range of any geometry once Rate is above zero and the surface starts to move.
 
@@ -256,6 +264,10 @@ Without the Deformer, the sphere does not respond to rotation at all: a perfect 
 
 **Torus**: 12 normals
 
+<div class="mat-figs mat-figs-geo">
+  <img class="mat-sphere" src="{{ '/assets/images/materials/geometry-torus.png' | relative_url }}" alt="Torus geometry rendered in Diamond, as in the Elements viewport" loading="lazy">
+</div>
+
 Twelve normals: the six axis directions plus six diagonals, with quadratic weighting (cos²). Rotating the torus gives a pronounced but smoother response than the Cube: in testing it had the second-strongest timbral response to rotation of the five geometries, ahead of the Teapot and Dodecahedron.
 
 > Pronounced but smooth. Strong response to rotation without the Cube's hard steps.
@@ -264,6 +276,10 @@ Twelve normals: the six axis directions plus six diagonals, with quadratic weigh
 
 **Dodecahedron**: 12 pentagonal faces
 
+<div class="mat-figs mat-figs-geo">
+  <img class="mat-sphere" src="{{ '/assets/images/materials/geometry-dodecahedron.png' | relative_url }}" alt="Dodecahedron geometry rendered in Diamond, as in the Elements viewport" loading="lazy">
+</div>
+
 Twelve face normals spread evenly across the sphere (the directions of an icosahedron's vertices), with quadratic weighting (cos²). Unlike the cube, there is no axis alignment, and several faces always contribute to the spectrum at once, so the dominant face shifts gradually rather than jumping. It is the steadiest of the solid shapes: the gentlest response to rotation and the most consistent texture.
 
 > Dense, even. Steady texture with the gentlest rotation response of the solids.
@@ -271,6 +287,10 @@ Twelve face normals spread evenly across the sphere (the directions of an icosah
 ---
 
 **Teapot**: 28 Bezier-patch normals
+
+<div class="mat-figs mat-figs-geo">
+  <img class="mat-sphere" src="{{ '/assets/images/materials/geometry-teapot.png' | relative_url }}" alt="Teapot geometry rendered in Diamond, as in the Elements viewport" loading="lazy">
+</div>
 
 The only asymmetric geometry in Elements. Twenty-eight Bezier patches contribute one normal each, sampled from the rim, body, handle, spout and lid, with quadratic weighting (cos²). Unlike the uniform solids above, rotation produces an irregular, non-repeating sequence of timbral changes rather than a predictable cycle. The size of the changes is moderate, between the Torus and the Dodecahedron.
 
