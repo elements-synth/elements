@@ -34,11 +34,11 @@ This makes Elements feel different from anything else you've used. Sound design 
 
 ## Two materials, one voice
 
-Elements runs two independent oscillators, A and B, each shaped by its own material and geometry. A **BLEND** mode decides how their spectra combine at the sample level:
+Elements runs two independent oscillators, A and B, each shaped by its own material (they share the same geometry, rotation and lights). A **BLEND** mode decides how their spectra combine at the sample level:
 
 - **Ring Mod**: multiplies A and B sample-by-sample, producing sum/difference sidebands that exist in neither source spectrum. Inharmonic and metallic, strongest with contrasting materials.
 - **AM**: B modulates the amplitude of A. At low depth you hear A enriched with new harmonics; the original timbre stays recognizable.
-- **XOR**: takes the absolute difference between A and B, highlighting where their spectra disagree most. Subtractive and hollow.
+- **XOR**: subtracts B from A, so where the two oscillators agree the output cancels, and where their spectra differ it is loudest. Subtractive and hollow.
 - **FM**: B modulates the phase of A before wavetable readout, from subtle pitch drift at low depth to dense, DX-style inharmonic spectra at high depth.
 
 **MIX** crossfades between pure A and the blended result, **DETUNE** offsets oscillator B's pitch (±100 cents), and **DEPTH** controls modulation intensity for AM and FM. Mute A to audition B in isolation. The result is a genuinely two-voice instrument: two separate optical scenes, combined in real time.
