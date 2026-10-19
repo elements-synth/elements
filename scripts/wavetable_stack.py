@@ -18,6 +18,18 @@ def _mix(c, w, bg=BG):
     return tuple(b + (c - b) * w)
 
 
+def align_phase(frames, front=6, smooth=16):
+    """Rotate all frames by one common phase offset so the cycle boundary (where every curve starts and
+    stops) lands on a gentle slope for the front frames. Without this, steep edges at phase 0 leave
+    vertical stubs / loose ends that look like broken lines. Purely cosmetic: a cycle has no true origin."""
+    f = np.asarray(frames, dtype=float)
+    sm = np.array([np.convolve(np.r_[w[-smooth:], w, w[:smooth]], np.ones(smooth) / smooth, "same")[smooth:-smooth]
+                   for w in f])
+    slope = np.abs(np.gradient(sm, axis=1))
+    r = int(np.argmin(slope[:front].max(axis=0)))
+    return np.roll(f, -r, axis=1)
+
+
 def draw_stack(ax, frames, color, points=360, amp=0.55, dx=0.020, dy=0.060, width=2.2,
                fade_min=0.10, width_min=0.20, hide_behind=False):
     """frames[0] is drawn at the FRONT (bottom), frames[-1] at the back (top)."""
@@ -37,7 +49,9 @@ def draw_stack(ax, frames, color, points=360, amp=0.55, dx=0.020, dy=0.060, widt
                 zorder=2 * (n - k) + 1, solid_capstyle="round")
 
 
-def render(frames, color, path, size=(3.2, 2.1), dpi=150, **kw):
+def render(frames, color, path, size=(3.2, 2.1), dpi=300, **kw):
+    frames = align_phase(frames)
+    kw.setdefault("points", 720)
     fig = plt.figure(figsize=size, dpi=dpi, facecolor=BG)
     ax = fig.add_axes([0.02, 0.04, 0.96, 0.92], facecolor=BG)
     draw_stack(ax, frames, color, **kw)
