@@ -18,7 +18,8 @@ def _mix(c, w, bg=BG):
     return tuple(b + (c - b) * w)
 
 
-def draw_stack(ax, frames, color, points=360, amp=0.55, dx=0.020, dy=0.060, width=2.2):
+def draw_stack(ax, frames, color, points=360, amp=0.55, dx=0.020, dy=0.060, width=2.2,
+               fade_min=0.10, width_min=0.20, hide_behind=False):
     """frames[0] is drawn at the FRONT (bottom), frames[-1] at the back (top)."""
     n = len(frames)
     for k in range(n - 1, -1, -1):          # back to front (painter's algorithm)
@@ -29,9 +30,10 @@ def draw_stack(ax, frames, color, points=360, amp=0.55, dx=0.020, dy=0.060, widt
         x = np.linspace(0, 1, points + 1)
         ox, oy = k * dx, k * dy
         X, Y = x * 0.78 + ox, y * amp * dy * 5 + oy
-        ax.fill_between(X, Y, oy - 0.02, color=BG, zorder=2 * (n - k), lw=0)
-        depth = 1.0 - 0.72 * (k / max(n - 1, 1))
-        ax.plot(X, Y, color=_mix(color, depth), lw=width * (0.75 + 0.25 * depth),
+        if hide_behind:                     # opaque fill = hidden-line look (cuts the back curves); off by default
+            ax.fill_between(X, Y, oy - 0.02, color=BG, zorder=2 * (n - k), lw=0)
+        t = k / max(n - 1, 1)               # 0 = front, 1 = back; opacity and thickness fall off linearly
+        ax.plot(X, Y, color=_mix(color, 1.0 - t * (1.0 - fade_min)), lw=width * (1.0 - t * (1.0 - width_min)),
                 zorder=2 * (n - k) + 1, solid_capstyle="round")
 
 
