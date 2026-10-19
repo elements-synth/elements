@@ -173,3 +173,45 @@ section {
     }
   }
 }
+
+// Material cards on Materials & Geometry: the sphere thumbnail (real Elements
+// viewport render, transparent PNG) next to the material's wavetable stack.
+// Both sit on bg0, the same colour the wavetable PNGs are drawn on, so the
+// hidden-line fill inside the stack is invisible.
+.mat-figs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: $bg0;
+  border: 1px solid $border;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 10px 0 14px;
+
+  .mat-sphere {
+    flex: 0 0 auto;
+    width: 150px;
+    height: 150px;
+  }
+
+  .mat-wt {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 430px;
+    height: auto;
+  }
+
+  // Phones: stack the two images so neither gets tiny.
+  @media (max-width: 560px) {
+    flex-direction: column;
+    gap: 8px;
+
+    .mat-sphere { width: 112px; height: 112px; }
+    .mat-wt { width: 100%; max-width: none; }
+  }
+}
+
+.mat-note {
+  color: $mid;
+  font-size: 0.9em;
+}
