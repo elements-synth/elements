@@ -56,6 +56,11 @@ Elements produces no sound without an active light source. The **LIGHTS** bar at
 
 While holding a note, move the **Key Intensity** slider. The pitch responds directly: above 0.5 it rises, below 0.5 it falls, by up to two semitones in either direction. This is one of Elements' most expressive performance parameters. Try automating it in your DAW for continuous pitch movement that feels organic rather than mechanical.
 
+<figure class="clip">
+  <img src="{{ '/assets/images/quick-start/intensity.gif' | relative_url }}" alt="Moving the Key Intensity slider in Elements; the light in the viewport grows brighter and dimmer" loading="lazy">
+  <figcaption>Drag the Key Intensity slider: the light in the viewport brightens and dims, and the pitch rises and falls with it. At zero the light is off for all practical purposes and the object goes dark.</figcaption>
+</figure>
+
 ---
 
 ## 5. Rotate the object
