@@ -26,6 +26,11 @@ The 3D viewport has two collapsible headers along its top edge, **GEOMETRIES** a
 - In **MATERIALS**, pick a material from the **MAT A** dropdown.
 - In **GEOMETRIES**, pick a shape from the **GEO** dropdown (Cube, Sphere, Torus, Dodeca or Teapot).
 
+<figure class="clip">
+  <img src="{{ '/assets/images/quick-start/materials.gif' | relative_url }}" alt="Opening the MATERIALS panel in Elements and switching MAT A between materials" loading="lazy">
+  <figcaption>Open MATERIALS, pick a material from MAT A: the sphere in the viewport changes at once.</figcaption>
+</figure>
+
 If you are not sure where to start, use **Sphere + Diamond**. Diamond has the broadest transmission curve and responds well to any light source, and the Sphere produces the smoothest, most immediate sound.
 
 ---

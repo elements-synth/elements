@@ -217,3 +217,23 @@ section {
 }
 
 .mat-figs.mat-figs-geo { width: fit-content; max-width: 100%; }
+
+// Animated screen clips (GIFs) in the Quick Start steps.
+.clip {
+  margin: 14px 0 18px;
+
+  img {
+    display: block;
+    width: 100%;
+    max-width: 800px;
+    height: auto;
+    border: 1px solid $border;
+    border-radius: 8px;
+  }
+
+  figcaption {
+    margin-top: 6px;
+    font-size: 0.85em;
+    opacity: 0.7;
+  }
+}
