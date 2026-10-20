@@ -7,49 +7,70 @@ title: Quick Start · Elements
 
 # Quick Start
 
-Your first sound in five steps.
+Your first sounds, step by step.
 
 ---
 
 ## 1. Load Elements in your DAW
 
-Open Elements as a VST3 or AU instrument. If this is your first time, refer to the [Installation guide](installation) for setup instructions including the Gatekeeper bypass required on macOS.
+Open Elements as a VST3 or AU instrument (or run the Standalone app). If this is your first time, refer to the [Installation guide](installation) for setup instructions including the Gatekeeper bypass required on macOS.
+
+A new instance starts with a ready-made scene: **Diamond** on a **Sphere**, lit by the **Key** light (Sunset, intensity 0.5). Play a note and you will already hear it.
 
 ---
 
 ## 2. Choose a material and geometry
 
-At the top of the interface, select a **Geometry** (GEO) and a **Material** (MAT) from the dropdown menus.
+The 3D viewport has two collapsible headers along its top edge, **GEOMETRIES** and **MATERIALS**. Click one to open its panel.
+
+- In **MATERIALS**, pick a material from the **MAT A** dropdown.
+- In **GEOMETRIES**, pick a shape from the **GEO** dropdown (Cube, Sphere, Torus, Dodeca or Teapot).
 
 If you are not sure where to start, use **Sphere + Diamond**. Diamond has the broadest transmission curve and responds well to any light source, and the Sphere produces the smoothest, most immediate sound.
 
 ---
 
-## 3. Turn on a light
+## 3. Choose and balance your lights
 
-Elements produces no sound without an active light source. In the Lights Bar at the bottom of the interface:
+Elements produces no sound without an active light source. The **LIGHTS** bar at the bottom of the viewport has three slots, **Key**, **Fill** and **Rim**. Each has a checkbox to switch it on, a source dropdown and an intensity slider.
 
-1. Check the **Key** checkbox to enable the first light slot
-2. Select **Daylight** as the light source: it has the broadest emission curve and works with almost every material
-3. Set the intensity to **0.5** to start at a neutral pitch
+1. The **Key** light is already on. To add more light, tick **Fill** and/or **Rim**
+2. Pick a source for each: **Sunset** (warm), **Daylight** (broad, works with almost every material) or **LED Cool** (bright)
+3. Leave the intensities at **0.5** to start at a neutral pitch
 
-You should now hear sound when you play a note.
-
-> If you hear nothing, verify that the Key light checkbox is checked and that the selected material is compatible with your light source. Some combinations produce near-silence by design; see [Materials & Geometry](materials-and-geometry) for the compatibility guide.
+> If you hear nothing, check that at least one light is ticked and that the intensity is not at zero. Some material and light pairings sound thin by design; see [Materials & Geometry](materials-and-geometry) for how each material responds to each light.
 
 ---
 
 ## 4. Play with light intensity
 
-While holding a note, move the **Key Intensity** slider. Notice that the pitch responds directly: above 0.5 it rises, below 0.5 it falls. This bidirectional relationship between light and pitch is one of Elements' most expressive performance parameters. Try automating it in your DAW for continuous pitch movement that feels organic rather than mechanical.
+While holding a note, move the **Key Intensity** slider. The pitch responds directly: above 0.5 it rises, below 0.5 it falls, by up to two semitones in either direction. This is one of Elements' most expressive performance parameters. Try automating it in your DAW for continuous pitch movement that feels organic rather than mechanical.
 
 ---
 
-## 5. Activate the Deformer (Sphere only)
+## 5. Rotate the object
 
-If you have Sphere selected, slowly raise the **Deform** slider. The surface of the sphere begins to deform under an animated noise field (Simplex by default; try Alligator or Worley from the **Noise** selector for a different character). Displaced normals introduce timbral variation, a continuous harmonic drift sets in, and the sinusoidal wavefolder starts adding harmonic density. Push it to around 0.4 for a rich, living texture. Pull it back to 0 for a clean, stable tone.
+Grab one of the three coloured rings around the object in the viewport and drag it, or double-click the **rotX**, **rotY** and **rotZ** fields to type an angle, or automate **Rotation X / Y / Z** from your DAW. (The right mouse button orbits the camera, which changes only what you see, not the sound.) Rotation changes the angle at which the light meets the surface, and so the timbre. The Cube changes in sharp steps and the Torus strongly but smoothly. The undeformed Sphere does not respond at all, which leads to the next step.
+
+---
+
+## 6. Activate the Deformer (Sphere only)
+
+With the Sphere selected, open **GEOMETRIES** and slowly raise **Deform**. The surface begins to deform under an animated noise field (Simplex by default; try Alligator or Worley from the **Noise** selector). Displaced normals introduce timbral variation, the harmonics drift in level and phase, and a wavefolder adds harmonic density. **Freq** sets how fine the surface detail is and **Rate** how fast it moves (0 freezes it). Push Deform to around 0.4 for a rich, living texture, and pull it back to 0 for a clean, stable tone.
 
 This is Elements at its most expressive.
+
+---
+
+## 7. Add a second material
+
+Each voice has two oscillators. In **MATERIALS**, choose a different material for **MAT B**, pick a **BLEND** mode (Ring Mod, AM, XOR or FM) and raise **MIX** above 0%. The two materials now interact: try Ring Mod for metallic, inharmonic tones or AM for pulsing ones, and use **DETUNE** and **MUTE A** to hear what B adds. The arrows button between the two selectors swaps A and B.
+
+---
+
+## 8. Try the Chorus
+
+Tick **Chorus** at the top left of the viewport. The object is duplicated into a trail of copies receding behind it, and each copy is a delayed, quieter echo of the sound. **Voices**, **Spread**, **Decay** and **Wobble** control how many copies there are, how far apart, how fast they fade, and how much they drift.
 
 ---
 
@@ -65,7 +86,7 @@ Open the **PRESET** dropdown at the top of the interface to browse them, grouped
 - **Drone**: Obsidian Drone, Alexandrite Hum, Teapot Void
 - **Choir**: Water Choir, Molten Choir, Crystal Choir
 
-Load one, play a few notes, then open the panels and see how MAT/GEO, lights, and envelope mode combine to produce it. This is the fastest way to hear Elements at its full expressive range without dialing in a scene from scratch. Once you start tweaking, save your own variations with the SAVE button; the factory presets themselves stay untouched no matter what you change.
+Load one, play a few notes, then open the panels and see how the materials, geometry, lights, and envelope mode combine to produce it. This is the fastest way to hear Elements at its full expressive range without dialing in a scene from scratch. Once you start tweaking, save your own variations with the SAVE button; the factory presets themselves stay untouched no matter what you change.
 
 ---
 
