@@ -43,6 +43,11 @@ Elements produces no sound without an active light source. The **LIGHTS** bar at
 2. Pick a source for each: **Sunset** (warm), **Daylight** (broad, works with almost every material) or **LED Cool** (bright)
 3. Leave the intensities at **0.5** to start at a neutral pitch
 
+<figure class="clip">
+  <img src="{{ '/assets/images/quick-start/lights.gif' | relative_url }}" alt="Switching the Fill and Rim lights on and off and changing the Key light source in Elements" loading="lazy">
+  <figcaption>Switch lights on and off and change their sources: the lighting on the object in the viewport changes as you go, and so does the sound.</figcaption>
+</figure>
+
 > If you hear nothing, check that at least one light is ticked and that the intensity is not at zero. Some material and light pairings sound thin by design; see [Materials & Geometry](materials-and-geometry) for how each material responds to each light.
 
 ---
