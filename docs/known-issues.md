@@ -35,6 +35,16 @@ Nothing is known to reset when you reopen a project. Your own presets are stored
 
 ---
 
+## Long-running sessions
+
+**Sound may stop responding to changes in a session left open for a long time.** In Bitwig Studio, after returning to a project that had been open for a long time (more than a day in the reported case), changes to the material, lights, geometry or other parameters sometimes had no audible effect. We have not found the cause or a way to reproduce it, so it is listed here as an open issue rather than a fixed one.
+
+What helps: recreate the Elements instrument track (a plain plugin rescan is not enough). This is the same step that fixed it when it was first seen. Saving your work and reopening the project is a reasonable first thing to try, but we have not confirmed that it clears the problem.
+
+If you run into it, please [open an issue](https://github.com/elements-synth/elements/issues) with your host, how long the session had been open, and which controls stopped responding.
+
+---
+
 ## Host compatibility
 
 Elements uses JUCE's generic VST3 and AU implementation with no host-specific workarounds.
