@@ -78,6 +78,11 @@ Grab one of the three coloured rings around the object in the viewport and drag 
 
 With the Sphere selected, open **GEOMETRIES** and slowly raise **Deform**. The surface begins to deform under an animated noise field (Simplex by default; try Alligator or Worley from the **Noise** selector). Displaced normals introduce timbral variation, the harmonics drift in level and phase, and a wavefolder adds harmonic density. **Freq** sets how fine the surface detail is and **Rate** how fast it moves (0 freezes it). Push Deform to around 0.4 for a rich, living texture, and pull it back to 0 for a clean, stable tone.
 
+<figure class="clip">
+  <img src="{{ '/assets/images/quick-start/deform.gif' | relative_url }}" alt="Raising the Deform amount on the Sphere in Elements and switching the Noise type between Simplex, Alligator and Worley" loading="lazy">
+  <figcaption>Raise Deform and the sphere's surface starts to move; Freq, Rate and the Noise type change its character.</figcaption>
+</figure>
+
 This is Elements at its most expressive.
 
 ---
