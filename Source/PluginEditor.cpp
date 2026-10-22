@@ -3605,10 +3605,19 @@ void ElementsAudioProcessorEditor::timerCallback()
     }
 
     // Sync rotation value displays
-    auto fmt = [](float v) { return juce::String(v, 1); };
-    rotXValue.setText(fmt(audioProcessor.getRotationX()), juce::dontSendNotification);
-    rotYValue.setText(fmt(audioProcessor.getRotationY()), juce::dontSendNotification);
-    rotZValue.setText(fmt(audioProcessor.getRotationZ()), juce::dontSendNotification);
+    // Label::setText() always closes an open text editor (even when the text is
+    // unchanged), so only touch a field that is not being edited and really differs;
+    // otherwise this 30 Hz sync kicks the user out of the box as soon as they click it.
+    auto syncRotField = [](juce::Label& field, float v) {
+        if (field.isBeingEdited())
+            return;
+        auto text = juce::String(v, 1);
+        if (field.getText() != text)
+            field.setText(text, juce::dontSendNotification);
+    };
+    syncRotField(rotXValue, audioProcessor.getRotationX());
+    syncRotField(rotYValue, audioProcessor.getRotationY());
+    syncRotField(rotZValue, audioProcessor.getRotationZ());
 
     // Sync filter value readouts ("2.5 kHz" / "Q:1.5")
     float cutoff = audioProcessor.apvts.getRawParameterValue("filterCutoff")->load();

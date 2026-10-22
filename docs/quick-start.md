@@ -65,7 +65,7 @@ While holding a note, move the **Key Intensity** slider. The pitch responds dire
 
 ## 5. Rotate the object
 
-Grab one of the three coloured rings around the object in the viewport and drag it, or double-click the **rotX**, **rotY** and **rotZ** fields to type an angle, or automate **Rotation X / Y / Z** from your DAW. (The right mouse button orbits the camera, which changes only what you see, not the sound.) Rotation changes the angle at which the light meets the surface, and so the timbre. The Cube changes in sharp steps and the Torus strongly but smoothly. The undeformed Sphere does not respond at all, which leads to the next step.
+Grab one of the three coloured rings around the object in the viewport and drag it, or click the **rotX**, **rotY** and **rotZ** fields to type an angle, or automate **Rotation X / Y / Z** from your DAW. (The right mouse button orbits the camera, which changes only what you see, not the sound.) Rotation changes the angle at which the light meets the surface, and so the timbre. The Cube changes in sharp steps and the Torus strongly but smoothly. The undeformed Sphere does not respond at all, which leads to the next step.
 
 ---
 
