@@ -422,6 +422,98 @@ def fig_deform(dump, mat="diamond"):
     save(fig, "deformer.png")
 
 
+# ---------------------------------------------------------------- Parameters page
+OUT_P = os.path.join(ROOT, "docs", "assets", "images", "parameters")
+
+
+def save_p(fig, name):
+    os.makedirs(OUT_P, exist_ok=True)
+    fig.savefig(os.path.join(OUT_P, name), dpi=DPI)
+    plt.close(fig)
+    print("wrote parameters/" + name)
+
+
+def svf_response(mode, cutoff, Q, sr=44100.0, n=1 << 15):
+    """Exact transcription of BiquadFilter (TPT SVF) in SynthEngine.cpp, driven with an impulse."""
+    cutoff = min(max(cutoff, 20.0), sr * 0.45); Q = min(max(Q, 0.5), 10.0)
+    g = np.tan(np.pi * cutoff / sr); k = 1.0 / Q
+    a1 = 1.0 / (1.0 + g * (g + k)); a2 = g * a1; a3 = g * a2
+    ic1 = ic2 = 0.0
+    out = np.zeros(n)
+    for i in range(n):
+        x = 1.0 if i == 0 else 0.0
+        v3 = x - ic2
+        v1 = a1 * ic1 + a2 * v3
+        v2 = ic2 + a2 * ic1 + a3 * v3
+        ic1 = 2 * v1 - ic1; ic2 = 2 * v2 - ic2
+        out[i] = {"low": v2, "high": x - k * v1 - v2, "band": v1}[mode]
+    H = np.abs(np.fft.rfft(out)); f = np.fft.rfftfreq(n, 1 / sr)
+    return f[1:], 20 * np.log10(np.maximum(H[1:], 1e-6))
+
+
+def fig_filter_response():
+    fig, axs = plt.subplots(1, 3, figsize=(9.6, 3.0), sharey=True)
+    cols = [MID, BLUE, GREEN, AMBER, RED]
+    for ax, (mode, ttl) in zip(axs, [("low", "Lowpass"), ("high", "Highpass"), ("band", "Bandpass")]):
+        for Q, c in zip([0.5, 1.0, 2.0, 5.0, 10.0], cols):
+            f, d = svf_response(mode, 2000.0, Q)
+            ax.semilogx(f, d, color=c, lw=1.7, label=f"Reso {Q:g}")
+        ax.axvline(2000, color=GRID, lw=1.0, ls=":")
+        ax.set_xlim(20, 20000); ax.set_ylim(-48, 24)
+        ax.set_xticks([100, 1000, 10000]); ax.set_xticklabels(["100", "1k", "10k"])
+        ax.set_title(ttl); ax.set_xlabel("frequency (Hz), cutoff 2 kHz")
+    axs[0].set_ylabel("gain (dB)")
+    axs[0].legend(loc="lower left", fontsize=6.8)
+    fig.suptitle("The three filter types (12 dB/octave) at five Resonance settings", y=0.99, fontsize=10, fontweight="bold")
+    fig.tight_layout()
+    save_p(fig, "filter-response.png")
+
+
+def fig_filter_env():
+    A, D, S, R, hold = 0.01, 0.3, 0.0, 0.3, 0.6
+    t = np.linspace(0, hold + R, 1200)
+    def env(t):
+        e = np.where(t < A, t / A, np.where(t < A + D, 1 - (1 - S) * (t - A) / D, S))
+        rel = t >= hold
+        e_hold = S
+        return np.where(rel, e_hold * np.clip(1 - (t - hold) / R, 0, 1), e)
+    e = env(t)
+    fig, axs = plt.subplots(1, 2, figsize=(9.0, 3.0))
+    axs[0].plot(t, e, color=AMETH, lw=2); axs[0].fill_between(t, e, color=AMETH, alpha=0.15)
+    axs[0].set_title("Filter envelope (defaults: A 0.01  D 0.3  S 0  R 0.3)"); axs[0].set_xlabel("seconds (note held 0.6 s)"); axs[0].set_ylabel("level")
+    axs[0].set_ylim(0, 1.1)
+    for amt, c in [(0.25, BLUE), (0.5, GREEN), (1.0, RED)]:
+        cut = np.minimum(300 * 2 ** (amt * e * 7), 19845)
+        axs[1].semilogy(t, cut, color=c, lw=2, label=f"Amt {amt:g}")
+    axs[1].axhline(300, color=MID, lw=1, ls=":")
+    axs[1].set_ylim(200, 25000); axs[1].set_yticks([300, 1000, 3000, 10000]); axs[1].set_yticklabels(["300", "1k", "3k", "10k"])
+    axs[1].set_title("Resulting cutoff (Cutoff knob at 300 Hz)"); axs[1].set_xlabel("seconds"); axs[1].set_ylabel("cutoff (Hz)")
+    axs[1].legend(loc="upper right")
+    fig.tight_layout()
+    save_p(fig, "filter-envelope.png")
+
+
+def fig_amp_env(dump):
+    entries = {e["id"]: e for e in json.load(open(os.path.join(dump, "manifest.json")))["entries"]}
+    fig, axs = plt.subplots(1, 3, figsize=(9.6, 2.9), sharey=True)
+    hold = 0.5
+    def draw(ax, a, d, s, r, col, ttl):
+        t = [0, a, a + d, a + d + hold, a + d + hold + r]; y = [0, 1, s, s, 0]
+        ax.plot(t, y, color=col, lw=2.2); ax.fill_between(t, y, color=col, alpha=0.14)
+        ax.set_title(ttl, fontsize=8.5, color=col); ax.set_xlim(0, 2.6); ax.set_ylim(0, 1.1)
+        ax.set_xlabel("seconds (note held 0.5 s)", fontsize=7)
+    draw(axs[0], 0.01, 0.1, 0.7, 0.3, AMETH, "Classic, defaults\nA 0.01  D 0.1  S 0.7  R 0.3")
+    for ax, name in zip(axs[1:], ["diamond", "obsidian"]):
+        e = entries[f"scene_m{NAMES.index(name)}_s1"]
+        a = 0.5 + (0.005 - 0.5) * 0.5; d = 0.5 * (1 - e["avgTrans"]) * 1.5
+        sus = float(np.clip(e["ior"] / 2.42, 0.1, 0.95)); r = e["ior"] * 0.2 * 0.5
+        draw(ax, a, d, sus, r, ACCENT[NAMES.index(name)], f"Physical, {name.title()}\n(Thickness 0.5, intensity 0.5)")
+    axs[0].set_ylabel("level")
+    fig.suptitle("Amplitude envelope: Classic is what you set, Physical is what the material and light decide", y=0.99, fontsize=10, fontweight="bold")
+    fig.tight_layout()
+    save_p(fig, "amp-envelope.png")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dump", default=None)
@@ -431,7 +523,8 @@ def main():
     fig_pipeline(M); fig_harmonics(M); fig_light_spectra(); fig_pitch()
     fig_chorus(); fig_wavefolder(); fig_blend(M); fig_materials(M)
     if a.dump:
-        fig_envelope(M, a.dump); fig_deform(a.dump)
+        fig_envelope(M, a.dump); fig_deform(a.dump); fig_amp_env(a.dump)
+    fig_filter_response(); fig_filter_env()
 
 
 if __name__ == "__main__":

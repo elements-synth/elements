@@ -15,6 +15,9 @@ Every parameter below marked *Automatable* appears in your host's automation lis
 
 ## Scene
 
+> **In short:** Pick the materials and the shape; Thickness and Rotation decide how the light meets them.
+{: .tldr}
+
 These parameters define the physical scene: the core of how Elements generates sound.
 
 **Material A / Material B** (MAT A / MAT B)
@@ -53,6 +56,9 @@ Rotates the geometry on each axis. Rotation changes the angle at which the light
 
 ## Lights
 
+> **In short:** Three lights, each with a source, a switch and an intensity. Intensity is also a pitch control.
+{: .tldr}
+
 Elements has three light slots: **Key**, **Fill** and **Rim**, each with its own source, on/off switch and intensity.
 
 **Light Enable (Key / Fill / Rim)**
@@ -77,11 +83,19 @@ How bright each light is. Intensity also moves the pitch: with the lights that a
 
 In Physical envelope mode, the average intensity of the active lights also sets the Attack: brighter light gives a faster attack.
 
+<figure class="clip">
+  <img src="{{ '/assets/images/science/pitch-vs-intensity.png' | relative_url }}" alt="Graph of pitch offset against light intensity for one, two and three lights" loading="lazy">
+  <figcaption>Pitch follows intensity: neutral at 0.5, up to ±2 semitones. With more lights on, a single slider moves the total less.</figcaption>
+</figure>
+
 - *Automatable*
 
 ---
 
 ## Oscillator blend
+
+> **In short:** Oscillator B joins A through one of four blend modes; Mix says how much.
+{: .tldr}
 
 Each voice runs two oscillators. The blend controls decide how oscillator B is combined with oscillator A. See [The Science](science#9-dual-oscillators-and-blend-modes) for the formulas.
 
@@ -95,6 +109,11 @@ How A and B are combined.
 
 - Default: Ring Mod
 - *Automatable*
+
+<figure class="clip">
+  <img src="{{ '/assets/images/science/blend-modes.png' | relative_url }}" alt="Waveforms of oscillators A and B and the Ring Mod, AM, XOR and FM results" loading="lazy">
+  <figcaption>The four blend modes on two real material waveforms (Ruby and Emerald).</figcaption>
+</figure>
 
 ---
 
@@ -128,6 +147,9 @@ Removes oscillator A from the blend so you can hear oscillator B on its own. A m
 
 ## Amplitude Envelope
 
+> **In short:** Classic is a plain ADSR you set yourself. Physical reads the shape from the materials and the lights.
+{: .tldr}
+
 **Envelope Mode**
 Switches between two envelope behaviours.
 
@@ -140,6 +162,11 @@ Switches between two envelope behaviours.
 
 - Default: Classic
 - *Automatable*
+
+<figure class="clip">
+  <img src="{{ '/assets/images/parameters/amp-envelope.png' | relative_url }}" alt="Classic default envelope and two Physical envelopes for Diamond and Obsidian" loading="lazy">
+  <figcaption>Classic uses your four knobs. Physical derives the shape: Diamond is short and sustained, Obsidian takes longer to settle.</figcaption>
+</figure>
 
 ---
 
@@ -173,7 +200,13 @@ Time to fall from the sustain level to silence after a note is released. Ignored
 
 ## Filter
 
+> **In short:** A 12 dB/octave filter on the final mix, with its own envelope. The materials do not touch it.
+{: .tldr}
+
 A global filter applied to the mixed output of both oscillators, with its own independent ADSR envelope. The filter envelope stays manual in both Classic and Physical mode.
+
+<details markdown="1">
+<summary>How the filter works in Elements</summary>
 
 ### How the filter works in Elements
 
@@ -188,10 +221,17 @@ A few things worth knowing when you sweep the cutoff:
 - **Materials with weak low harmonics need a higher cutoff to be heard working.** Sapphire, for example, has very little energy near the fundamental, so a low cutoff on it sounds nearly silent.
 - **The envelope moves the cutoff in octaves.** At full Filter Env Amt the envelope can open the cutoff up to 7 octaves above the Cutoff setting.
 
+</details>
+
 **Filter Type**
 - Options: Lowpass, Highpass, Bandpass
 - Default: Lowpass
 - *Automatable*
+
+<figure class="clip">
+  <img src="{{ '/assets/images/parameters/filter-response.png' | relative_url }}" alt="Frequency response of the lowpass, highpass and bandpass filters at five resonance values" loading="lazy">
+  <figcaption>The real filter, measured from its own code at a 2 kHz cutoff. Resonance adds a peak at the cutoff without changing the slopes.</figcaption>
+</figure>
 
 ---
 
@@ -211,6 +251,11 @@ Emphasis at the cutoff frequency. Higher values produce a more pronounced peak.
 
 **Filter Env Amt** · `0.0 – 1.0` · Default: `0.0`
 Depth of the filter envelope over the cutoff. At 0.0 the envelope has no effect; at 1.0 it can open the cutoff up to 7 octaves.
+
+<figure class="clip">
+  <img src="{{ '/assets/images/parameters/filter-envelope.png' | relative_url }}" alt="The filter envelope and the cutoff it produces at three amounts" loading="lazy">
+  <figcaption>With the Cutoff knob at 300 Hz, a full-amount envelope throws the cutoff all the way up to the top of the range and sweeps it back. Lower amounts open it less.</figcaption>
+</figure>
 
 - *Automatable*
 
@@ -246,6 +291,9 @@ Release time of the filter envelope.
 
 ## Deformer
 
+> **In short:** Roughens the sphere so the sound moves. Sphere only.
+{: .tldr}
+
 The Deformer turns the smooth sphere into a bumpy, evolving surface, and is available for the **Sphere geometry only** (its controls are greyed out for the other geometries). It acts on the sound in three layers, all driven by one animated noise field: tilted surface normals with scattering, a per-harmonic shimmer, and a wavefolder. See [The Science](science#8-the-deformer) for the full explanation.
 
 **Deform Amount** · `0.0 – 1.0` · Default: `0.0`
@@ -279,9 +327,17 @@ The character of the noise field.
 - Default: Simplex
 - *Automatable*
 
+<figure class="clip">
+  <img src="{{ '/assets/images/science/deformer.png' | relative_url }}" alt="A diamond spectrum darkening as Deform rises, and the waveform changing from front to back" loading="lazy">
+  <figcaption>Real engine output for Diamond on a Sphere. Raising Deform lowers and tilts the spectrum and reshapes the waveform.</figcaption>
+</figure>
+
 ---
 
 ## Chorus
+
+> **In short:** A trail of delayed, quieter copies of the sound.
+{: .tldr}
 
 Chorus duplicates the object into a trail of copies receding behind it; each copy is a delayed, quieter echo of the sound. See [The Science](science#10-chorus).
 
@@ -316,9 +372,17 @@ How much each copy's delay drifts over time. This movement is what makes it soun
 
 - *Automatable*
 
+<figure class="clip">
+  <img src="{{ '/assets/images/science/chorus-taps.png' | relative_url }}" alt="Bar charts of chorus copy gains at three decay settings" loading="lazy">
+  <figcaption>Each copy is a delayed echo, quieter by the Decay amount.</figcaption>
+</figure>
+
 ---
 
 ## Output
+
+> **In short:** Transpose shifts the register; Volume sets the master level.
+{: .tldr}
 
 **Transpose** · `−24 – +24 semitones` · Default: `0`
 Shifts the register of new notes. In the interface it is a five-step octave selector (−2 OCT to +2 OCT) next to the keyboard, and the keyboard's octave labels follow it. It is applied when a note starts, so changing it never bends a note that is already sounding. The parameter itself moves in semitones if you automate it.
@@ -335,6 +399,12 @@ Master output volume. A soft clipper (tanh) is applied to the output. If you hea
 ---
 
 ## Automation summary
+
+> **In short:** all 35 parameters can be automated and are saved with the project. Only the material, geometry and light selectors are interface-only, and MUTE A is not saved.
+{: .tldr}
+
+<details markdown="1">
+<summary>Full automation and saving tables</summary>
 
 **Automatable and saved with the project (all 35):**
 
@@ -361,6 +431,8 @@ Master output volume. A soft clipper (tanh) is applied to the output. If you hea
 **Not saved:** MUTE A.
 
 All of the above, except MUTE A, are stored in presets.
+
+</details>
 
 ---
 
