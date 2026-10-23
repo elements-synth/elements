@@ -102,6 +102,11 @@ Each voice has two oscillators. In **MATERIALS**, choose a different material fo
 
 Tick **Chorus** at the top left of the viewport. The object is duplicated into a trail of copies receding behind it, and each copy is a delayed, quieter echo of the sound. **Voices**, **Spread**, **Decay** and **Wobble** control how many copies there are, how far apart, how fast they fade, and how much they drift.
 
+<figure class="clip">
+  <img src="{{ '/assets/images/quick-start/chorus.gif' | relative_url }}" alt="Ticking Chorus in Elements and adjusting Voices, Spread, Decay and Wobble while the object is duplicated into a trail of copies" loading="lazy">
+  <figcaption>Tick Chorus and the object multiplies into a trail of copies; Voices, Spread, Decay and Wobble shape the trail and the echo of the sound.</figcaption>
+</figure>
+
 ---
 
 ## Factory presets
