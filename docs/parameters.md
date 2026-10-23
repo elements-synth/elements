@@ -23,7 +23,7 @@ Every parameter below marked *Automatable* appears in your host's automation lis
     <a class="pin" href="#chorus" title="Chorus" style="left:23.5%;top:16.4%">7</a>
     <a class="pin" href="#output" title="Output" style="left:78.0%;top:83.8%">8</a>
   </div>
-  <figcaption>Click a number to jump to its section. **1** [Scene](#scene) · **2** [Lights](#lights) · **3** [Oscillator blend](#oscillator-blend) · **4** [Amplitude Envelope](#amplitude-envelope) · **5** [Filter](#filter) · **6** [Deformer](#deformer) · **7** [Chorus](#chorus) · **8** [Output](#output)</figcaption>
+  <figcaption>Click a number to jump to its section. <strong>1</strong> <a href="#scene">Scene</a> · <strong>2</strong> <a href="#lights">Lights</a> · <strong>3</strong> <a href="#oscillator-blend">Oscillator blend</a> · <strong>4</strong> <a href="#amplitude-envelope">Amplitude Envelope</a> · <strong>5</strong> <a href="#filter">Filter</a> · <strong>6</strong> <a href="#deformer">Deformer</a> · <strong>7</strong> <a href="#chorus">Chorus</a> · <strong>8</strong> <a href="#output">Output</a></figcaption>
 </figure>
 
 ---
@@ -119,7 +119,7 @@ In Physical envelope mode, the average intensity of the active lights also sets 
 
 <figure class="clip shot">
   <img src="{{ '/assets/images/ui/blend.png' | relative_url }}" alt="The MATERIALS panel with MAT A, MAT B, Blend, Mix, Detune and Depth" style="max-width:387px" loading="lazy">
-  <figcaption>Open **MATERIALS** to reach the blend controls.</figcaption>
+  <figcaption>Open <strong>MATERIALS</strong> to reach the blend controls.</figcaption>
 </figure>
 
 Each voice runs two oscillators. The blend controls decide how oscillator B is combined with oscillator A. See [The Science](science#9-dual-oscillators-and-blend-modes) for the formulas.
@@ -331,7 +331,7 @@ Release time of the filter envelope.
 
 <figure class="clip shot">
   <img src="{{ '/assets/images/ui/deformer.png' | relative_url }}" alt="The GEOMETRIES panel with Geo, Thickness, Deform, Noise, Freq and Rate" style="max-width:386px" loading="lazy">
-  <figcaption>Open **GEOMETRIES** to reach Thickness and the Deformer controls.</figcaption>
+  <figcaption>Open <strong>GEOMETRIES</strong> to reach Thickness and the Deformer controls.</figcaption>
 </figure>
 
 The Deformer turns the smooth sphere into a bumpy, evolving surface, and is available for the **Sphere geometry only** (its controls are greyed out for the other geometries). It acts on the sound in three layers, all driven by one animated noise field: tilted surface normals with scattering, a per-harmonic shimmer, and a wavefolder. See [The Science](science#8-the-deformer) for the full explanation.
