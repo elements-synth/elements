@@ -13,10 +13,28 @@ description: A synthesizer where light meets sound.
 
 ## Video demos
 
-- [The Deformer](https://www.youtube.com/watch?v=lJhoasqMsv8): Simplex Noise + Wavefolding in action
-- [Light × Material](https://www.youtube.com/watch?v=kIsSFacwmfY): light intensity controls pitch, material controls timbre
-- [Geometry × Rotation](https://www.youtube.com/watch?v=xloh2gQo6ps): same material, same light, four different sounds
-- [3D Viewport](https://www.youtube.com/watch?v=WOz9LchJtqY): the instrument in three dimensions
+<div class="video-grid">
+  <a class="video-card" href="https://www.youtube.com/watch?v=lJhoasqMsv8">
+    <img src="{{ '/assets/images/videos/deformer.jpg' | relative_url }}" alt="Video: the Elements Deformer reshaping an amethyst sphere" loading="lazy">
+    <span class="video-title">The Deformer</span>
+    <span class="video-desc">Simplex Noise + Wavefolding in action</span>
+  </a>
+  <a class="video-card" href="https://www.youtube.com/watch?v=kIsSFacwmfY">
+    <img src="{{ '/assets/images/videos/light-material.jpg' | relative_url }}" alt="Video: light and material in Elements" loading="lazy">
+    <span class="video-title">Light × Material</span>
+    <span class="video-desc">Light intensity controls pitch, material controls timbre</span>
+  </a>
+  <a class="video-card" href="https://www.youtube.com/watch?v=xloh2gQo6ps">
+    <img src="{{ '/assets/images/videos/geometry-rotation.jpg' | relative_url }}" alt="Video: geometry and rotation in Elements" loading="lazy">
+    <span class="video-title">Geometry × Rotation</span>
+    <span class="video-desc">Same material, same light, four different sounds</span>
+  </a>
+  <a class="video-card" href="https://www.youtube.com/watch?v=WOz9LchJtqY">
+    <img src="{{ '/assets/images/videos/viewport.jpg' | relative_url }}" alt="Video: the Elements 3D viewport" loading="lazy">
+    <span class="video-title">3D Viewport</span>
+    <span class="video-desc">The instrument in three dimensions</span>
+  </a>
+</div>
 
 ---
 
