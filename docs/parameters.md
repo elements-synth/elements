@@ -11,6 +11,21 @@ Elements exposes **35 parameters** to your DAW for automation, and keeps a furth
 
 Every parameter below marked *Automatable* appears in your host's automation list under the name shown in bold. Everything marked *Saved with project* is restored when you reopen the session, and all of them are saved in presets.
 
+<figure class="clip overview">
+  <div class="pins">
+    <img src="{{ '/assets/images/ui/overview.png' | relative_url }}" alt="The Elements window with numbered markers for each parameter section">
+    <a class="pin" href="#scene" title="Scene" style="left:6.5%;top:75.9%">1</a>
+    <a class="pin" href="#lights" title="Lights" style="left:69.5%;top:83.0%">2</a>
+    <a class="pin" href="#oscillator-blend" title="Oscillator blend" style="left:40.0%;top:12.9%">3</a>
+    <a class="pin" href="#amplitude-envelope" title="Amplitude Envelope" style="left:71.5%;top:69.6%">4</a>
+    <a class="pin" href="#filter" title="Filter" style="left:71.3%;top:35.9%">5</a>
+    <a class="pin" href="#deformer" title="Deformer" style="left:7.5%;top:12.9%">6</a>
+    <a class="pin" href="#chorus" title="Chorus" style="left:23.5%;top:16.4%">7</a>
+    <a class="pin" href="#output" title="Output" style="left:78.0%;top:83.8%">8</a>
+  </div>
+  <figcaption>Click a number to jump to its section. **1** [Scene](#scene) · **2** [Lights](#lights) · **3** [Oscillator blend](#oscillator-blend) · **4** [Amplitude Envelope](#amplitude-envelope) · **5** [Filter](#filter) · **6** [Deformer](#deformer) · **7** [Chorus](#chorus) · **8** [Output](#output)</figcaption>
+</figure>
+
 ---
 
 ## Scene
@@ -59,6 +74,11 @@ Rotates the geometry on each axis. Rotation changes the angle at which the light
 > **In short:** Three lights, each with a source, a switch and an intensity. Intensity is also a pitch control.
 {: .tldr}
 
+<figure class="clip shot">
+  <img src="{{ '/assets/images/ui/lights.png' | relative_url }}" alt="The Lights bar with the Key, Fill and Rim slots" style="max-width:771px" loading="lazy">
+  <figcaption>The Lights bar at the bottom of the viewport: a switch, a source and an intensity for each slot.</figcaption>
+</figure>
+
 Elements has three light slots: **Key**, **Fill** and **Rim**, each with its own source, on/off switch and intensity.
 
 **Light Enable (Key / Fill / Rim)**
@@ -96,6 +116,11 @@ In Physical envelope mode, the average intensity of the active lights also sets 
 
 > **In short:** Oscillator B joins A through one of four blend modes; Mix says how much.
 {: .tldr}
+
+<figure class="clip shot">
+  <img src="{{ '/assets/images/ui/blend.png' | relative_url }}" alt="The MATERIALS panel with MAT A, MAT B, Blend, Mix, Detune and Depth" style="max-width:387px" loading="lazy">
+  <figcaption>Open **MATERIALS** to reach the blend controls.</figcaption>
+</figure>
 
 Each voice runs two oscillators. The blend controls decide how oscillator B is combined with oscillator A. See [The Science](science#9-dual-oscillators-and-blend-modes) for the formulas.
 
@@ -150,6 +175,11 @@ Removes oscillator A from the blend so you can hear oscillator B on its own. A m
 > **In short:** Classic is a plain ADSR you set yourself. Physical reads the shape from the materials and the lights.
 {: .tldr}
 
+<figure class="clip shot">
+  <img src="{{ '/assets/images/ui/amp-env.png' | relative_url }}" alt="The AMP ENV panel" style="max-width:294px" loading="lazy">
+  <figcaption>The AMP ENV panel: the mode selector, the four knobs and the envelope shape.</figcaption>
+</figure>
+
 **Envelope Mode**
 Switches between two envelope behaviours.
 
@@ -202,6 +232,11 @@ Time to fall from the sustain level to silence after a note is released. Ignored
 
 > **In short:** A 12 dB/octave filter on the final mix, with its own envelope. The materials do not touch it.
 {: .tldr}
+
+<figure class="clip shot">
+  <img src="{{ '/assets/images/ui/filter.png' | relative_url }}" alt="The FILTER panel" style="max-width:294px" loading="lazy">
+  <figcaption>The FILTER panel: type, Cutoff and Reso, the filter envelope and its Amt.</figcaption>
+</figure>
 
 A global filter applied to the mixed output of both oscillators, with its own independent ADSR envelope. The filter envelope stays manual in both Classic and Physical mode.
 
@@ -294,6 +329,11 @@ Release time of the filter envelope.
 > **In short:** Roughens the sphere so the sound moves. Sphere only.
 {: .tldr}
 
+<figure class="clip shot">
+  <img src="{{ '/assets/images/ui/deformer.png' | relative_url }}" alt="The GEOMETRIES panel with Geo, Thickness, Deform, Noise, Freq and Rate" style="max-width:386px" loading="lazy">
+  <figcaption>Open **GEOMETRIES** to reach Thickness and the Deformer controls.</figcaption>
+</figure>
+
 The Deformer turns the smooth sphere into a bumpy, evolving surface, and is available for the **Sphere geometry only** (its controls are greyed out for the other geometries). It acts on the sound in three layers, all driven by one animated noise field: tilted surface normals with scattering, a per-harmonic shimmer, and a wavefolder. See [The Science](science#8-the-deformer) for the full explanation.
 
 **Deform Amount** · `0.0 – 1.0` · Default: `0.0`
@@ -339,6 +379,11 @@ The character of the noise field.
 > **In short:** A trail of delayed, quieter copies of the sound.
 {: .tldr}
 
+<figure class="clip shot">
+  <img src="{{ '/assets/images/ui/chorus.png' | relative_url }}" alt="The Chorus controls: Voices, Spread, Decay and Wobble" style="max-width:226px" loading="lazy">
+  <figcaption>The Chorus controls at the top left of the viewport (hidden while GEOMETRIES or MATERIALS is open).</figcaption>
+</figure>
+
 Chorus duplicates the object into a trail of copies receding behind it; each copy is a delayed, quieter echo of the sound. See [The Science](science#10-chorus).
 
 **Chorus** (on/off) · Default: Off
@@ -383,6 +428,11 @@ How much each copy's delay drifts over time. This movement is what makes it soun
 
 > **In short:** Transpose shifts the register; Volume sets the master level.
 {: .tldr}
+
+<figure class="clip shot">
+  <img src="{{ '/assets/images/ui/output.png' | relative_url }}" alt="The octave selector and the Volume knob" style="max-width:384px" loading="lazy">
+  <figcaption>The octave selector (OCT, bottom left) and the Volume knob (bottom right).</figcaption>
+</figure>
 
 **Transpose** · `−24 – +24 semitones` · Default: `0`
 Shifts the register of new notes. In the interface it is a five-step octave selector (−2 OCT to +2 OCT) next to the keyboard, and the keyboard's octave labels follow it. It is applied when a note starts, so changing it never bends a note that is already sounding. The parameter itself moves in semitones if you automate it.

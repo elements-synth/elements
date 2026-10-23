@@ -264,3 +264,11 @@ details > :not(summary) { margin-left: 1em; margin-right: 1em; }
 .gallery-item img { display: block; width: 100%; height: auto; }
 .gallery-item span { display: block; font-size: .8em; margin-top: 4px; color: $text; }
 .gallery.gallery-wide { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+
+/* Parameters page: UI screenshot strips and the clickable overview */
+figure.clip.shot img { width: auto; max-width: 100%; }
+figure.clip.overview { max-width: 900px; }
+.pins { position: relative; line-height: 0; }
+.pins img { width: 100%; height: auto; }
+.pin { position: absolute; transform: translate(-50%, -50%); width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 50%; background: $accent; color: $bg0; font-weight: 700; font-size: 13px; text-decoration: none; box-shadow: 0 0 0 3px rgba(13,17,23,.7); }
+.pin:hover { background: lighten($accent, 12%); color: $bg0; }
