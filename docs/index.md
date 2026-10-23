@@ -9,6 +9,10 @@ description: A synthesizer where light meets sound.
 
 [Quick Start](quick-start) · [Installation](installation) · [Materials & Geometry](materials-and-geometry) · [Parameters](parameters) · [Known Issues](known-issues) · [The Science](science)
 
+<figure class="clip hero">
+  <img src="{{ '/assets/images/hero.gif' | relative_url }}" alt="The Elements plugin: a sphere deforming into a crystalline star while the spectrum and oscilloscope move" loading="eager">
+</figure>
+
 ---
 
 ## Video demos
@@ -50,6 +54,67 @@ This makes Elements feel different from anything else you've used. Sound design 
 
 ---
 
+## Thirteen materials
+
+Every material is a real optical curve: gems, minerals, two metals and water. Click any of them to see how it sounds and why.
+
+<div class="gallery">
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/diamond-sphere.png' | relative_url }}" alt="Diamond sphere" loading="lazy">
+    <span>Diamond</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/water-sphere.png' | relative_url }}" alt="Water sphere" loading="lazy">
+    <span>Water</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/amber-sphere.png' | relative_url }}" alt="Amber sphere" loading="lazy">
+    <span>Amber</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/ruby-sphere.png' | relative_url }}" alt="Ruby sphere" loading="lazy">
+    <span>Ruby</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/gold-sphere.png' | relative_url }}" alt="Gold sphere" loading="lazy">
+    <span>Gold</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/emerald-sphere.png' | relative_url }}" alt="Emerald sphere" loading="lazy">
+    <span>Emerald</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/amethyst-sphere.png' | relative_url }}" alt="Amethyst sphere" loading="lazy">
+    <span>Amethyst</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/sapphire-sphere.png' | relative_url }}" alt="Sapphire sphere" loading="lazy">
+    <span>Sapphire</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/copper-sphere.png' | relative_url }}" alt="Copper sphere" loading="lazy">
+    <span>Copper</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/obsidian-sphere.png' | relative_url }}" alt="Obsidian sphere" loading="lazy">
+    <span>Obsidian</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/alexandrite-sphere.png' | relative_url }}" alt="Alexandrite sphere" loading="lazy">
+    <span>Alexandrite</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/malachite-sphere.png' | relative_url }}" alt="Malachite sphere" loading="lazy">
+    <span>Malachite</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/neodymium-sphere.png' | relative_url }}" alt="Neodymium sphere" loading="lazy">
+    <span>Neodymium</span>
+  </a>
+</div>
+
+---
+
 ## Two materials, one voice
 
 Elements runs two independent oscillators, A and B, each shaped by its own material (they share the same geometry, rotation and lights). A **BLEND** mode decides how their spectra combine at the sample level:
@@ -60,6 +125,11 @@ Elements runs two independent oscillators, A and B, each shaped by its own mater
 - **FM**: B modulates the phase of A before wavetable readout, from subtle pitch drift at low depth to dense, DX-style inharmonic spectra at high depth.
 
 **MIX** crossfades between pure A and the blended result, **DETUNE** offsets oscillator B's pitch (±100 cents), and **DEPTH** controls modulation intensity for AM and FM. Mute A to audition B in isolation. The result is a genuinely two-voice instrument: two separate optical scenes, combined in real time.
+
+<figure class="clip">
+  <img src="{{ '/assets/images/science/blend-modes.png' | relative_url }}" alt="Waveforms of oscillators A and B and the Ring Mod, AM, XOR and FM results" loading="lazy">
+  <figcaption>Ruby (A) and Emerald (B) through each blend mode: same two materials, four very different waves.</figcaption>
+</figure>
 
 ---
 

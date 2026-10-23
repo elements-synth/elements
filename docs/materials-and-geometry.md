@@ -36,6 +36,65 @@ Each material below comes with two pictures.
 
 Both are drawn in the same reference scene: undeformed Sphere, Daylight, Thickness 0.5. Where a description mentions **the strongest harmonics**, it means the harmonics within half of the loudest one under Daylight, out of the 20 that carry the material's spectrum. Light-source behaviour is described by where the energy moves, which is what you actually hear.
 
+### All thirteen under the same light
+
+Same light, same geometry, same thickness: only the material changes. The differences in shape below are the differences you hear.
+
+<div class="gallery gallery-wide">
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/diamond-wavetable.png' | relative_url }}" alt="Diamond wavetable" loading="lazy">
+    <span>Diamond</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/water-wavetable.png' | relative_url }}" alt="Water wavetable" loading="lazy">
+    <span>Water</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/amber-wavetable.png' | relative_url }}" alt="Amber wavetable" loading="lazy">
+    <span>Amber</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/ruby-wavetable.png' | relative_url }}" alt="Ruby wavetable" loading="lazy">
+    <span>Ruby</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/gold-wavetable.png' | relative_url }}" alt="Gold wavetable" loading="lazy">
+    <span>Gold</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/emerald-wavetable.png' | relative_url }}" alt="Emerald wavetable" loading="lazy">
+    <span>Emerald</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/amethyst-wavetable.png' | relative_url }}" alt="Amethyst wavetable" loading="lazy">
+    <span>Amethyst</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/sapphire-wavetable.png' | relative_url }}" alt="Sapphire wavetable" loading="lazy">
+    <span>Sapphire</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/copper-wavetable.png' | relative_url }}" alt="Copper wavetable" loading="lazy">
+    <span>Copper</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/obsidian-wavetable.png' | relative_url }}" alt="Obsidian wavetable" loading="lazy">
+    <span>Obsidian</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/alexandrite-wavetable.png' | relative_url }}" alt="Alexandrite wavetable" loading="lazy">
+    <span>Alexandrite</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/malachite-wavetable.png' | relative_url }}" alt="Malachite wavetable" loading="lazy">
+    <span>Malachite</span>
+  </a>
+  <a class="gallery-item" href="materials-and-geometry">
+    <img src="{{ '/assets/images/materials/neodymium-wavetable.png' | relative_url }}" alt="Neodymium wavetable" loading="lazy">
+    <span>Neodymium</span>
+  </a>
+</div>
+
 ---
 
 ## Materials

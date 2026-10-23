@@ -247,3 +247,21 @@ section {
 .video-card .video-title { display: block; padding: 8px 12px 0; font-weight: 600; }
 .video-card .video-desc { display: block; padding: 2px 12px 10px; font-size: .85em; opacity: .75; }
 @media (max-width: 600px) { .video-grid { grid-template-columns: 1fr; } }
+
+/* One-sentence summaries on the science page */
+blockquote.tldr { border-left: 3px solid $accent; background: $bg2; margin: 0.6em 0 1em; padding: 0.5em 1em; }
+blockquote.tldr p { margin: 0; }
+details { margin: 1em 0; border: 1px solid $border; border-radius: 6px; background: $bg1; }
+details > summary { cursor: pointer; padding: 0.55em 1em; color: $accent; font-weight: 600; }
+details > summary:hover { color: lighten($accent, 12%); }
+details[open] > summary { border-bottom: 1px solid $border; }
+details > :not(summary) { margin-left: 1em; margin-right: 1em; }
+
+/* Landing-page hero and the material galleries */
+figure.clip.hero { margin: 1.2em auto; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 1em 0; }
+.gallery-item { display: block; text-align: center; text-decoration: none; border: 1px solid $border; border-radius: 8px; background: $bg0; padding: 6px 4px 8px; transition: border-color .2s, transform .2s; }
+.gallery-item:hover { border-color: $accent; transform: translateY(-2px); }
+.gallery-item img { display: block; width: 100%; height: auto; }
+.gallery-item span { display: block; font-size: .8em; margin-top: 4px; color: $text; }
+.gallery.gallery-wide { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
