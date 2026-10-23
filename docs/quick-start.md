@@ -91,6 +91,11 @@ This is Elements at its most expressive.
 
 Each voice has two oscillators. In **MATERIALS**, choose a different material for **MAT B**, pick a **BLEND** mode (Ring Mod, AM, XOR or FM) and raise **MIX** above 0%. The two materials now interact: try Ring Mod for metallic, inharmonic tones or AM for pulsing ones, and use **DETUNE** and **MUTE A** to hear what B adds. The arrows button between the two selectors swaps A and B.
 
+<figure class="clip">
+  <img src="{{ '/assets/images/quick-start/second-material.gif' | relative_url }}" alt="Choosing a second material for MAT B in Elements, setting the blend mode to Ring Mod and raising MIX and DETUNE" loading="lazy">
+  <figcaption>Pick a material for MAT B, choose a BLEND mode and raise MIX: the second oscillator appears in the OSC B scope and the two materials start to interact.</figcaption>
+</figure>
+
 ---
 
 ## 8. Try the Chorus
