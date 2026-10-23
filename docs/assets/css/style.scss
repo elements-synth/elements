@@ -257,8 +257,7 @@ details > summary:hover { color: lighten($accent, 12%); }
 details[open] > summary { border-bottom: 1px solid $border; }
 details > :not(summary) { margin-left: 1em; margin-right: 1em; }
 
-/* Landing-page hero and the material galleries */
-figure.clip.hero { margin: 1.2em auto; }
+/* Landing-page material galleries */
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 1em 0; }
 .gallery-item { display: block; text-align: center; text-decoration: none; border: 1px solid $border; border-radius: 8px; background: $bg0; padding: 6px 4px 8px; transition: border-color .2s, transform .2s; }
 .gallery-item:hover { border-color: $accent; transform: translateY(-2px); }

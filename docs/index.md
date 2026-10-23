@@ -9,10 +9,6 @@ description: A synthesizer where light meets sound.
 
 [Quick Start](quick-start) · [Installation](installation) · [Materials & Geometry](materials-and-geometry) · [Parameters](parameters) · [Known Issues](known-issues) · [The Science](science)
 
-<figure class="clip hero">
-  <img src="{{ '/assets/images/hero.gif' | relative_url }}" alt="The Elements plugin: a sphere deforming into a crystalline star while the spectrum and oscilloscope move" loading="eager">
-</figure>
-
 ---
 
 ## Video demos
