@@ -266,7 +266,7 @@ details > :not(summary) { margin-left: 1em; margin-right: 1em; }
 .gallery.gallery-wide { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 
 /* Parameters page: UI screenshot strips and the clickable overview */
-figure.clip.shot img { width: auto; max-width: 100%; }
+figure.clip.shot img { max-width: 100%; height: auto; }
 figure.clip.overview { max-width: 900px; }
 .pins { position: relative; line-height: 0; }
 .pins img { width: 100%; height: auto; }

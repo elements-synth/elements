@@ -75,7 +75,7 @@ Rotates the geometry on each axis. Rotation changes the angle at which the light
 {: .tldr}
 
 <figure class="clip shot">
-  <img src="{{ '/assets/images/ui/lights.png' | relative_url }}" alt="The Lights bar with the Key, Fill and Rim slots" style="max-width:771px" loading="lazy">
+  <img src="{{ '/assets/images/ui/lights.png' | relative_url }}" alt="The Lights bar with the Key, Fill and Rim slots" style="width:771px" loading="lazy">
   <figcaption>The Lights bar at the bottom of the viewport: a switch, a source and an intensity for each slot.</figcaption>
 </figure>
 
@@ -118,7 +118,7 @@ In Physical envelope mode, the average intensity of the active lights also sets 
 {: .tldr}
 
 <figure class="clip shot">
-  <img src="{{ '/assets/images/ui/blend.png' | relative_url }}" alt="The MATERIALS panel with MAT A, MAT B, Blend, Mix, Detune and Depth" style="max-width:387px" loading="lazy">
+  <img src="{{ '/assets/images/ui/blend.png' | relative_url }}" alt="The MATERIALS panel with MAT A, MAT B, Blend, Mix, Detune and Depth" style="width:387px" loading="lazy">
   <figcaption>Open <strong>MATERIALS</strong> to reach the blend controls.</figcaption>
 </figure>
 
@@ -176,7 +176,7 @@ Removes oscillator A from the blend so you can hear oscillator B on its own. A m
 {: .tldr}
 
 <figure class="clip shot">
-  <img src="{{ '/assets/images/ui/amp-env.png' | relative_url }}" alt="The AMP ENV panel" style="max-width:294px" loading="lazy">
+  <img src="{{ '/assets/images/ui/amp-env.png' | relative_url }}" alt="The AMP ENV panel" style="width:294px" loading="lazy">
   <figcaption>The AMP ENV panel: the mode selector, the four knobs and the envelope shape.</figcaption>
 </figure>
 
@@ -234,7 +234,7 @@ Time to fall from the sustain level to silence after a note is released. Ignored
 {: .tldr}
 
 <figure class="clip shot">
-  <img src="{{ '/assets/images/ui/filter.png' | relative_url }}" alt="The FILTER panel" style="max-width:294px" loading="lazy">
+  <img src="{{ '/assets/images/ui/filter.png' | relative_url }}" alt="The FILTER panel" style="width:294px" loading="lazy">
   <figcaption>The FILTER panel: type, Cutoff and Reso, the filter envelope and its Amt.</figcaption>
 </figure>
 
@@ -330,7 +330,7 @@ Release time of the filter envelope.
 {: .tldr}
 
 <figure class="clip shot">
-  <img src="{{ '/assets/images/ui/deformer.png' | relative_url }}" alt="The GEOMETRIES panel with Geo, Thickness, Deform, Noise, Freq and Rate" style="max-width:386px" loading="lazy">
+  <img src="{{ '/assets/images/ui/deformer.png' | relative_url }}" alt="The GEOMETRIES panel with Geo, Thickness, Deform, Noise, Freq and Rate" style="width:386px" loading="lazy">
   <figcaption>Open <strong>GEOMETRIES</strong> to reach Thickness and the Deformer controls.</figcaption>
 </figure>
 
@@ -380,7 +380,7 @@ The character of the noise field.
 {: .tldr}
 
 <figure class="clip shot">
-  <img src="{{ '/assets/images/ui/chorus.png' | relative_url }}" alt="The Chorus controls: Voices, Spread, Decay and Wobble" style="max-width:226px" loading="lazy">
+  <img src="{{ '/assets/images/ui/chorus.png' | relative_url }}" alt="The Chorus controls: Voices, Spread, Decay and Wobble" style="width:226px" loading="lazy">
   <figcaption>The Chorus controls at the top left of the viewport (hidden while GEOMETRIES or MATERIALS is open).</figcaption>
 </figure>
 
@@ -430,7 +430,7 @@ How much each copy's delay drifts over time. This movement is what makes it soun
 {: .tldr}
 
 <figure class="clip shot">
-  <img src="{{ '/assets/images/ui/output.png' | relative_url }}" alt="The octave selector and the Volume knob" style="max-width:384px" loading="lazy">
+  <img src="{{ '/assets/images/ui/output.png' | relative_url }}" alt="The octave selector and the Volume knob" style="width:384px" loading="lazy">
   <figcaption>The octave selector (OCT, bottom left) and the Volume knob (bottom right).</figcaption>
 </figure>
 
