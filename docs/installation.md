@@ -10,7 +10,7 @@ title: Installation · Elements
 ## Requirements
 
 **macOS**
-- macOS 12 (Monterey) or later
+- macOS 13 (Ventura) or later
 - Apple Silicon or Intel Mac (Universal Binary)
 - A VST3 compatible host (Ableton Live, Bitwig, Reaper, FL Studio, etc.)
 
