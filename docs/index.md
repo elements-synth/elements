@@ -5,7 +5,7 @@ description: A synthesizer where light meets sound.
 ---
 
 **[Download v1.0.0 for macOS & Windows](https://github.com/elements-synth/elements/releases/latest)**
-*VST3 · macOS Universal Binary (Apple Silicon + Intel) · Windows x64 · Free*
+*VST3 and Standalone · macOS Universal Binary (Apple Silicon + Intel) · Windows x64 · Free*
 
 [Quick Start](quick-start) · [Installation](installation) · [Materials & Geometry](materials-and-geometry) · [Parameters](parameters) · [Known Issues](known-issues) · [The Science](science)
 

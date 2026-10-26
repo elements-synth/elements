@@ -47,7 +47,7 @@ If you run into it, please [open an issue](https://github.com/elements-synth/ele
 
 ## Host compatibility
 
-Elements uses JUCE's generic VST3 implementation with no host-specific workarounds. It is released as VST3 only, so there is no AU build for now.
+Elements uses JUCE's generic VST3 implementation with no host-specific workarounds. Elements is released as VST3 and as a Standalone app. There is no AU build for now.
 
 **Bitwig Studio**: Bitwig aggressively caches VST3 parameter layouts. If you update Elements to a version that adds new parameters, you will need to recreate the instrument track (rescanning plugins is not enough) for Bitwig to recognize the new parameters.
 
@@ -61,7 +61,7 @@ Elements uses JUCE's generic VST3 implementation with no host-specific workaroun
 
 **Occasional saturation**: With spectrally dense materials and high polyphony, the output signal can clip. A soft clipper (tanh) is in place but there is no full limiter. If you experience saturation, reduce the light intensities or the number of simultaneous voices.
 
-**Apple Silicon + Intel**: Elements is a Universal Binary, running natively on both Apple Silicon and Intel Macs. A Windows x64 build is also provided, but it is built automatically and is less tested than the macOS version.
+**Apple Silicon + Intel**: Elements is a Universal Binary, running natively on both Apple Silicon and Intel Macs. A Windows x64 build (VST3 and Standalone) is also provided, but it is built automatically and is less tested than the macOS version.
 
 **Deformer is Sphere-only**: The Geometric Deformer works on the Sphere geometry only. With the other geometries its controls are greyed out and the sound is not deformed.
 

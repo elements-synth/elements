@@ -41,8 +41,8 @@ Core functionality working:
 
 | Platform | Format | Status |
 |----------|--------|--------|
-| macOS 13+ (Universal Binary) | VST3 | Primary platform |
-| Windows 10/11 x64 | VST3 | Supported (see note below) |
+| macOS 13+ (Universal Binary) | VST3, Standalone | Primary platform |
+| Windows 10/11 x64 | VST3, Standalone | Supported (see note below) |
 
 > **Note:** Elements is developed primarily for macOS. The Windows build is compiled automatically via GitHub Actions and may contain bugs or visual differences not present in the Mac version.
 
