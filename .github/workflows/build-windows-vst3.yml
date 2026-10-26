@@ -25,8 +25,17 @@ jobs:
       - name: Build VST3
         run: cmake --build build --config Release --target Elements_VST3
 
+      - name: Build Standalone
+        run: cmake --build build --config Release --target Elements_Standalone
+
       - name: Upload VST3 artifact
         uses: actions/upload-artifact@v6
         with:
           name: Elements-VST3-Windows-x64
           path: build/Elements_artefacts/Release/VST3/Elements.vst3
+
+      - name: Upload Standalone artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: Elements-Standalone-Windows-x64
+          path: build/Elements_artefacts/Release/Standalone/Elements.exe
