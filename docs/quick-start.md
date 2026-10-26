@@ -13,7 +13,7 @@ Your first sounds, step by step.
 
 ## 1. Load Elements in your DAW
 
-Open Elements as a VST3 or AU instrument (or run the Standalone app). If this is your first time, refer to the [Installation guide](installation) for setup instructions including the Gatekeeper bypass required on macOS.
+Open Elements as a VST3 instrument. If this is your first time, refer to the [Installation guide](installation) for setup instructions including the Gatekeeper bypass required on macOS.
 
 A new instance starts with a ready-made scene: **Diamond** on a **Sphere**, lit by the **Key** light (Sunset, intensity 0.5). Play a note and you will already hear it.
 

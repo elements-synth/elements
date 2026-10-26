@@ -33,7 +33,7 @@ Core functionality working:
 - **Chorus** — duplicates the object into a trail receding behind it, in sound and in the viewport
 - **Transpose** (-2 to +2 octaves)
 - Polyphonic wavetable synthesis (8 voices, band-limited, 10 octave bands up to Nyquist)
-- Biquad filter (LP/HP/BP), ADSR envelope, ADSR graph display
+- 12 dB/oct state-variable filter (LP/HP/BP), ADSR envelope, ADSR graph display
 - Anti-click system (crossfades, voice stealing, retrigger fades)
 - Volume and all key parameters are DAW-automatable via APVTS
 

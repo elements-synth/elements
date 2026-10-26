@@ -19,7 +19,7 @@ Elements has its own preset system: 15 factory presets plus SAVE / DEL for your 
 
 ## Polyphony
 
-Elements has a fixed limit of **8 voices**. When a ninth note arrives, the oldest held voice is taken over for the new note, with a short (~5.8 ms) anti-click fade-in. In practice no note is dropped, but with long release times and fast passages you will hear the oldest notes cut short to make room.
+Elements has a fixed limit of **8 voices**. When a ninth note arrives, the oldest held voice is taken over for the new note, with a short (about 5 to 6 ms) anti-click fade-in. In practice no note is dropped, but with long release times and fast passages you will hear the oldest notes cut short to make room.
 
 ---
 
@@ -47,11 +47,11 @@ If you run into it, please [open an issue](https://github.com/elements-synth/ele
 
 ## Host compatibility
 
-Elements uses JUCE's generic VST3 and AU implementation with no host-specific workarounds.
+Elements uses JUCE's generic VST3 implementation with no host-specific workarounds. It is released as VST3 only, so there is no AU build for now.
 
 **Bitwig Studio**: Bitwig aggressively caches VST3 parameter layouts. If you update Elements to a version that adds new parameters, you will need to recreate the instrument track (rescanning plugins is not enough) for Bitwig to recognize the new parameters.
 
-**Logic Pro (AU)**: Not extensively tested. The AU wrapper is JUCE's generic implementation with no Logic-specific adaptations. No issues are known, but full compatibility cannot be guaranteed.
+**Logic Pro**: Logic loads Audio Units only, so Elements does not currently work there (no AU build is released).
 
 **Other DAWs**: Not tested. Elements declares mono and stereo support, accepts standard MIDI, and reports a 5-second tail length for release.
 

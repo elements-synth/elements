@@ -656,7 +656,7 @@ For Gold and Copper the curve is a reflectance (section 4). For all others it is
 - [Beer-Lambert law (RP Photonics)](https://www.rp-photonics.com/beer_lambert_law.html): technical reference
 
 **Schlick approximation**
-- Schlick, C. (1994). *An Inexpensive BDRF Model for Physically-based Rendering*. Computer Graphics Forum, 13(3), 233–246. Original paper describing the Fresnel approximation used for metals in Elements.
+- Schlick, C. (1994). *An Inexpensive BRDF Model for Physically-based Rendering*. Computer Graphics Forum, 13(3), 233–246. Original paper describing the Fresnel approximation used for metals in Elements.
 
 **Metals and complex refractive index**
 - Palik, E.D. (1985). *Handbook of Optical Constants of Solids*. Source of the `n` and `k` values for Gold and Copper.
