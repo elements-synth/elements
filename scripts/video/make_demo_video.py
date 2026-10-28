@@ -5,15 +5,15 @@
   python3 scripts/video/make_demo_video.py INPUT.mp4 OUTPUT.mp4 --title "The Deformer" \\
       --subtitle "The Deformer as a sound shaping tool. Noise types + wavefolding" \\
       [--material 12] [--thickness 0.36] [--deform 1] [--noise 0] [--freq 2.8] [--time 3] [--no-sphere] \\
-      [--fade-start 50] [--intro 3.5] [--version v1.0.0] [--no-bars] [--bars-opacity 0.30]
+      [--fade-start 50] [--intro 3.5] [--version v1.0.0] [--no-bars] [--bars-opacity 0.22]
 
 --material: index in the plugin (0 Diamond, 1 Water, 2 Amber, 3 Ruby, 4 Gold, 5 Emerald, 6 Amethyst, 7 Sapphire,
             8 Copper, 9 Obsidian, 10 Alexandrite, 11 Malachite, 12 Neodymium). --noise: 0 Simplex, 1 Alligator, 2 Worley.
 --time: the animation moment of the noise field (pick one you like; look at --keep-dir output).
 Template defaults: 3.5 s intro with 0.7 s fades, silent; fade-out of image AND sound from --fade-start to the end.
 16:9 canvas (Oct 28): a capture narrower than 16:9 is centred on a 16:9 canvas. The intro card is a full 16:9 card (no
-effects). Behind the capture, soft light in the Spectrum display's colours (380-780 nm, the plugin's own wavelengthToColour,
-split in two halves, violet..green left / yellow..red right, high frequencies on top) spills from the capture's left and
+effects). Behind the capture, soft light in the Elements logo's colours (blue -> teal -> green, split in two halves, blue..teal
+left / teal..green right, high frequencies on top) spills from the capture's left and
 right edges and brightens with the capture's audio (FFT). Dim by design (--bars-opacity). --no-bars keeps the old
 native-size output.
 """
@@ -44,6 +44,13 @@ def wl2rgb(w):
     elif w > 700: f = 0.3 + 0.7 * (780 - w) / 80
     return np.array([r * f, g * f, b * f])
 
+# Elements logo gradient (blue -> teal -> green), sampled from Source/elements-logo.png
+LOGO_RAMP = [(0.0, (90, 140, 230)), (0.35, (75, 180, 220)), (0.7, (55, 212, 185)), (1.0, (60, 224, 140))]
+
+def logo_colour(t):
+    xs = [p for p, _ in LOGO_RAMP]
+    return np.array([np.interp(t, xs, [c[i] for _, c in LOGO_RAMP]) for i in range(3)])
+
 def band_levels(audio_in, nframes):
     """(frames, 2*N_BARS) levels 0..1; index 0 = violet/highest frequency, last = red/lowest."""
     sr = 48000
@@ -72,10 +79,10 @@ def band_levels(audio_in, nframes):
     return out
 
 def write_glow(proc, levels, side, H, opacity):
-    """Soft spectrum light spilling out of the capture's left/right edges (not bars): each strip is the plugin's
-    spectrum colours running top to bottom (violet..green left, yellow..red right); brightness follows the audio."""
+    """Soft light spilling out of the capture's left/right edges (not bars): the Elements logo's blue->green gradient
+    split in two halves (blue..teal left, teal..green right), top to bottom; brightness follows the audio."""
     nb = 2 * N_BARS; Ws = 2 * side
-    cols = np.array([wl2rgb(380 + 400 * i / nb) for i in range(nb)]) * 255
+    cols = np.array([logo_colour(i / (nb - 1)) for i in range(nb)])
     yy = np.linspace(0, N_BARS - 1, H)
     colrow = [np.stack([np.interp(yy, np.arange(N_BARS), cols[h * N_BARS:(h + 1) * N_BARS, c]) for c in range(3)], 1) for h in (0, 1)]
     d = np.arange(side) / side                        # 0 at the capture's edge, 1 at the screen edge
@@ -89,7 +96,7 @@ def write_glow(proc, levels, side, H, opacity):
             for h in (0, 1):
                 prof = lv[h * N_BARS:(h + 1) * N_BARS]
                 for _ in range(2): prof = np.convolve(np.pad(prof, 1, mode="edge"), k3, "valid")
-                I = np.interp(yy, np.arange(N_BARS), 0.10 + 0.90 * prof)[:, None] * falls[h] * opacity
+                I = np.interp(yy, np.arange(N_BARS), 0.08 + 0.92 * prof)[:, None] * falls[h] * opacity
                 frame[:, h * side:(h + 1) * side] = (bg + (colrow[h][:, None, :] - bg) * I[..., None]).astype(np.uint8)
             proc.stdin.write(frame.tobytes())
         proc.stdin.close()
@@ -126,7 +133,7 @@ def main():
     p.add_argument("--no-sphere", action="store_true"); p.add_argument("--sphere-png", help="use this PNG instead of rendering")
     p.add_argument("--intro", type=float, default=3.5); p.add_argument("--fade-start", type=float, default=50.0)
     p.add_argument("--no-bars", action="store_true", help="keep the native capture size (no 16:9 canvas / spectrum strips)")
-    p.add_argument("--bars-opacity", type=float, default=0.30)
+    p.add_argument("--bars-opacity", type=float, default=0.22)
     p.add_argument("--keep-dir", help="keep the intermediate PNGs here")
     a = p.parse_args()
     d = a.keep_dir or tempfile.mkdtemp(prefix="elements_video_"); os.makedirs(d, exist_ok=True)
