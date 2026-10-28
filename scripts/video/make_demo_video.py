@@ -5,16 +5,17 @@
   python3 scripts/video/make_demo_video.py INPUT.mp4 OUTPUT.mp4 --title "The Deformer" \\
       --subtitle "The Deformer as a sound shaping tool. Noise types + wavefolding" \\
       [--material 12] [--thickness 0.36] [--deform 1] [--noise 0] [--freq 2.8] [--time 3] [--no-sphere] \\
-      [--fade-start 50] [--intro 3.5] [--version v1.0.0] [--no-bars] [--bars-opacity 0.38]
+      [--fade-start 50] [--intro 3.5] [--version v1.0.0] [--no-bars] [--bars-opacity 0.30]
 
 --material: index in the plugin (0 Diamond, 1 Water, 2 Amber, 3 Ruby, 4 Gold, 5 Emerald, 6 Amethyst, 7 Sapphire,
             8 Copper, 9 Obsidian, 10 Alexandrite, 11 Malachite, 12 Neodymium). --noise: 0 Simplex, 1 Alligator, 2 Worley.
 --time: the animation moment of the noise field (pick one you like; look at --keep-dir output).
 Template defaults: 3.5 s intro with 0.7 s fades, silent; fade-out of image AND sound from --fade-start to the end.
-16:9 canvas (Oct 28): a capture narrower than 16:9 is centred on a 16:9 canvas and the side strips are filled with the
-Spectrum display's colours (380-780 nm, the plugin's own wavelengthToColour) split in two halves, dim and driven by the
-capture's audio (FFT). As in the plugin, the lowest frequencies are the red end (right) and the highest the violet end
-(left). --no-bars keeps the old native-size output.
+16:9 canvas (Oct 28): a capture narrower than 16:9 is centred on a 16:9 canvas. The intro card is a full 16:9 card (no
+effects). Behind the capture, soft light in the Spectrum display's colours (380-780 nm, the plugin's own wavelengthToColour,
+split in two halves, violet..green left / yellow..red right, high frequencies on top) spills from the capture's left and
+right edges and brightens with the capture's audio (FFT). Dim by design (--bars-opacity). --no-bars keeps the old
+native-size output.
 """
 import argparse, os, subprocess, sys, tempfile
 import numpy as np
@@ -43,7 +44,7 @@ def wl2rgb(w):
     elif w > 700: f = 0.3 + 0.7 * (780 - w) / 80
     return np.array([r * f, g * f, b * f])
 
-def band_levels(audio_in, intro, total_frames):
+def band_levels(audio_in, nframes):
     """(frames, 2*N_BARS) levels 0..1; index 0 = violet/highest frequency, last = red/lowest."""
     sr = 48000
     raw = subprocess.run(["ffmpeg", "-v", "error", "-i", audio_in, "-vn", "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"],
@@ -54,12 +55,10 @@ def band_levels(audio_in, intro, total_frames):
     win_n = 4096; win = np.hanning(win_n).astype(np.float32)
     bins = np.fft.rfftfreq(win_n, 1 / sr)
     tilt = 3.0 * np.log2(freqs / 1000.0)            # +3 dB/oct: compensates the natural spectral slope
-    db = np.full((total_frames, nb), -200.0)
+    db = np.full((nframes, nb), -200.0)
     pad = np.concatenate([np.zeros(win_n // 2, np.float32), x, np.zeros(win_n, np.float32)])
-    for k in range(total_frames):
-        t = k / FPS - intro
-        if t < 0: continue
-        c = int(t * sr)
+    for k in range(nframes):
+        c = int(k / FPS * sr)
         seg = pad[c:c + win_n]
         if len(seg) < win_n or not seg.any(): continue
         mag = np.abs(np.fft.rfft(seg * win)) / win_n
@@ -68,26 +67,31 @@ def band_levels(audio_in, intro, total_frames):
     ref = np.percentile(live, 99.5) if live.size else 0.0
     lvl = np.clip((db - (ref - 48)) / 48, 0, 1) ** 1.3
     out = np.zeros_like(lvl); y = np.zeros(nb)
-    for k in range(total_frames):                    # instant attack, smooth release
-        y = np.maximum(lvl[k], y * 0.93); out[k] = y
+    for k in range(nframes):                         # instant attack, slow release
+        y = np.maximum(lvl[k], y * 0.95); out[k] = y
     return out
 
-def write_bars(proc, levels, side, H, opacity):
+def write_glow(proc, levels, side, H, opacity):
+    """Soft spectrum light spilling out of the capture's left/right edges (not bars): each strip is the plugin's
+    spectrum colours running top to bottom (violet..green left, yellow..red right); brightness follows the audio."""
     nb = 2 * N_BARS; Ws = 2 * side
     cols = np.array([wl2rgb(380 + 400 * i / nb) for i in range(nb)]) * 255
-    xs = np.arange(Ws); half = xs // side; xin = xs - half * side
-    pos = xin * N_BARS / side; k = np.floor(pos).astype(int); gap = (pos - k) > 0.83
-    idx = half * N_BARS + np.minimum(k, N_BARS - 1)
-    vf = (0.55 + 0.45 * np.arange(H) / H)[:, None, None]         # brighter at the base, dimmer at the top
-    bg = np.array(BG, float)[None, None, :]
-    barfull = (bg + (cols[idx][None, :, :] - bg) * opacity * vf).astype(np.uint8)
-    bgfull = np.broadcast_to(np.array(BG, np.uint8), (H, Ws, 3))
-    ys = np.arange(H)[:, None]
+    yy = np.linspace(0, N_BARS - 1, H)
+    colrow = [np.stack([np.interp(yy, np.arange(N_BARS), cols[h * N_BARS:(h + 1) * N_BARS, c]) for c in range(3)], 1) for h in (0, 1)]
+    d = np.arange(side) / side                        # 0 at the capture's edge, 1 at the screen edge
+    fall = np.exp(-d / 0.42)[None, :] * (1 - d ** 2)[None, :]
+    falls = [fall[:, ::-1], fall]                     # left strip: edge on the right; right strip: edge on the left
+    bg = np.array(BG, np.float32)[None, None, :]
+    k3 = np.array([1, 2, 1]) / 4
     try:
         for lv in levels:
-            hpx = (0.012 + 0.70 * lv) * H
-            mask = (ys >= (H - hpx[idx])[None, :]) & (~gap)[None, :]
-            proc.stdin.write(np.where(mask[..., None], barfull, bgfull).tobytes())
+            frame = np.empty((H, Ws, 3), np.uint8)
+            for h in (0, 1):
+                prof = lv[h * N_BARS:(h + 1) * N_BARS]
+                for _ in range(2): prof = np.convolve(np.pad(prof, 1, mode="edge"), k3, "valid")
+                I = np.interp(yy, np.arange(N_BARS), 0.10 + 0.90 * prof)[:, None] * falls[h] * opacity
+                frame[:, h * side:(h + 1) * side] = (bg + (colrow[h][:, None, :] - bg) * I[..., None]).astype(np.uint8)
+            proc.stdin.write(frame.tobytes())
         proc.stdin.close()
     except BrokenPipeError:   # ffmpeg finished first (overlay eof_action=endall): the output is complete
         pass
@@ -122,7 +126,7 @@ def main():
     p.add_argument("--no-sphere", action="store_true"); p.add_argument("--sphere-png", help="use this PNG instead of rendering")
     p.add_argument("--intro", type=float, default=3.5); p.add_argument("--fade-start", type=float, default=50.0)
     p.add_argument("--no-bars", action="store_true", help="keep the native capture size (no 16:9 canvas / spectrum strips)")
-    p.add_argument("--bars-opacity", type=float, default=0.38)
+    p.add_argument("--bars-opacity", type=float, default=0.30)
     p.add_argument("--keep-dir", help="keep the intermediate PNGs here")
     a = p.parse_args()
     d = a.keep_dir or tempfile.mkdtemp(prefix="elements_video_"); os.makedirs(d, exist_ok=True)
@@ -131,37 +135,37 @@ def main():
     sphere = a.sphere_png
     if not a.no_sphere and not sphere:
         sphere = os.path.join(d, "sphere.png"); render_sphere(a, d, sphere)
-    card = os.path.join(d, "intro.png")
-    subprocess.check_call([sys.executable, os.path.join(ROOT, "scripts", "video", "make_intro_card.py"), card, a.title, a.subtitle, a.version, sphere or "-", str(W), str(H)], cwd=ROOT)
     f = max(dur - a.fade_start, 0.1)
     CW = int(round(H * 16 / 9 / 2)) * 2
     bars = not a.no_bars and CW > W and (CW - W) % 2 == 0
     BGHEX = "0x%02x%02x%02x" % BG
+    card = os.path.join(d, "intro.png")
+    cardargs = [str(CW if bars else W), str(H)] + ([str(W)] if bars else [])
+    subprocess.check_call([sys.executable, os.path.join(ROOT, "scripts", "video", "make_intro_card.py"), card, a.title, a.subtitle, a.version, sphere or "-"] + cardargs, cwd=ROOT)
     enc = ["-r", str(FPS), "-c:v", "libx264", "-crf", "17", "-preset", "slow", "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", a.output]
+    intro = (f"[0:v]format=yuv420p,fade=t=in:st=0:d=0.7,fade=t=out:st={a.intro-0.7}:d=0.7,setsar=1[iv];"
+             f"anullsrc=r=48000:cl=stereo,atrim=0:{a.intro},asetpts=N/SR/TB[ia];")
+    audio = f"[1:a]afade=t=out:st={a.fade_start}:d={f:.2f}[ma];"
+    inp = ["ffmpeg", "-y", "-v", "error", "-loop", "1", "-framerate", str(FPS), "-t", str(a.intro), "-i", card, "-i", a.input]
     if not bars:
-        graph = (f"[0:v]format=yuv420p,fade=t=in:st=0:d=0.7,fade=t=out:st={a.intro-0.7}:d=0.7,setsar=1[iv];"
-                 f"anullsrc=r=48000:cl=stereo,atrim=0:{a.intro},asetpts=N/SR/TB[ia];"
-                 f"[1:v]fade=t=out:st={a.fade_start}:d={f-0.1:.2f},setsar=1[mv];[1:a]afade=t=out:st={a.fade_start}:d={f:.2f}[ma];"
-                 "[iv][ia][mv][ma]concat=n=2:v=1:a=1[v][a]")
-        subprocess.check_call(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-framerate", str(FPS), "-t", str(a.intro), "-i", card, "-i", a.input,
-                               "-filter_complex", graph, "-map", "[v]", "-map", "[a]"] + enc)
+        graph = (intro + f"[1:v]fade=t=out:st={a.fade_start}:d={f-0.1:.2f},setsar=1[mv];" + audio + "[iv][ia][mv][ma]concat=n=2:v=1:a=1[v][a]")
+        subprocess.check_call(inp + ["-filter_complex", graph, "-map", "[v]", "-map", "[a]"] + enc)
     else:
-        side = (CW - W) // 2; total = a.intro + dur; nfr = int(round(total * FPS))
-        levels = band_levels(a.input, a.intro, nfr)
-        ft = a.intro + a.fade_start
-        graph = (f"[0:v]format=yuv420p,fade=t=in:st=0:d=0.7:color={BGHEX},fade=t=out:st={a.intro-0.7}:d=0.7:color={BGHEX},setsar=1[iv];"
-                 f"anullsrc=r=48000:cl=stereo,atrim=0:{a.intro},asetpts=N/SR/TB[ia];"
-                 f"[1:v]fade=t=out:st={a.fade_start}:d={f-0.1:.2f},setsar=1[mv];[1:a]afade=t=out:st={a.fade_start}:d={f:.2f}[ma];"
-                 "[iv][ia][mv][ma]concat=n=2:v=1:a=1[m][a];"
+        side = (CW - W) // 2; nfr = int(round(dur * FPS))
+        levels = band_levels(a.input, nfr)
+        grad = np.repeat(np.linspace(0, 1, H)[:, None, None], CW, 1)             # same top-to-bottom gradient as the intro card
+        c0, c1 = np.array((17, 24, 32), float), np.array(BG, float)
+        Image.fromarray((c0 + (c1 - c0) * grad).astype(np.uint8)).save(os.path.join(d, "bg.png"))
+        graph = (intro + audio +
                  f"[2:v]split[sa][sb];[sa]crop={side}:{H}:0:0[L];[sb]crop={side}:{H}:{side}:0[R];"
-                 f"color=c={BGHEX}:s={CW}x{H}:r={FPS}:d={total:.3f}[bg];[bg][L]overlay=0:0[b1];[b1][R]overlay={CW-side}:0,format=yuv420p,"
-                 f"fade=t=in:st=0:d=0.7,fade=t=out:st={ft:.3f}:d={f-0.1:.2f}[base];"
-                 f"[base][m]overlay={side}:0:eof_action=endall,setsar=1[v]")
-        proc = subprocess.Popen(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-framerate", str(FPS), "-t", str(a.intro), "-i", card, "-i", a.input,
-                                 "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{2*side}x{H}", "-framerate", str(FPS), "-i", "pipe:0",
-                                 "-filter_complex", graph, "-map", "[v]", "-map", "[a]"] + enc, stdin=subprocess.PIPE)
-        write_bars(proc, levels, side, H, a.bars_opacity)
+                 f"[3:v][L]overlay=0:0[b1];[b1][R]overlay={CW-side}:0[b2];[b2][1:v]overlay={side}:0:eof_action=endall,format=yuv420p,"
+                 f"fade=t=out:st={a.fade_start}:d={f-0.1:.2f},setsar=1[mv];"
+                 "[iv][ia][mv][ma]concat=n=2:v=1:a=1[v][a]")
+        proc = subprocess.Popen(inp + ["-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{2*side}x{H}", "-framerate", str(FPS), "-i", "pipe:0",
+                                       "-loop", "1", "-framerate", str(FPS), "-t", f"{dur + 1:.3f}", "-i", os.path.join(d, "bg.png"),
+                                       "-filter_complex", graph, "-map", "[v]", "-map", "[a]"] + enc, stdin=subprocess.PIPE)
+        write_glow(proc, levels, side, H, a.bars_opacity)
         if proc.wait(): sys.exit("ffmpeg failed")
     print("wrote", a.output, "| intermediates:", d)
 

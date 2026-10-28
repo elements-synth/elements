@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Render an Elements-style intro card PNG.
-  python3 scripts/video/make_intro_card.py out.png "The Deformer" "Subtitle" [version] [image.png|-] [W H]
+  python3 scripts/video/make_intro_card.py out.png "The Deformer" "Subtitle" [version] [image.png|-] [W H [BASE_W]]
+  BASE_W: size the layout was designed at (default W). If W > BASE_W the card is a wider canvas: same absolute sizes, no border.
 """
 import sys
 from PIL import Image, ImageDraw, ImageFont
@@ -9,6 +10,7 @@ out, title, sub = sys.argv[1:4]
 ver = sys.argv[4] if len(sys.argv) > 4 else "v1.0.0"
 pic = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] != "-" else None
 W, H = (int(sys.argv[6]), int(sys.argv[7])) if len(sys.argv) > 7 else (1428, 1080)
+BW = int(sys.argv[8]) if len(sys.argv) > 8 else W
 img = Image.new("RGB", (W, H), BG0)
 px = img.load()
 for y in range(H):                       # same top-to-bottom gradient as the docs
@@ -17,10 +19,10 @@ for y in range(H):                       # same top-to-bottom gradient as the do
     for x in range(W): px[x, y] = c
 d = ImageDraw.Draw(img)
 logo = Image.open("Source/elements-logo.png").convert("RGBA")
-lw = int(W * 0.31); logo = logo.resize((lw, int(logo.height * lw / logo.width)), Image.LANCZOS)
-bold = ImageFont.truetype("Source/JetBrainsMono-Bold.ttf", int(W * 0.0235))
-reg = ImageFont.truetype("Source/JetBrainsMono-Regular.ttf", int(W * 0.012))
-verf = ImageFont.truetype("Source/JetBrainsMono-Regular.ttf", int(W * 0.0105))
+lw = int(BW * 0.31); logo = logo.resize((lw, int(logo.height * lw / logo.width)), Image.LANCZOS)
+bold = ImageFont.truetype("Source/JetBrainsMono-Bold.ttf", int(BW * 0.0235))
+reg = ImageFont.truetype("Source/JetBrainsMono-Regular.ttf", int(BW * 0.012))
+verf = ImageFont.truetype("Source/JetBrainsMono-Regular.ttf", int(BW * 0.0105))
 gap1, gap2, gap3, rule = int(H * 0.025), int(H * 0.06), int(H * 0.025), int(H * 0.04)
 if pic:
     pi = Image.open(pic).convert("RGBA"); pi = pi.crop(pi.getbbox())
@@ -38,5 +40,5 @@ if pic:
 centred(title, y, bold, AMETHYST); y += th + rule // 2
 d.line([(W * 0.46, y), (W * 0.54, y)], fill=ACCENT, width=2); y += rule // 2 + gap3
 centred(sub, y, reg, MID)
-d.rectangle([14, 14, W - 15, H - 15], outline=BORDER, width=1)
+if BW == W: d.rectangle([14, 14, W - 15, H - 15], outline=BORDER, width=1)
 img.save(out)
